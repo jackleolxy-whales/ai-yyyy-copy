@@ -3584,6 +3584,14 @@ Now, I give you the json:</textarea>
             const successCount = results.filter(r => r.success).length;
             const totalCount = results.length;
 
+            // 确保进度显示为100%完成
+            updateStepProgress(3, 100);
+            showPersonAnalysisProgress(
+                `人物分析完成！成功处理 ${successCount}/${totalCount} 个结果`,
+                totalCount,
+                totalCount
+            );
+
             if (successCount === totalCount) {
                 setStepStatus(3, 'completed', '已完成');
             } else if (successCount > 0) {
@@ -3592,9 +3600,15 @@ Now, I give you the json:</textarea>
                 setStepStatus(3, 'error', '分析失败');
             }
 
-            updateStepProgress(3, 100);
+            // 显示结果
             showPersonAnalysisBatchResults(results);
-            resetPersonAnalysisInterface();
+
+            // 重置按钮状态但不重置进度条
+            const startBtn = document.getElementById('startPersonAnalysisBtn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-users"></i> 开始人物分析';
+            }
         }
 
         // 显示人物分析结果
@@ -3902,17 +3916,7 @@ Now, I give you the json:</textarea>
         }
 
         // 重置第三步分析界面
-        function resetPersonAnalysisInterface() {
-            const startBtn = document.getElementById('startPersonAnalysisBtn');
-            if (startBtn) {
-                startBtn.disabled = false;
-                startBtn.innerHTML = '<i class="fas fa-users"></i> 开始人物分析';
-            }
-
-            setStepStatus(3, 'waiting', '等待中');
-            updateStepProgress(3, 0);
-        }
-
+  
         // 存储DeepSeek结果
         function storeDeepSeekResults(results) {
             if (Array.isArray(results)) {
