@@ -1117,6 +1117,14 @@
                                     <div class="step-title">分时间戳人物分析</div>
                                     <div class="step-status" id="step3Status">等待中</div>
                                 </div>
+                                <div class="step-item" id="step4">
+                                    <div class="step-circle">
+                                        <span class="step-number">4</span>
+                                        <i class="fas fa-code-merge step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">JSON拼接</div>
+                                    <div class="step-status" id="step4Status">等待中</div>
+                                </div>
                             </div>
                         </div>
 
@@ -1952,6 +1960,46 @@ Now, I give you the json:</textarea>
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- 第四步：JSON拼接 -->
+                                <div class="mt-4" id="jsonMergeSection" style="display: none;">
+                                    <h5 class="mb-3">
+                                        <i class="fas fa-code-merge text-warning"></i> 第四步：JSON拼接
+                                    </h5>
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="alert alert-warning">
+                                                <i class="fas fa-info-circle"></i>
+                                                <strong>JSON拼接说明：</strong>将第一步的视频分析结果和第三步的人物分析结果按时间戳进行一一对应拼接，生成包含完整时间轴信息的综合JSON数据。
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="jsonMergePrompt" class="form-label">
+                                                    <i class="fas fa-edit"></i> JSON拼接要求
+                                                </label>
+                                                <textarea class="form-control" id="jsonMergePrompt" rows="6" placeholder="请输入JSON拼接的具体要求...">{I'll give you two JSONs. The common feature of these two JSONs is that both have timestamps. One JSON has a timestamp in the form: "timestamp": "00:45-00:47". The other JSON has: "time_segment": { "start": "01:01", "end": "01:02" }. However, in fact, the timestamps involved in these two JSONs correspond one-to-one. I need you to combine these two JSONs into one JSON. Now, I give you these two JSONs:}</textarea>
+                                                <div class="form-text">
+                                                    <i class="fas fa-lightbulb"></i>
+                                                    系统将自动把第一步和第三步的分析结果按顺序拼接到此提示词后面，然后调用DeepSeek进行JSON拼接处理。
+                                                </div>
+                                            </div>
+
+                                            <div class="text-center">
+                                                <button type="button" class="btn btn-warning btn-lg" id="startJsonMergeBtn" onclick="startJsonMerge()">
+                                                    <i class="fas fa-code-merge"></i> 开始JSON拼接
+                                                </button>
+                                            </div>
+
+                                            <!-- JSON拼接结果 -->
+                                            <div class="mt-3" id="jsonMergeResultContainer" style="display: none;">
+                                                <h6 class="mb-2">
+                                                    <i class="fas fa-check-circle text-success"></i> JSON拼接结果
+                                                </h6>
+                                                <div id="jsonMergeResults"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2137,7 +2185,7 @@ Now, I give you the json:</textarea>
             deepSeekTaskIds = [];
 
             // 重置所有步骤状态
-            for (let i = 1; i <= 2; i++) {
+            for (let i = 1; i <= 4; i++) {
                 const stepItem = document.getElementById(`step${i}`);
                 const stepStatus = document.getElementById(`step${i}Status`);
 
@@ -2186,21 +2234,21 @@ Now, I give you the json:</textarea>
         }
 
         function updateStepProgress(stepNumber, progress) {
-            // 防止第三步进度回退 - 只允许增加或重置到0（仅在重新开始时）
-            if (stepNumber === 3) {
+            // 防止第三步和第四步进度回退 - 只允许增加或重置到0（仅在重新开始时）
+            if (stepNumber === 3 || stepNumber === 4) {
                 const stepProgress = document.getElementById('stepProgress');
                 const stepProgressFill = stepProgress.querySelector('.step-progress-fill');
                 const currentWidth = stepProgressFill ? parseInt(stepProgressFill.style.width) || 0 : 0;
 
                 // 如果当前进度已经是100%，不允许回退
                 if (currentWidth === 100 && progress < 100) {
-                    console.log(`⚠️ [Step 3] Blocking progress rollback from ${currentWidth}% to ${progress}%`);
+                    console.log(`⚠️ [Step ${stepNumber}] Blocking progress rollback from ${currentWidth}% to ${progress}%`);
                     return;
                 }
 
                 // 如果试图回退但不是重置到0，阻止
                 if (currentWidth > 0 && progress === 0 && currentWidth !== 100) {
-                    console.log(`⚠️ [Step 3] Blocking progress reset from ${currentWidth}% to ${progress}%`);
+                    console.log(`⚠️ [Step ${stepNumber}] Blocking progress reset from ${currentWidth}% to ${progress}%`);
                     return;
                 }
             }
@@ -2216,7 +2264,7 @@ Now, I give you the json:</textarea>
         }
 
         function moveToNextStep() {
-            if (currentStep < 2) {
+            if (currentStep < 4) {
                 // 完成当前步骤
                 setStepStatus(currentStep, 'completed', '已完成');
                 updateStepProgress(currentStep, 100);
@@ -2225,8 +2273,10 @@ Now, I give you the json:</textarea>
                 currentStep++;
                 setStepStatus(currentStep, 'active', '进行中');
 
-                // 重置进度条为下一步准备
-                updateStepProgress(currentStep, 0);
+                // 重置进度条为下一步准备（但第三步和第四步不重置，因为有自己的进度管理）
+                if (currentStep < 3) {
+                    updateStepProgress(currentStep, 0);
+                }
 
                 // 如果移动到第二步，显示DeepSeek处理区域
                 if (currentStep === 2) {
@@ -3206,6 +3256,7 @@ Now, I give you the json:</textarea>
 
         // 第三步：分时间戳人物分析相关函数
         let deepSeekResults = []; // 存储第二步的DeepSeek处理结果
+        let personAnalysisResults = []; // 存储第三步的人物分析结果
 
         // 显示第三步入口按钮
         function showThirdStepEntrance() {
@@ -3619,8 +3670,14 @@ Now, I give you the json:</textarea>
                 setStepStatus(3, 'error', '分析失败');
             }
 
+            // 存储人物分析结果供第四步使用
+            personAnalysisResults = results;
+
             // 显示结果
             showPersonAnalysisBatchResults(results);
+
+            // 显示第四步入口按钮
+            showFourthStepEntrance();
 
             // 重置按钮状态但不重置进度条
             const startBtn = document.getElementById('startPersonAnalysisBtn');
@@ -3769,6 +3826,339 @@ Now, I give you the json:</textarea>
             }
 
             return null;
+        }
+
+        // 第四步：JSON拼接相关函数
+
+        // 显示第四步入口按钮
+        function showFourthStepEntrance() {
+            console.log('showFourthStepEntrance function called');
+
+            // 创建第四步入口按钮容器
+            const entranceContainer = document.createElement('div');
+            entranceContainer.className = 'text-center mt-4 fade-in';
+            entranceContainer.id = 'fourthStepEntranceContainer';
+
+            entranceContainer.innerHTML = `
+                <button type="button" class="btn btn-warning btn-lg" id="fourthStepEntranceBtn" onclick="proceedToStep4()">
+                    <i class="fas fa-code-merge"></i> 下一步：JSON拼接
+                </button>
+                <div class="mt-2 text-muted">
+                    <small>将第一步的视频分析结果和第三步的人物分析结果按时间戳进行拼接，生成完整的JSON数据</small>
+                </div>
+            `;
+
+            // 将按钮添加到人物分析结果容器后面
+            const personAnalysisContainer = document.getElementById('personAnalysisResultContainer');
+            if (personAnalysisContainer) {
+                personAnalysisContainer.appendChild(entranceContainer);
+            }
+        }
+
+        // 进入第四步
+        function proceedToStep4() {
+            console.log('进入第四步：JSON拼接');
+
+            // 隐藏第四步入口按钮
+            const entranceContainer = document.getElementById('fourthStepEntranceContainer');
+            if (entranceContainer) {
+                entranceContainer.style.display = 'none';
+            }
+
+            // 移动到第四步
+            moveToNextStep();
+
+            // 显示第四步分析界面
+            showJsonMergeSection();
+        }
+
+        // 显示第四步分析界面
+        function showJsonMergeSection() {
+            const jsonMergeSection = document.getElementById('jsonMergeSection');
+            if (jsonMergeSection) {
+                jsonMergeSection.style.display = 'block';
+            }
+        }
+
+        // 开始JSON拼接
+        function startJsonMerge() {
+            console.log('startJsonMerge function called');
+
+            const mergePrompt = document.getElementById('jsonMergePrompt').value.trim();
+
+            console.log('mergePrompt length:', mergePrompt.length);
+            console.log('videoAnalysisResults length:', videoAnalysisResults.length);
+            console.log('personAnalysisResults length:', personAnalysisResults.length);
+
+            // 验证数据
+            if (videoAnalysisResults.length === 0) {
+                showError('缺少第一步的视频分析结果，无法进行JSON拼接');
+                return;
+            }
+
+            if (personAnalysisResults.length === 0) {
+                showError('缺少第三步的人物分析结果，无法进行JSON拼接');
+                return;
+            }
+
+            if (videoAnalysisResults.length !== personAnalysisResults.length) {
+                showError(`第一步结果数量(${videoAnalysisResults.length})与第三步结果数量(${personAnalysisResults.length})不匹配，无法进行一一对应拼接`);
+                return;
+            }
+
+            // 禁用按钮并显示加载状态
+            const startBtn = document.getElementById('startJsonMergeBtn');
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="loading-spinner"></span> JSON拼接中...';
+            }
+
+            // 更新步骤状态
+            setStepStatus(4, 'processing', 'JSON拼接中');
+            updateStepProgress(4, 10);
+
+            // 分别处理每对结果
+            processJsonMergeBatch(mergePrompt);
+        }
+
+        // 处理JSON拼接批量
+        function processJsonMergeBatch(basePrompt) {
+            const totalResults = Math.min(videoAnalysisResults.length, personAnalysisResults.length);
+            let completedCount = 0;
+            const jsonMergeResults = [];
+
+            // 显示进度条
+            showJsonMergeProgress('正在启动JSON拼接...', 0, totalResults);
+
+            // 为每对结果调用DeepSeek接口
+            for (let i = 0; i < totalResults; i++) {
+                const videoResult = videoAnalysisResults[i];
+                const personResult = personAnalysisResults[i];
+
+                console.log(`Processing JSON merge ${i + 1}/${totalResults}`);
+
+                // 构建完整的提示词：用户提示词 + 第一步结果 + 第三步结果
+                const fullPrompt = basePrompt + '\n\n第一步结果（视频分析）：\n' +
+                    (typeof videoResult === 'string' ? videoResult : videoResult.result) +
+                    '\n\n第三步结果（人物分析）：\n' +
+                    (personResult.success ? personResult.result : personResult.error);
+
+                console.log(`📤 [${i + 1}/${totalResults}] Sending request to DeepSeek API`);
+                console.log(`📝 [${i + 1}] Prompt length: ${fullPrompt.length}`);
+
+                // 使用DeepSeek处理器进行JSON拼接
+                fetch('/deepseek/process/batch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text_prompt: fullPrompt,
+                        batch_id: 'json_merge_batch'
+                    })
+                })
+                .then(response => {
+                    console.log(`📡 [${i + 1}] DeepSeek response status:`, response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    completedCount++;
+
+                    // 更新进度条和状态
+                    const progress = Math.round((completedCount / totalResults) * 100);
+                    updateStepProgress(4, progress);
+                    showJsonMergeProgress(
+                        `正在处理第 ${completedCount}/${totalResults} 个JSON拼接...`,
+                        completedCount,
+                        totalResults
+                    );
+
+                    if (data.success && data.results && data.results.length > 0) {
+                        const result = data.results[0];
+                        jsonMergeResults.push({
+                            index: i,
+                            videoResult: videoResult,
+                            personResult: personResult,
+                            mergedResult: result.success ? result.result : result.error,
+                            success: result.success
+                        });
+                    } else {
+                        jsonMergeResults.push({
+                            index: i,
+                            videoResult: videoResult,
+                            personResult: personResult,
+                            error: data.error || 'DeepSeek处理失败',
+                            success: false
+                        });
+                    }
+
+                    // 检查是否所有处理都已完成
+                    if (completedCount === totalResults) {
+                        finishJsonMergeBatch(jsonMergeResults);
+                    }
+                })
+                .catch(error => {
+                    completedCount++;
+
+                    // 更新进度条和状态
+                    const progress = Math.round((completedCount / totalResults) * 100);
+                    updateStepProgress(4, progress);
+                    showJsonMergeProgress(
+                        `正在处理第 ${completedCount}/${totalResults} 个JSON拼接...`,
+                        completedCount,
+                        totalResults
+                    );
+
+                    jsonMergeResults.push({
+                        index: i,
+                        videoResult: videoResult,
+                        personResult: personResult,
+                        error: `网络错误: ${error.message}`,
+                        success: false
+                    });
+
+                    // 检查是否所有处理都已完成
+                    if (completedCount === totalResults) {
+                        finishJsonMergeBatch(jsonMergeResults);
+                    }
+                });
+            }
+        }
+
+        // 完成JSON拼接批量处理
+        function finishJsonMergeBatch(results) {
+            console.log(`🏁 Finishing JSON merge batch processing`);
+            console.log(`📊 Results summary:`, {
+                total: results.length,
+                success: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length
+            });
+
+            const successCount = results.filter(r => r.success).length;
+            const totalCount = results.length;
+
+            // 确保进度显示为100%完成
+            updateStepProgress(4, 100);
+            showJsonMergeProgress(
+                `JSON拼接完成！成功处理 ${successCount}/${totalCount} 个结果`,
+                totalCount,
+                totalCount
+            );
+
+            if (successCount === totalCount) {
+                setStepStatus(4, 'completed', '已完成');
+            } else if (successCount > 0) {
+                setStepStatus(4, 'completed', '部分完成');
+            } else {
+                setStepStatus(4, 'error', '拼接失败');
+            }
+
+            // 显示结果
+            showJsonMergeResults(results);
+
+            // 重置按钮状态
+            const startBtn = document.getElementById('startJsonMergeBtn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-code-merge"></i> 开始JSON拼接';
+            }
+        }
+
+        // 显示JSON拼接结果
+        function showJsonMergeResults(results) {
+            const resultContainer = document.getElementById('jsonMergeResultContainer');
+            const resultsDiv = document.getElementById('jsonMergeResults');
+
+            if (resultContainer && resultsDiv) {
+                let html = '';
+
+                if (results.length === 1) {
+                    // 单个结果，直接显示
+                    const result = results[0];
+                    if (result.success) {
+                        html = `
+                            <div class="card result-card">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0">JSON拼接结果</h6>
+                                </div>
+                                <div class="card-body">
+                                    <pre style="white-space: pre-wrap; font-family: inherit; color: #333333;">${result.mergedResult}</pre>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html = `
+                            <div class="card result-card">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0">JSON拼接失败</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-danger">${result.error}</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // 多个结果，使用手风琴显示
+                    html = '<div class="accordion" id="jsonMergeAccordion">';
+                    results.forEach((result, index) => {
+                        const accordionId = `jsonMergeCollapse${index}`;
+                        html += `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="jsonMergeHeading${index}">
+                                    <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                                        <div class="d-flex w-100 justify-content-between align-items-center">
+                                            <div>
+                                                <i class="fas fa-code-merge me-2"></i>
+                                                <strong>JSON拼接结果 ${index + 1}</strong>
+                                                ${result.success ?
+                                                    '<span class="badge bg-success ms-2">拼接成功</span>' :
+                                                    '<span class="badge bg-danger ms-2">拼接失败</span>'
+                                                }
+                                            </div>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="${accordionId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#jsonMergeAccordion">
+                                    <div class="accordion-body">
+                                        ${result.success ?
+                                            `<pre style="white-space: pre-wrap; font-family: inherit; color: #333333;">${result.mergedResult}</pre>` :
+                                            `<p class="text-danger">${result.error}</p>`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+
+                resultsDiv.innerHTML = html;
+                resultContainer.style.display = 'block';
+            }
+        }
+
+        // 显示JSON拼接进度
+        function showJsonMergeProgress(message, current = 0, total = 0) {
+            console.log('JSON拼接进度:', message);
+
+            // 更新进度条界面
+            const progressContainer = document.getElementById('analysisProgressContainer');
+            const progressBar = document.getElementById('personAnalysisProgressBar');
+            const progressText = document.getElementById('progressText');
+
+            if (progressContainer && progressBar && progressText) {
+                progressContainer.style.display = 'block';
+
+                if (total > 0) {
+                    const percentage = Math.round((current / total) * 100);
+                    progressBar.style.width = percentage + '%';
+                    progressText.textContent = `${message} (${percentage}%)`;
+                } else {
+                    progressBar.style.width = '10%';
+                    progressText.textContent = message;
+                }
+            }
         }
 
         // 第三步状态检查
