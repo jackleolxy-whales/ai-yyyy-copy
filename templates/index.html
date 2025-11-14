@@ -3407,21 +3407,28 @@ Now, I give you the json:</textarea>
             processPersonAnalysisBatch(analysisPrompt, originalVideoUrl);
         }
 
-        // 批量处理人物分析
+        // 处理人物分析（改为单个视频模式）
         function processPersonAnalysisBatch(basePrompt, videoUrl) {
             const totalResults = deepSeekResults.length;
-            let completedCount = 0;
+            // 重置全局计数器
+            window.personAnalysisCompletedCount = 0;
             const personAnalysisResults = [];
 
             // 显示进度条
             showPersonAnalysisProgress('正在启动人物分析...', 0, totalResults);
 
-            // 对于批量上传，使用占位符URL或空字符串
-            const effectiveVideoUrl = videoUrl || 'batch_upload';
+            // 获取原始上传的视频文件
+            const videoFile = getOriginalVideoFile();
 
-            console.log('Starting batch person analysis with URL:', effectiveVideoUrl);
+            if (!videoFile) {
+                showError('找不到原始视频文件，请重新上传视频');
+                resetPersonAnalysisInterface();
+                return;
+            }
 
-            // 为每个DeepSeek结果调用分析接口
+            console.log('Starting person analysis with video file:', videoFile.name);
+
+            // 为每个DeepSeek结果调用分析接口（分别处理）
             deepSeekResults.forEach((deepSeekResult, index) => {
                 // 更新视频状态为 "处理中"
                 updateVideoStatus(index, 'processing');
@@ -3429,59 +3436,71 @@ Now, I give you the json:</textarea>
                 // 构建完整的分析提示词
                 const fullPrompt = basePrompt + '\n\n' + deepSeekResult;
 
-                console.log(`Processing video ${index + 1}/${totalResults}`);
+                console.log(`Processing analysis ${index + 1}/${totalResults}`);
 
-                // 使用新的批量分析接口
-                fetch('/analyze/batch', {
+                // 重新创建FormData并上传视频文件
+                const formData = new FormData();
+                formData.append('video_file', videoFile);
+                formData.append('text_prompt', fullPrompt);
+
+                // 使用单个视频上传接口（和第一步相同的接口）
+                console.log(`📤 [${index + 1}/${totalResults}] Sending request to /upload endpoint`);
+                console.log(`📝 [${index + 1}] FormData contents:`, {
+                    video_file: formData.get('video_file')?.name || 'N/A',
+                    text_prompt_length: formData.get('text_prompt')?.length || 0
+                });
+
+                fetch('/upload', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        text_prompt: fullPrompt,
-                        batch_id: 'person_analysis_batch'
-                    })
+                    body: formData
                 })
-                .then(response => response.json())
+                .then(response => {
+                    console.log(`📡 [${index + 1}] Upload response status:`, response.status);
+                    return response.json();
+                })
                 .then(data => {
-                    completedCount++;
-
-                    // 更新进度条和状态
-                    const progress = Math.round((completedCount / totalResults) * 100);
-                    updateStepProgress(3, progress);
-                    showPersonAnalysisProgress(
-                        `正在处理第 ${completedCount}/${totalResults} 个结果...`,
-                        completedCount,
-                        totalResults
-                    );
+                    console.log(`📥 [${index + 1}] Upload response data:`, data);
 
                     if (data.success) {
-                        // 更新视频状态为 "已完成"
-                        updateVideoStatus(index, 'completed');
-                        personAnalysisResults.push({
-                            index: index,
-                            result: data.result,
-                            deepSeekInput: deepSeekResult,
-                            success: true
-                        });
+                        // 保存task_id用于状态检查
+                        const personAnalysisTaskId = data.task_id;
+                        console.log(`🎯 [${index + 1}] Got task_id:`, personAnalysisTaskId);
+
+                        // 启动状态检查来获取实际结果
+                        startPersonAnalysisStatusCheck(personAnalysisTaskId, index, deepSeekResult, personAnalysisResults, totalResults);
                     } else {
+                        // 更新全局completedCount
+                        window.personAnalysisCompletedCount = (window.personAnalysisCompletedCount || 0) + 1;
+                        const completedCount = window.personAnalysisCompletedCount;
+
+                        // 更新进度条和状态
+                        const progress = Math.round((completedCount / totalResults) * 100);
+                        updateStepProgress(3, progress);
+                        showPersonAnalysisProgress(
+                            `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                            completedCount,
+                            totalResults
+                        );
+
                         // 更新视频状态为 "失败"
-                        updateVideoStatus(index, 'error', data.error || '分析失败');
+                        updateVideoStatus(index, 'error', data.error || '上传失败');
                         personAnalysisResults.push({
                             index: index,
-                            error: data.error || '分析失败',
+                            error: data.error || '上传失败',
                             deepSeekInput: deepSeekResult,
                             success: false
                         });
-                    }
 
-                    // 检查是否所有处理都已完成
-                    if (completedCount === totalResults) {
-                        finishPersonAnalysisBatch(personAnalysisResults);
+                        // 检查是否所有处理都已完成
+                        if (completedCount === totalResults) {
+                            finishPersonAnalysisBatch(personAnalysisResults);
+                        }
                     }
                 })
                 .catch(error => {
-                    completedCount++;
+                    // 更新全局completedCount
+                    window.personAnalysisCompletedCount = (window.personAnalysisCompletedCount || 0) + 1;
+                    const completedCount = window.personAnalysisCompletedCount;
 
                     // 更新进度条和状态
                     const progress = Math.round((completedCount / totalResults) * 100);
@@ -3535,6 +3554,33 @@ Now, I give you the json:</textarea>
 
         // 完成批量人物分析
         function finishPersonAnalysisBatch(results) {
+            console.log(`🏁 Finishing person analysis batch processing`);
+            console.log(`📊 Results summary:`, {
+                total: results.length,
+                success: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length
+            });
+
+            // 详细打印每个结果
+            results.forEach((result, index) => {
+                console.log(`📋 [${index + 1}] Result details:`, {
+                    index: result.index,
+                    success: result.success,
+                    hasResult: !!result.result,
+                    resultLength: result.result ? result.result.length : 0,
+                    hasError: !!result.error,
+                    errorLength: result.error ? result.error.length : 0,
+                    hasDeepSeekInput: !!result.deepSeekInput,
+                    deepSeekInputLength: result.deepSeekInput ? result.deepSeekInput.length : 0
+                });
+
+                if (result.success && result.result) {
+                    console.log(`🎯 [${index + 1}] Result preview:`, result.result.substring(0, 200) + '...');
+                } else if (!result.success) {
+                    console.log(`❌ [${index + 1}] Error:`, result.error);
+                }
+            });
+
             const successCount = results.filter(r => r.success).length;
             const totalCount = results.length;
 
@@ -3673,6 +3719,198 @@ Now, I give you the json:</textarea>
                 startBtn.disabled = false;
                 startBtn.innerHTML = '<i class="fas fa-users"></i> 开始人物分析';
             }
+        }
+
+        // 获取原始上传的视频文件
+        function getOriginalVideoFile() {
+            // 尝试从单个视频上传获取文件
+            const videoFileInput = document.getElementById('videoFile');
+            if (videoFileInput && videoFileInput.files && videoFileInput.files.length > 0) {
+                return videoFileInput.files[0];
+            }
+
+            // 尝试从批量上传获取第一个文件
+            const videoFilesInput = document.getElementById('videoFiles');
+            if (videoFilesInput && videoFilesInput.files && videoFilesInput.files.length > 0) {
+                return videoFilesInput.files[0];
+            }
+
+            return null;
+        }
+
+        // 第三步状态检查
+        function startPersonAnalysisStatusCheck(taskId, index, deepSeekResult, personAnalysisResults, totalResults) {
+            console.log(`🔍 [${index + 1}] Starting status check for task_id: ${taskId}`);
+
+            const checkInterval = setInterval(() => {
+                console.log(`📞 [${index + 1}] Checking status for task: ${taskId}`);
+
+                fetch(`/status/${taskId}`)
+                    .then(response => {
+                        console.log(`📡 [${index + 1}] Status response status:`, response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(`📥 [${index + 1}] Status check data:`, data);
+                        console.log(`📊 [${index + 1}] Task status:`, data.status);
+
+                        if (data.status === 'completed') {
+                            clearInterval(checkInterval);
+                            console.log(`✅ [${index + 1}] Task completed!`);
+                            console.log(`🔍 [${index + 1}] Fetching result from /result endpoint...`);
+
+                            // 任务完成后，需要单独获取结果
+                            fetch(`/result/${taskId}`)
+                                .then(response => {
+                                    console.log(`📡 [${index + 1}] Result response status:`, response.status);
+                                    return response.json();
+                                })
+                                .then(resultData => {
+                                    console.log(`📥 [${index + 1}] Result data:`, resultData);
+                                    console.log(`🎯 [${index + 1}] Result preview:`, resultData.result ? resultData.result.substring(0, 100) + '...' : 'No result');
+
+                                    // 更新全局completedCount
+                                    window.personAnalysisCompletedCount = (window.personAnalysisCompletedCount || 0) + 1;
+                                    const completedCount = window.personAnalysisCompletedCount;
+
+                                    // 更新进度条和状态
+                                    const progress = Math.round((completedCount / totalResults) * 100);
+                                    updateStepProgress(3, progress);
+                                    showPersonAnalysisProgress(
+                                        `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                                        completedCount,
+                                        totalResults
+                                    );
+
+                                    // 更新视频状态为 "已完成"
+                                    updateVideoStatus(index, 'completed');
+
+                                    const resultItem = {
+                                        index: index,
+                                        result: resultData.result,
+                                        deepSeekInput: deepSeekResult,
+                                        success: resultData.success
+                                    };
+
+                                    console.log(`💾 [${index + 1}] Adding result to personAnalysisResults:`, {
+                                        hasResult: !!resultData.result,
+                                        resultLength: resultData.result ? resultData.result.length : 0,
+                                        deepSeekInputLength: deepSeekResult ? deepSeekResult.length : 0,
+                                        success: resultData.success
+                                    });
+
+                                    personAnalysisResults.push(resultItem);
+
+                                    // 检查是否所有处理都已完成
+                                    if (completedCount === totalResults) {
+                                        console.log(`🏁 [${index + 1}] All tasks completed! Total results: ${personAnalysisResults.length}`);
+                                        finishPersonAnalysisBatch(personAnalysisResults);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error(`❌ [${index + 1}] Error fetching result:`, error);
+
+                                    // 更新全局completedCount
+                                    window.personAnalysisCompletedCount = (window.personAnalysisCompletedCount || 0) + 1;
+                                    const completedCount = window.personAnalysisCompletedCount;
+
+                                    // 更新进度条和状态
+                                    const progress = Math.round((completedCount / totalResults) * 100);
+                                    updateStepProgress(3, progress);
+                                    showPersonAnalysisProgress(
+                                        `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                                        completedCount,
+                                        totalResults
+                                    );
+
+                                    // 更新视频状态为 "失败"
+                                    updateVideoStatus(index, 'error', `获取结果失败: ${error.message}`);
+                                    personAnalysisResults.push({
+                                        index: index,
+                                        error: `获取结果失败: ${error.message}`,
+                                        deepSeekInput: deepSeekResult,
+                                        success: false
+                                    });
+
+                                    // 检查是否所有处理都已完成
+                                    if (completedCount === totalResults) {
+                                        console.log(`🏁 [${index + 1}] All tasks completed! Total results: ${personAnalysisResults.length}`);
+                                        finishPersonAnalysisBatch(personAnalysisResults);
+                                    }
+                                });
+                        } else if (data.status === 'error') {
+                            clearInterval(checkInterval);
+                            // 更新全局completedCount
+                            window.personAnalysisCompletedCount = (window.personAnalysisCompletedCount || 0) + 1;
+                            const completedCount = window.personAnalysisCompletedCount;
+
+                            // 更新进度条和状态
+                            const progress = Math.round((completedCount / totalResults) * 100);
+                            updateStepProgress(3, progress);
+                            showPersonAnalysisProgress(
+                                `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                                completedCount,
+                                totalResults
+                            );
+
+                            // 更新视频状态为 "失败"
+                            updateVideoStatus(index, 'error', data.error || '分析失败');
+                            personAnalysisResults.push({
+                                index: index,
+                                error: data.error || '分析失败',
+                                deepSeekInput: deepSeekResult,
+                                success: false
+                            });
+
+                            // 检查是否所有处理都已完成
+                            if (completedCount === totalResults) {
+                                finishPersonAnalysisBatch(personAnalysisResults);
+                            }
+                        }
+                        // 如果还在处理中，继续等待
+                    })
+                    .catch(error => {
+                        clearInterval(checkInterval);
+                        // 更新全局completedCount
+                        window.personAnalysisCompletedCount = (window.personAnalysisCompletedCount || 0) + 1;
+                        const completedCount = window.personAnalysisCompletedCount;
+
+                        // 更新进度条和状态
+                        const progress = Math.round((completedCount / totalResults) * 100);
+                        updateStepProgress(3, progress);
+                        showPersonAnalysisProgress(
+                            `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                            completedCount,
+                            totalResults
+                        );
+
+                        // 更新视频状态为 "失败"
+                        updateVideoStatus(index, 'error', `网络错误: ${error.message}`);
+                        personAnalysisResults.push({
+                            index: index,
+                            error: `网络错误: ${error.message}`,
+                            deepSeekInput: deepSeekResult,
+                            success: false
+                        });
+
+                        // 检查是否所有处理都已完成
+                        if (completedCount === totalResults) {
+                            finishPersonAnalysisBatch(personAnalysisResults);
+                        }
+                    });
+            }, 2000); // 每2秒检查一次状态
+        }
+
+        // 重置第三步分析界面
+        function resetPersonAnalysisInterface() {
+            const startBtn = document.getElementById('startPersonAnalysisBtn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-users"></i> 开始人物分析';
+            }
+
+            setStepStatus(3, 'waiting', '等待中');
+            updateStepProgress(3, 0);
         }
 
         // 存储DeepSeek结果
