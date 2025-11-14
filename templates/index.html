@@ -681,20 +681,347 @@
         }
 
         /* 加载动画优化 */
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(139, 92, 246, 0.2);
-            border-top: 2px solid #8b5cf6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
+        
+        /* 步骤指示器样式 */
+        .step-indicator {
+            background: linear-gradient(135deg,
+                rgba(30, 30, 45, 0.8) 0%,
+                rgba(40, 40, 60, 0.7) 100%);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
         }
 
-        @keyframes spin {
+        .step-indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(138, 43, 226, 0.3),
+                transparent);
+            animation: step-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes step-glow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+
+        .step-item {
+            text-align: center;
+            flex: 1;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .step-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg,
+                rgba(50, 50, 70, 0.9) 0%,
+                rgba(60, 60, 80, 0.8) 100%);
+            border: 3px solid rgba(138, 43, 226, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            position: relative;
+            transition: all 0.4s ease;
+            color: rgba(229, 231, 235, 0.6);
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .step-item.active .step-circle {
+            background: linear-gradient(135deg,
+                rgba(139, 92, 246, 0.2) 0%,
+                rgba(124, 58, 237, 0.15) 100%);
+            border-color: rgba(139, 92, 246, 0.6);
+            color: #8b5cf6;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+            animation: step-active-pulse 2s ease-in-out infinite;
+        }
+
+        .step-item.completed .step-circle {
+            background: linear-gradient(135deg,
+                rgba(34, 197, 94, 0.2) 0%,
+                rgba(22, 163, 74, 0.15) 100%);
+            border-color: rgba(34, 197, 94, 0.6);
+            color: #22c55e;
+        }
+
+        .step-item.processing .step-circle {
+            background: linear-gradient(135deg,
+                rgba(59, 130, 246, 0.2) 0%,
+                rgba(37, 99, 235, 0.15) 100%);
+            border-color: rgba(59, 130, 246, 0.6);
+            color: #3b82f6;
+            animation: step-processing-spin 2s linear infinite;
+        }
+
+        @keyframes step-active-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+        }
+
+        @keyframes step-processing-spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        .step-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+        }
+
+        .step-number {
+            transition: opacity 0.3s ease;
+        }
+
+        .step-item.completed .step-number,
+        .step-item.processing .step-number {
+            opacity: 0;
+        }
+
+        .step-item.completed .step-icon,
+        .step-item.processing .step-icon {
+            display: block !important;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: rgba(229, 231, 235, 0.6);
+            font-size: 14px;
+            margin-bottom: 4px;
+            transition: color 0.3s ease;
+        }
+
+        .step-item.active .step-title,
+        .step-item.completed .step-title,
+        .step-item.processing .step-title {
+            color: #f3f4f6;
+        }
+
+        .step-status {
+            font-size: 12px;
+            color: rgba(229, 231, 235, 0.5);
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .step-item.active .step-status {
+            color: #8b5cf6;
+        }
+
+        .step-item.completed .step-status {
+            color: #22c55e;
+        }
+
+        .step-item.processing .step-status {
+            color: #3b82f6;
+        }
+
+        .step-connector {
+            flex: 0 0 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 16px;
+        }
+
+        .step-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(138, 43, 226, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .step-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-progress-fill::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent);
+            animation: step-progress-shimmer 2s infinite;
+        }
+
+        @keyframes step-progress-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        /* 步骤进度条样式 */
+        .step-progress-container {
+            margin-top: 16px;
+            padding: 0 40px;
+        }
+
+        .step-progress-bar {
+            height: 8px;
+            background: rgba(138, 43, 226, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .step-progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6, #7c3aed, #6d28d9);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-progress-bar-fill::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent);
+            animation: step-bar-shimmer 1.5s infinite;
+        }
+
+        @keyframes step-bar-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .step-progress-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 12px;
+            color: rgba(229, 231, 235, 0.7);
+            font-weight: 500;
+        }
+
+        /* 步骤区域样式 */
+        .step-section {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(138, 43, 226, 0.1);
+            background: linear-gradient(135deg,
+                rgba(25, 25, 40, 0.5) 0%,
+                rgba(35, 35, 50, 0.4) 100%);
+            backdrop-filter: blur(5px);
+            position: relative;
+        }
+
+        .step-section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(138, 43, 226, 0.1);
+        }
+
+        .step-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f3f4f6;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .step-section-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg,
+                rgba(139, 92, 246, 0.2) 0%,
+                rgba(124, 58, 237, 0.15) 100%);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8b5cf6;
+            font-size: 12px;
+        }
+
+        .step-section.completed .step-section-icon {
+            background: linear-gradient(135deg,
+                rgba(34, 197, 94, 0.2) 0%,
+                rgba(22, 163, 74, 0.15) 100%);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+
+        .step-section.processing .step-section-icon {
+            background: linear-gradient(135deg,
+                rgba(59, 130, 246, 0.2) 0%,
+                rgba(37, 99, 235, 0.15) 100%);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #3b82f6;
+            animation: step-icon-spin 2s linear infinite;
+        }
+
+        @keyframes step-icon-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .step-section-badge {
+            margin-left: auto;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .step-section-badge.waiting {
+            background: rgba(107, 114, 128, 0.2);
+            color: rgba(229, 231, 235, 0.6);
+        }
+
+        .step-section-badge.processing {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .step-section-badge.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
         }
     </style>
 </head>
@@ -753,6 +1080,33 @@
                 <!-- 主要分析界面 -->
                 <div class="card">
                     <div class="card-body p-4">
+                        <!-- 步骤指示器 -->
+                        <div class="step-indicator mb-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <div class="step-item active" id="step1">
+                                    <div class="step-circle">
+                                        <span class="step-number">1</span>
+                                        <i class="fas fa-video step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">视频分析</div>
+                                    <div class="step-status" id="step1Status">进行中</div>
+                                </div>
+                                <div class="step-connector">
+                                    <div class="step-progress" id="stepProgress">
+                                        <div class="step-progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="step-item" id="step2">
+                                    <div class="step-circle">
+                                        <span class="step-number">2</span>
+                                        <i class="fas fa-brain step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">DeepSeek处理</div>
+                                    <div class="step-status" id="step2Status">等待中</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <h5 class="card-title mb-4">
                             <i class="fas fa-search"></i> 开始分析视频
                         </h5>
@@ -804,9 +1158,97 @@
                                     <textarea
                                         class="form-control prompt-input"
                                         id="textPrompt"
-                                        rows="4"
-                                        placeholder="请描述你希望AI如何分析这个视频，例如：详细描述视频内容、分析视频中的场景和人物、总结视频主题等..."
-                                    >请详细描述这个视频的内容，包括场景、人物、动作和整体主题</textarea>
+                                        rows="18"
+                                        placeholder="专业短剧分析提示词已预填充，可根据需要自定义修改..."
+                                    >### Short-Form Drama "Agony/Payoff" Analyst (JSON Output)
+
+**Role:**
+You are a professional Short-Form Drama Analyst. Your expertise is deconstructing video content to identify narrative archetypes, psychological hooks, and commercial appeal.
+
+**Task:**
+You will receive  video files. Your task is to analyze this video by deconstructing *why* it is compelling. You must use two core frameworks:
+
+1.  **The Impact Framework:** Identifying and categorizing all key events (Visual, Action, Dialogue, Confrontation, Plot Twist).
+2.  **The Deep Appeal Framework:** Analyzing the underlying psychological hooks (the "Agony/Payoff" loop), the narrative archetypes used, and the commercial strategy driving the content.
+
+Your entire output **must** be a single JSON code block. Do not include *any* introductory, explanatory, or summary text before or after the JSON.
+
+**Core Frameworks (For Your Analysis):**
+
+  * **Impact Framework (for `eventType`):**
+      * `VisualImpact`: A key visual cue (a close-up on a token, a specific expression, a "red dress").
+      * `ActionImpact`: A significant physical action (a slap, a rescue, a choke, a push).
+      * `DialogueImpact`: A "Killing Line" or key piece of information delivered via speech/text.
+      * `ConfrontationImpact`: A direct clash between two or more characters (an argument, a public humiliation).
+      * `PlotTwist`: A non-obvious reveal that re-contextualizes the plot (e.g., "He's not the CEO," "She's his long-lost sister").
+  * **Deep Appeal Framework (for `overallAnalysis`):**
+      * `primaryPsychologicalHook`: The main emotional driver (e.g., 'Revenge Anticipation', 'Emotional Debt', 'Justice Catharsis', 'Forbidden Love').
+      * `narrativeArchetypes`: The character templates (e.g., 'Alpha-Male CEO', 'The Vicious Rival', 'The Innocent Victim', 'The Substitute').
+      * `commercialStrategy`: The business logic (e.g., 'Hook-First Pacing', 'Paywall-Baiting', 'Extreme Character Tropes').
+
+-----
+
+### JSON Output Requirement
+
+You must and only provide your complete analysis in the following JSON structure.
+
+**JSON Structure and Field Definitions:**
+
+```json
+{
+  "videoInfo": {
+    "title": "Inferred title or filename of the video",
+    "duration": "Total video duration (e.g., '00:59')",
+    "description": "A brief (1-2 sentence) summary of the video's plot."
+  },
+  "overallAnalysis": {
+    "primaryPsychologicalHook": "The main psychological hook (e.g., 'Revenge Anticipation')",
+    "narrativeArchetypes": [
+      "Identified narrative archetypes (e.g., 'Alpha-Male CEO', 'The Vicious Rival')"
+    ],
+    "commercialStrategy": "Identified commercial strategy (e.g., 'Hook-First Pacing', 'Paywall-Baiting')",
+    "appealScore": "An overall appeal score from 1-10 (based on its ability to generate 'Agony/Payoff' emotions)",
+    "appealReason": "A brief justification for the score, tied to the 'Agony/Payoff' loop."
+  },
+  "eventBreakdown": [
+    {
+      "timestamp": "Start-End time of the event (e.g., 'mm:ss:ff-mm:ss:ff')",
+      "eventType": "The type of impact (e.g., 'VisualImpact', 'ActionImpact', 'DialogueImpact', 'ConfrontationImpact', 'PlotTwist')",
+      "description": "Objective description of the event (e.g., 'Male lead saves female lead from drowning')",
+      "analysis": "Analysis of the event's appeal. Explain *how* this event builds 'Agony' (emotional debt) or provides 'Payoff' (catharsis), linking to the flags.",
+      "flags": {
+        "isHighlight": "true | false",
+        "isKeyPoint": "true | false",
+        "isAppealing": "true | false"
+      },
+      "keyElements": [
+        "Key elements involved in this event (e.g., 'Wedding Dress', 'Jade Pendant', 'Drugging', 'Slap', 'Pool')"
+      ]
+    }
+  ]
+}
+```
+
+-----
+
+### Strict Definitions for `flags` (MANDATORY)
+
+You must judge `true` or `false` based *only* on these criteria:
+
+  * **`isHighlight`:**
+
+      * **true:** If this is an "apex" of emotion or action. This is the most shocking, explosive, or high-energy moment (e.g., the public humiliation, the dress-tearing, the slap, the passionate kiss, the "Go." line).
+      * **false:** A standard transition, setup, or normal-paced dialogue.
+
+  * **`isKeyPoint`:**
+
+      * **true:** If this is a "critical information" moment that drives the plot or reversal, *even if it is not a highlight*. It is essential for understanding the *truth* (e.g., a flashback showing the real culprit, the reveal of a token, a line of dialogue revealing a secret identity: "She's mute," "He's looking for 'Annie'").
+      * **false:** It's just action or emotion, but contains no *new information* or *plot-driving* secret.
+
+  * **`isAppealing`:**
+
+      * **true:** If the event effectively builds **"Agony"** (emotional debt, oppression, misunderstanding, pain) or provides/promises a **"Payoff"** (catharsis, revenge, thrill, power). This is judged based on the "addictive" logic of short-form drama. Nearly all Highlights and Key Points should be Appealing.
+      * **false:** Pure exposition, neutral transitions, or moments that don't create emotional investment.</textarea>
                                 </div>
 
                                 <div class="text-center">
@@ -844,9 +1286,97 @@
                                     <textarea
                                         class="form-control prompt-input"
                                         id="uploadTextPrompt"
-                                        rows="4"
-                                        placeholder="请描述你希望AI如何分析这个视频，例如：详细描述视频内容、分析视频中的场景和人物、总结视频主题等..."
-                                    >请详细描述这个视频的内容，包括场景、人物、动作和整体主题</textarea>
+                                        rows="18"
+                                        placeholder="专业短剧分析提示词已预填充，可根据需要自定义修改..."
+                                    >### Short-Form Drama "Agony/Payoff" Analyst (JSON Output)
+
+**Role:**
+You are a professional Short-Form Drama Analyst. Your expertise is deconstructing video content to identify narrative archetypes, psychological hooks, and commercial appeal.
+
+**Task:**
+You will receive  video files. Your task is to analyze this video by deconstructing *why* it is compelling. You must use two core frameworks:
+
+1.  **The Impact Framework:** Identifying and categorizing all key events (Visual, Action, Dialogue, Confrontation, Plot Twist).
+2.  **The Deep Appeal Framework:** Analyzing the underlying psychological hooks (the "Agony/Payoff" loop), the narrative archetypes used, and the commercial strategy driving the content.
+
+Your entire output **must** be a single JSON code block. Do not include *any* introductory, explanatory, or summary text before or after the JSON.
+
+**Core Frameworks (For Your Analysis):**
+
+  * **Impact Framework (for `eventType`):**
+      * `VisualImpact`: A key visual cue (a close-up on a token, a specific expression, a "red dress").
+      * `ActionImpact`: A significant physical action (a slap, a rescue, a choke, a push).
+      * `DialogueImpact`: A "Killing Line" or key piece of information delivered via speech/text.
+      * `ConfrontationImpact`: A direct clash between two or more characters (an argument, a public humiliation).
+      * `PlotTwist`: A non-obvious reveal that re-contextualizes the plot (e.g., "He's not the CEO," "She's his long-lost sister").
+  * **Deep Appeal Framework (for `overallAnalysis`):**
+      * `primaryPsychologicalHook`: The main emotional driver (e.g., 'Revenge Anticipation', 'Emotional Debt', 'Justice Catharsis', 'Forbidden Love').
+      * `narrativeArchetypes`: The character templates (e.g., 'Alpha-Male CEO', 'The Vicious Rival', 'The Innocent Victim', 'The Substitute').
+      * `commercialStrategy`: The business logic (e.g., 'Hook-First Pacing', 'Paywall-Baiting', 'Extreme Character Tropes').
+
+-----
+
+### JSON Output Requirement
+
+You must and only provide your complete analysis in the following JSON structure.
+
+**JSON Structure and Field Definitions:**
+
+```json
+{
+  "videoInfo": {
+    "title": "Inferred title or filename of the video",
+    "duration": "Total video duration (e.g., '00:59')",
+    "description": "A brief (1-2 sentence) summary of the video's plot."
+  },
+  "overallAnalysis": {
+    "primaryPsychologicalHook": "The main psychological hook (e.g., 'Revenge Anticipation')",
+    "narrativeArchetypes": [
+      "Identified narrative archetypes (e.g., 'Alpha-Male CEO', 'The Vicious Rival')"
+    ],
+    "commercialStrategy": "Identified commercial strategy (e.g., 'Hook-First Pacing', 'Paywall-Baiting')",
+    "appealScore": "An overall appeal score from 1-10 (based on its ability to generate 'Agony/Payoff' emotions)",
+    "appealReason": "A brief justification for the score, tied to the 'Agony/Payoff' loop."
+  },
+  "eventBreakdown": [
+    {
+      "timestamp": "Start-End time of the event (e.g., 'mm:ss:ff-mm:ss:ff')",
+      "eventType": "The type of impact (e.g., 'VisualImpact', 'ActionImpact', 'DialogueImpact', 'ConfrontationImpact', 'PlotTwist')",
+      "description": "Objective description of the event (e.g., 'Male lead saves female lead from drowning')",
+      "analysis": "Analysis of the event's appeal. Explain *how* this event builds 'Agony' (emotional debt) or provides 'Payoff' (catharsis), linking to the flags.",
+      "flags": {
+        "isHighlight": "true | false",
+        "isKeyPoint": "true | false",
+        "isAppealing": "true | false"
+      },
+      "keyElements": [
+        "Key elements involved in this event (e.g., 'Wedding Dress', 'Jade Pendant', 'Drugging', 'Slap', 'Pool')"
+      ]
+    }
+  ]
+}
+```
+
+-----
+
+### Strict Definitions for `flags` (MANDATORY)
+
+You must judge `true` or `false` based *only* on these criteria:
+
+  * **`isHighlight`:**
+
+      * **true:** If this is an "apex" of emotion or action. This is the most shocking, explosive, or high-energy moment (e.g., the public humiliation, the dress-tearing, the slap, the passionate kiss, the "Go." line).
+      * **false:** A standard transition, setup, or normal-paced dialogue.
+
+  * **`isKeyPoint`:**
+
+      * **true:** If this is a "critical information" moment that drives the plot or reversal, *even if it is not a highlight*. It is essential for understanding the *truth* (e.g., a flashback showing the real culprit, the reveal of a token, a line of dialogue revealing a secret identity: "She's mute," "He's looking for 'Annie'").
+      * **false:** It's just action or emotion, but contains no *new information* or *plot-driving* secret.
+
+  * **`isAppealing`:**
+
+      * **true:** If the event effectively builds **"Agony"** (emotional debt, oppression, misunderstanding, pain) or provides/promises a **"Payoff"** (catharsis, revenge, thrill, power). This is judged based on the "addictive" logic of short-form drama. Nearly all Highlights and Key Points should be Appealing.
+      * **false:** Pure exposition, neutral transitions, or moments that don't create emotional investment.</textarea>
                                 </div>
 
                                 <div class="text-center">
@@ -885,9 +1415,97 @@
                                     <textarea
                                         class="form-control prompt-input"
                                         id="batchTextPrompt"
-                                        rows="4"
+                                        rows="18"
                                         placeholder="请描述你希望AI如何分析这些视频，例如：详细描述视频内容、分析视频中的场景和人物、总结视频主题等..."
-                                    >请详细描述这个视频的内容，包括场景、人物、动作和整体主题</textarea>
+                                    >### Short-Form Drama "Agony/Payoff" Analyst (JSON Output)
+
+**Role:**
+You are a professional Short-Form Drama Analyst. Your expertise is deconstructing video content to identify narrative archetypes, psychological hooks, and commercial appeal.
+
+**Task:**
+You will receive  video files. Your task is to analyze this video by deconstructing *why* it is compelling. You must use two core frameworks:
+
+1.  **The Impact Framework:** Identifying and categorizing all key events (Visual, Action, Dialogue, Confrontation, Plot Twist).
+2.  **The Deep Appeal Framework:** Analyzing the underlying psychological hooks (the "Agony/Payoff" loop), the narrative archetypes used, and the commercial strategy driving the content.
+
+Your entire output **must** be a single JSON code block. Do not include *any* introductory, explanatory, or summary text before or after the JSON.
+
+**Core Frameworks (For Your Analysis):**
+
+  * **Impact Framework (for `eventType`):**
+      * `VisualImpact`: A key visual cue (a close-up on a token, a specific expression, a "red dress").
+      * `ActionImpact`: A significant physical action (a slap, a rescue, a choke, a push).
+      * `DialogueImpact`: A "Killing Line" or key piece of information delivered via speech/text.
+      * `ConfrontationImpact`: A direct clash between two or more characters (an argument, a public humiliation).
+      * `PlotTwist`: A non-obvious reveal that re-contextualizes the plot (e.g., "He's not the CEO," "She's his long-lost sister").
+  * **Deep Appeal Framework (for `overallAnalysis`):**
+      * `primaryPsychologicalHook`: The main emotional driver (e.g., 'Revenge Anticipation', 'Emotional Debt', 'Justice Catharsis', 'Forbidden Love').
+      * `narrativeArchetypes`: The character templates (e.g., 'Alpha-Male CEO', 'The Vicious Rival', 'The Innocent Victim', 'The Substitute').
+      * `commercialStrategy`: The business logic (e.g., 'Hook-First Pacing', 'Paywall-Baiting', 'Extreme Character Tropes').
+
+-----
+
+### JSON Output Requirement
+
+You must and only provide your complete analysis in the following JSON structure.
+
+**JSON Structure and Field Definitions:**
+
+```json
+{
+  "videoInfo": {
+    "title": "Inferred title or filename of the video",
+    "duration": "Total video duration (e.g., '00:59')",
+    "description": "A brief (1-2 sentence) summary of the video's plot."
+  },
+  "overallAnalysis": {
+    "primaryPsychologicalHook": "The main psychological hook (e.g., 'Revenge Anticipation')",
+    "narrativeArchetypes": [
+      "Identified narrative archetypes (e.g., 'Alpha-Male CEO', 'The Vicious Rival')"
+    ],
+    "commercialStrategy": "Identified commercial strategy (e.g., 'Hook-First Pacing', 'Paywall-Baiting')",
+    "appealScore": "An overall appeal score from 1-10 (based on its ability to generate 'Agony/Payoff' emotions)",
+    "appealReason": "A brief justification for the score, tied to the 'Agony/Payoff' loop."
+  },
+  "eventBreakdown": [
+    {
+      "timestamp": "Start-End time of the event (e.g., 'mm:ss:ff-mm:ss:ff')",
+      "eventType": "The type of impact (e.g., 'VisualImpact', 'ActionImpact', 'DialogueImpact', 'ConfrontationImpact', 'PlotTwist')",
+      "description": "Objective description of the event (e.g., 'Male lead saves female lead from drowning')",
+      "analysis": "Analysis of the event's appeal. Explain *how* this event builds 'Agony' (emotional debt) or provides 'Payoff' (catharsis), linking to the flags.",
+      "flags": {
+        "isHighlight": "true | false",
+        "isKeyPoint": "true | false",
+        "isAppealing": "true | false"
+      },
+      "keyElements": [
+        "Key elements involved in this event (e.g., 'Wedding Dress', 'Jade Pendant', 'Drugging', 'Slap', 'Pool')"
+      ]
+    }
+  ]
+}
+```
+
+-----
+
+### Strict Definitions for `flags` (MANDATORY)
+
+You must judge `true` or `false` based *only* on these criteria:
+
+  * **`isHighlight`:**
+
+      * **true:** If this is an "apex" of emotion or action. This is the most shocking, explosive, or high-energy moment (e.g., the public humiliation, the dress-tearing, the slap, the passionate kiss, the "Go." line).
+      * **false:** A standard transition, setup, or normal-paced dialogue.
+
+  * **`isKeyPoint`:**
+
+      * **true:** If this is a "critical information" moment that drives the plot or reversal, *even if it is not a highlight*. It is essential for understanding the *truth* (e.g., a flashback showing the real culprit, the reveal of a token, a line of dialogue revealing a secret identity: "She's mute," "He's looking for 'Annie'").
+      * **false:** It's just action or emotion, but contains no *new information* or *plot-driving* secret.
+
+  * **`isAppealing`:**
+
+      * **true:** If the event effectively builds **"Agony"** (emotional debt, oppression, misunderstanding, pain) or provides/promises a **"Payoff"** (catharsis, revenge, thrill, power). This is judged based on the "addictive" logic of short-form drama. Nearly all Highlights and Key Points should be Appealing.
+      * **false:** Pure exposition, neutral transitions, or moments that don't create emotional investment.</textarea>
                                 </div>
 
                                 <!-- 文件列表预览 -->
@@ -922,6 +1540,50 @@
                             </div>
                         </div>
 
+                        <!-- 第一步进度 -->
+                        <div class="step-progress-container" id="step1ProgressContainer" style="display: none;">
+                            <div class="step-section processing" id="step1Section">
+                                <div class="step-section-header">
+                                    <h6 class="step-section-title">
+                                        <div class="step-section-icon">
+                                            <i class="fas fa-video"></i>
+                                        </div>
+                                        第一步：视频内容分析
+                                    </h6>
+                                    <span class="step-section-badge processing" id="step1Badge">处理中</span>
+                                </div>
+                                <div class="step-progress-bar">
+                                    <div class="step-progress-bar-fill" id="step1ProgressBar"></div>
+                                </div>
+                                <div class="step-progress-text">
+                                    <span id="step1StatusText">正在分析视频内容...</span>
+                                    <span id="step1ProgressText">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 第二步进度 -->
+                        <div class="step-progress-container" id="step2ProgressContainer" style="display: none;">
+                            <div class="step-section" id="step2Section">
+                                <div class="step-section-header">
+                                    <h6 class="step-section-title">
+                                        <div class="step-section-icon">
+                                            <i class="fas fa-brain"></i>
+                                        </div>
+                                        第二步：DeepSeek智能处理
+                                    </h6>
+                                    <span class="step-section-badge waiting" id="step2Badge">等待中</span>
+                                </div>
+                                <div class="step-progress-bar">
+                                    <div class="step-progress-bar-fill" id="step2ProgressBar"></div>
+                                </div>
+                                <div class="step-progress-text">
+                                    <span id="step2StatusText">等待视频分析完成...</span>
+                                    <span id="step2ProgressText">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 错误信息 -->
                         <div class="error-message" id="errorMessage" style="display: none;">
                             <i class="fas fa-exclamation-triangle"></i>
@@ -931,11 +1593,110 @@
                         <!-- 分析结果 -->
                         <div class="result-container" id="resultContainer">
                             <h5 class="mb-3">
-                                <i class="fas fa-check-circle text-success"></i> 分析结果
+                                <i class="fas fa-check-circle text-success"></i> 第一步：视频分析结果
                             </h5>
                             <div class="card result-card">
                                 <div class="card-body">
                                     <div id="resultText"></div>
+                                </div>
+                            </div>
+
+                            <!-- 下一步按钮 -->
+                            <div class="text-center mt-4" id="nextStepButtonContainer">
+                                <button type="button" class="btn btn-primary btn-lg" id="nextStepBtn" onclick="proceedToStep2()">
+                                    <i class="fas fa-arrow-right"></i> 下一步：DeepSeek处理
+                                </button>
+                                <div class="mt-2 text-muted">
+                                    <small>使用DeepSeek对视频分析结果进行进一步处理</small>
+                                </div>
+                            </div>
+
+                            <!-- DeepSeek第二步处理 -->
+                            <div class="mt-4" id="deepSeekSection" style="display: none;">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-brain text-info"></i> 第二步：DeepSeek智能处理
+                                </h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="deepSeekPrompt" class="form-label fw-bold">
+                                                <i class="fas fa-edit"></i> 处理指令
+                                            </label>
+                                            <textarea
+                                                class="form-control prompt-input"
+                                                id="deepSeekPrompt"
+                                                rows="8"
+                                                placeholder="请输入DeepSeek的处理指令，将基于视频分析结果进行处理..."
+                                            ># Role
+
+You are a JSON data processing engine.
+
+
+
+# Core Directive
+
+Your sole task is to parse the JSON data provided by the user. You are strictly forbidden from performing any web searches, information lookups, or using any information from your knowledge base unrelated to this JSON. You must operate *only* on the provided JSON text.
+
+
+
+# Task
+
+1.  Receive the JSON data provided by the user.
+
+2.  Locate the array named `eventBreakdown` within the JSON data.
+
+3.  Iterate through every object within the `eventBreakdown` array.
+
+4.  From each object, extract the value associated with the `timestamp` key.
+
+5.  Collect all extracted `timestamp` values into a JSON string array, maintaining their original order of appearance.
+
+
+
+# Output Constraints (!!! Must Be Strictly Followed !!!)
+
+-   Your final response **must** be *only* the JSON array itself.
+
+-   You **must not** include any explanatory text (e.g., "Here is the data you requested...").
+
+-   You **must not** include any Markdown formatting (e.g., ```json ... ```).
+
+-   Your response must begin directly with `[` and end directly with `]`.
+
+
+
+# Example (For your internal understanding only; do not output)
+
+If the input JSON contains:
+
+`"eventBreakdown": [{"timestamp": "A"}, {"timestamp": "B"}]`
+
+Your one and only output must be:
+
+`["A", "B"]`
+
+
+
+Now, I give you the user's JSON data: </textarea>
+                                        </div>
+                                        <div class="text-center">
+                                            <button type="button" class="btn btn-info btn-lg" id="deepSeekBtn">
+                                                <i class="fas fa-brain"></i> 开始DeepSeek处理
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- DeepSeek处理结果 -->
+                                <div class="mt-3" id="deepSeekResultContainer" style="display: none;">
+                                    <h6 class="mb-2">
+                                        <i class="fas fa-check-circle text-info"></i> DeepSeek处理结果
+                                    </h6>
+                                    <div class="card result-card">
+                                        <div class="card-body">
+                                            <div id="deepSeekResultText"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -943,9 +1704,104 @@
                         <!-- 批量分析结果 -->
                         <div class="result-container" id="batchResultContainer" style="display: none;">
                             <h5 class="mb-3">
-                                <i class="fas fa-layer-group text-success"></i> 批量分析结果
+                                <i class="fas fa-layer-group text-success"></i> 第一步：批量分析结果
                             </h5>
                             <div id="batchResults"></div>
+
+                            <!-- 下一步按钮 -->
+                            <div class="text-center mt-4" id="batchNextStepButtonContainer">
+                                <button type="button" class="btn btn-primary btn-lg" id="batchNextStepBtn" onclick="proceedToBatchStep2()">
+                                    <i class="fas fa-arrow-right"></i> 下一步：批量DeepSeek处理
+                                </button>
+                                <div class="mt-2 text-muted">
+                                    <small>使用DeepSeek对所有视频分析结果进行批量处理</small>
+                                </div>
+                            </div>
+
+                            <!-- 批量DeepSeek处理 -->
+                            <div class="mt-4" id="batchDeepSeekSection" style="display: none;">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-brain text-info"></i> 第二步：批量DeepSeek处理
+                                </h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="batchDeepSeekPrompt" class="form-label fw-bold">
+                                                <i class="fas fa-edit"></i> 处理指令（将应用于所有视频分析结果）
+                                            </label>
+                                            <textarea
+                                                class="form-control prompt-input"
+                                                id="batchDeepSeekPrompt"
+                                                rows="8"
+                                                placeholder="请输入DeepSeek的处理指令，将基于每个视频的分析结果分别进行处理..."
+                                            ># Role
+
+You are a JSON data processing engine.
+
+
+
+# Core Directive
+
+Your sole task is to parse the JSON data provided by the user. You are strictly forbidden from performing any web searches, information lookups, or using any information from your knowledge base unrelated to this JSON. You must operate *only* on the provided JSON text.
+
+
+
+# Task
+
+1.  Receive the JSON data provided by the user.
+
+2.  Locate the array named `eventBreakdown` within the JSON data.
+
+3.  Iterate through every object within the `eventBreakdown` array.
+
+4.  From each object, extract the value associated with the `timestamp` key.
+
+5.  Collect all extracted `timestamp` values into a JSON string array, maintaining their original order of appearance.
+
+
+
+# Output Constraints (!!! Must Be Strictly Followed !!!)
+
+-   Your final response **must** be *only* the JSON array itself.
+
+-   You **must not** include any explanatory text (e.g., "Here is the data you requested...").
+
+-   You **must not** include any Markdown formatting (e.g., ```json ... ```).
+
+-   Your response must begin directly with `[` and end directly with `]`.
+
+
+
+# Example (For your internal understanding only; do not output)
+
+If the input JSON contains:
+
+`"eventBreakdown": [{"timestamp": "A"}, {"timestamp": "B"}]`
+
+Your one and only output must be:
+
+`["A", "B"]`
+
+
+
+Now, I give you the user's JSON data: </textarea>
+                                        </div>
+                                        <div class="text-center">
+                                            <button type="button" class="btn btn-info btn-lg" id="batchDeepSeekBtn" onclick="startBatchDeepSeekProcessing()">
+                                                <i class="fas fa-brain"></i> 开始批量DeepSeek处理
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 批量DeepSeek处理结果 -->
+                                <div class="mt-3" id="batchDeepSeekResultContainer" style="display: none;">
+                                    <h6 class="mb-2">
+                                        <i class="fas fa-check-circle text-info"></i> 批量DeepSeek处理结果
+                                    </h6>
+                                    <div id="batchDeepSeekResults"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1032,6 +1888,7 @@
 
         // 上传表单提交处理
         document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            console.log('uploadForm submit event triggered'); // 调试信息
             e.preventDefault();
             startUploadAnalysis();
         });
@@ -1117,12 +1974,585 @@
             }
         });
 
+        // 步骤控制相关变量
+        let currentStep = 1;
+        let videoAnalysisResults = []; // 存储视频分析结果
+        let deepSeekTaskIds = []; // 存储DeepSeek处理任务ID
+
+        // 步骤控制函数
+        function resetSteps() {
+            currentStep = 1;
+            videoAnalysisResults = [];
+            deepSeekTaskIds = [];
+
+            // 重置所有步骤状态
+            for (let i = 1; i <= 2; i++) {
+                const stepItem = document.getElementById(`step${i}`);
+                const stepStatus = document.getElementById(`step${i}Status`);
+
+                stepItem.className = 'step-item' + (i === 1 ? ' active' : '');
+                stepStatus.textContent = i === 1 ? '进行中' : '待处理';
+            }
+
+            // 重置共用进度条
+            const stepProgress = document.getElementById('stepProgress');
+            const stepProgressFill = stepProgress.querySelector('.step-progress-fill');
+            if (stepProgressFill) {
+                stepProgressFill.style.width = '0%';
+            }
+
+            // 确保进度条显示
+            document.getElementById('stepProgress').style.display = 'block';
+
+            // 隐藏DeepSeek处理区域
+            hideDeepSeekSections();
+        }
+
+        function setStepStatus(stepNumber, status, statusText) {
+            const stepItem = document.getElementById(`step${stepNumber}`);
+            const stepStatus = document.getElementById(`step${stepNumber}Status`);
+            const stepCircle = stepItem.querySelector('.step-circle');
+
+            // 移除所有状态类
+            stepItem.classList.remove('active', 'processing', 'completed', 'error');
+
+            // 添加新状态类
+            if (status === 'active') {
+                stepItem.classList.add('active');
+                stepCircle.classList.add('active');
+            } else if (status === 'processing') {
+                stepItem.classList.add('processing');
+                stepCircle.classList.add('processing');
+            } else if (status === 'completed') {
+                stepItem.classList.add('completed');
+                stepCircle.classList.add('completed');
+            } else if (status === 'error') {
+                stepItem.classList.add('error');
+                stepCircle.classList.add('error');
+            }
+
+            stepStatus.textContent = statusText;
+        }
+
+        function updateStepProgress(stepNumber, progress) {
+            const stepProgress = document.getElementById('stepProgress');
+            const stepProgressFill = stepProgress.querySelector('.step-progress-fill');
+
+            if (stepProgressFill) {
+                stepProgressFill.style.width = progress + '%';
+            }
+
+            console.log(`Step ${stepNumber} progress updated to ${progress}%`); // 调试信息
+        }
+
+        function moveToNextStep() {
+            if (currentStep < 2) {
+                // 完成当前步骤
+                setStepStatus(currentStep, 'completed', '已完成');
+                updateStepProgress(currentStep, 100);
+
+                // 激活下一步
+                currentStep++;
+                setStepStatus(currentStep, 'active', '进行中');
+
+                // 重置进度条为下一步准备
+                updateStepProgress(currentStep, 0);
+
+                // 如果移动到第二步，显示DeepSeek处理区域
+                if (currentStep === 2) {
+                    showDeepSeekSections();
+                    // 自动填充视频分析结果
+                    fillVideoAnalysisResults();
+                }
+            }
+        }
+
+        function showDeepSeekSections() {
+            // 显示单个结果的DeepSeek处理区域
+            const singleDeepSeekSection = document.getElementById('singleDeepSeekSection');
+            if (singleDeepSeekSection) {
+                singleDeepSeekSection.style.display = 'block';
+            }
+
+            // 显示批量结果的DeepSeek处理区域
+            const batchDeepSeekSection = document.getElementById('batchDeepSeekSection');
+            if (batchDeepSeekSection) {
+                batchDeepSeekSection.style.display = 'block';
+            }
+        }
+
+        function hideDeepSeekSections() {
+            const singleDeepSeekSection = document.getElementById('singleDeepSeekSection');
+            if (singleDeepSeekSection) {
+                singleDeepSeekSection.style.display = 'none';
+            }
+
+            const batchDeepSeekSection = document.getElementById('batchDeepSeekSection');
+            if (batchDeepSeekSection) {
+                batchDeepSeekSection.style.display = 'none';
+            }
+        }
+
+        // 进入第二步（单个视频）
+        function proceedToStep2() {
+            console.log('进入第二步：单个视频DeepSeek处理');
+
+            // 隐藏下一步按钮
+            document.getElementById('nextStepButtonContainer').style.display = 'none';
+
+            // 移动到第二步
+            moveToNextStep();
+        }
+
+        // 进入第二步（批量视频）
+        function proceedToBatchStep2() {
+            console.log('进入第二步：批量视频DeepSeek处理');
+
+            // 隐藏下一步按钮
+            document.getElementById('batchNextStepButtonContainer').style.display = 'none';
+
+            // 移动到第二步
+            moveToNextStep();
+        }
+
+        function fillVideoAnalysisResults() {
+            // 填充单个视频分析结果
+            if (videoAnalysisResults.length === 1) {
+                const videoResultInput = document.getElementById('videoResultInput');
+                if (videoResultInput) {
+                    videoResultInput.value = videoAnalysisResults[0];
+                }
+            }
+
+            // 填充批量视频分析结果
+            if (videoAnalysisResults.length > 1) {
+                for (let i = 0; i < videoAnalysisResults.length; i++) {
+                    const batchResultInput = document.getElementById(`batchResultInput${i}`);
+                    if (batchResultInput) {
+                        batchResultInput.value = videoAnalysisResults[i];
+                    }
+                }
+            }
+        }
+
+        // DeepSeek处理函数
+        function startDeepSeekProcessing() {
+            console.log('startDeepSeekProcessing function called'); // 调试信息
+
+            const userPrompt = document.getElementById('userPrompt').value.trim();
+            const videoResult = document.getElementById('videoResultInput').value.trim();
+
+            console.log('userPrompt length:', userPrompt.length); // 调试信息
+            console.log('videoResult length:', videoResult.length); // 调试信息
+
+            if (!videoResult) {
+                showError('视频分析结果不能为空');
+                return;
+            }
+
+            // 设置步骤状态
+            setStepStatus(2, 'processing', 'DeepSeek处理中');
+            updateStepProgress(2, 30);
+
+            // 禁用DeepSeek处理按钮
+            const deepSeekBtn = document.getElementById('deepSeekProcessBtn');
+            console.log('deepSeekBtn:', deepSeekBtn); // 调试信息
+
+            if (deepSeekBtn) {
+                deepSeekBtn.disabled = true;
+                deepSeekBtn.innerHTML = '<span class="loading-spinner"></span>DeepSeek处理中...';
+            } else {
+                console.error('deepSeekProcessBtn not found!'); // 调试信息
+            }
+
+            updateStepProgress(2, 50);
+
+            // 发送DeepSeek处理请求
+            console.log('Sending DeepSeek request...'); // 调试信息
+            fetch('/deepseek/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    video_result: videoResult,
+                    user_prompt: userPrompt
+                })
+            })
+            .then(response => {
+                console.log('DeepSeek response received:', response.status); // 调试信息
+                return response.json();
+            })
+            .then(data => {
+                console.log('DeepSeek data:', data); // 调试信息
+                if (data.success) {
+                    updateStepProgress(2, 80);
+                    // 直接显示结果（同步处理）
+                    showDeepSeekResult(data.result);
+                    setStepStatus(2, 'completed', '已完成');
+                    updateStepProgress(2, 100);
+                } else {
+                    setStepStatus(2, 'error', '处理失败');
+                    showError(data.error || 'DeepSeek处理失败');
+                }
+                resetDeepSeekInterface();
+            })
+            .catch(error => {
+                console.error('DeepSeek processing error:', error); // 调试信息
+                setStepStatus(2, 'error', '处理失败');
+                showError('DeepSeek处理错误：' + error.message);
+                resetDeepSeekInterface();
+            });
+        }
+
+        function startBatchDeepSeekProcessing() {
+            console.log('startBatchDeepSeekProcessing function called'); // 调试信息
+
+            const userPrompt = document.getElementById('batchDeepSeekPrompt').value.trim();
+            console.log('batchDeepSeekPrompt length:', userPrompt.length); // 调试信息
+
+            // 收集所有视频分析结果
+            console.log('videoAnalysisResults:', videoAnalysisResults); // 调试信息
+            console.log('videoAnalysisResults type:', typeof videoAnalysisResults); // 调试信息
+
+            const videoResults = [];
+            if (videoAnalysisResults && Array.isArray(videoAnalysisResults)) {
+                for (let i = 0; i < videoAnalysisResults.length; i++) {
+                    if (videoAnalysisResults[i] && videoAnalysisResults[i].trim()) {
+                        videoResults.push(videoAnalysisResults[i].trim());
+                    }
+                }
+            } else {
+                console.error('videoAnalysisResults is not available or not an array'); // 调试信息
+            }
+
+            console.log('videoResults count:', videoResults.length); // 调试信息
+            console.log('videoAnalysisResults count:', videoAnalysisResults ? videoAnalysisResults.length : 'undefined'); // 调试信息
+
+            if (videoResults.length === 0) {
+                showError('没有可处理的视频分析结果');
+                return;
+            }
+
+            // 设置步骤状态
+            setStepStatus(2, 'processing', 'DeepSeek批量处理中');
+            updateStepProgress(2, 20);
+
+            // 禁用批量DeepSeek处理按钮
+            const batchDeepSeekBtn = document.getElementById('batchDeepSeekBtn');
+            console.log('batchDeepSeekBtn:', batchDeepSeekBtn); // 调试信息
+
+            if (batchDeepSeekBtn) {
+                batchDeepSeekBtn.disabled = true;
+                batchDeepSeekBtn.innerHTML = '<span class="loading-spinner"></span>批量DeepSeek处理中...';
+            } else {
+                console.error('batchDeepSeekBtn not found!'); // 调试信息
+            }
+
+            updateStepProgress(2, 40);
+
+            // 发送批量DeepSeek处理请求
+            console.log('Sending batch DeepSeek request...'); // 调试信息
+            fetch('/deepseek/process/batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    video_results: videoResults,
+                    user_prompt: userPrompt
+                })
+            })
+            .then(response => {
+                console.log('Batch DeepSeek response received:', response.status); // 调试信息
+                return response.json();
+            })
+            .then(data => {
+                console.log('Batch DeepSeek data:', data); // 调试信息
+                if (data.success) {
+                    updateStepProgress(2, 70);
+                    // 直接显示批量结果（同步处理）
+                    showBatchDeepSeekResults(data.results, data.total_count);
+                    setStepStatus(2, 'completed', '已完成');
+                    updateStepProgress(2, 100);
+                } else {
+                    setStepStatus(2, 'error', '批量处理失败');
+                    showError(data.error || '批量DeepSeek处理失败');
+                }
+                resetBatchDeepSeekInterface();
+            })
+            .catch(error => {
+                console.error('Batch DeepSeek processing error:', error); // 调试信息
+                setStepStatus(2, 'error', '批量处理失败');
+                showError('批量DeepSeek处理错误：' + error.message);
+                resetBatchDeepSeekInterface();
+            });
+        }
+
+        function showDeepSeekResult(result) {
+            const deepSeekResultContainer = document.getElementById('deepSeekResultContainer');
+            const deepSeekResultText = document.getElementById('deepSeekResultText');
+
+            if (deepSeekResultContainer && deepSeekResultText) {
+                deepSeekResultText.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${result}</pre>`;
+                deepSeekResultContainer.style.display = 'block';
+                deepSeekResultContainer.classList.add('fade-in');
+            }
+        }
+
+        function showBatchDeepSeekResults(results, totalCount) {
+            const batchDeepSeekResultContainer = document.getElementById('batchDeepSeekResultContainer');
+            const batchDeepSeekResults = document.getElementById('batchDeepSeekResults');
+
+            if (!batchDeepSeekResultContainer || !batchDeepSeekResults) {
+                return;
+            }
+
+            let html = `
+                <div class="mb-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        DeepSeek处理了 <strong>${totalCount}</strong> 个视频分析结果
+                    </div>
+                </div>
+                <div class="accordion" id="batchDeepSeekAccordion">
+            `;
+
+            results.forEach((result, index) => {
+                const isSuccess = result.success;
+                const accordionId = `deepSeekCollapse${index}`;
+
+                html += `
+                    <div class="accordion-item mb-3">
+                        <h2 class="accordion-header" id="deepSeekHeading${index}">
+                            <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-brain me-2"></i>
+                                        <strong>视频 ${index + 1} DeepSeek处理结果</strong>
+                                        ${isSuccess ?
+                                            '<span class="badge bg-success ms-2">处理成功</span>' :
+                                            '<span class="badge bg-danger ms-2">处理失败</span>'
+                                        }
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="${accordionId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#batchDeepSeekAccordion">
+                            <div class="accordion-body">
+                                ${isSuccess ?
+                                    `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>` :
+                                    `<div class="alert alert-danger">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        ${result.error || 'DeepSeek处理过程中发生错误'}
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            batchDeepSeekResults.innerHTML = html;
+            batchDeepSeekResultContainer.style.display = 'block';
+            batchDeepSeekResultContainer.classList.add('fade-in');
+        }
+
+        function resetDeepSeekInterface() {
+            const deepSeekBtn = document.getElementById('deepSeekProcessBtn');
+            if (deepSeekBtn) {
+                deepSeekBtn.disabled = false;
+                deepSeekBtn.innerHTML = '<i class="fas fa-brain"></i> 开始DeepSeek处理';
+            }
+        }
+
+        function resetBatchDeepSeekInterface() {
+            const batchDeepSeekBtn = document.getElementById('batchDeepSeekBtn');
+            if (batchDeepSeekBtn) {
+                batchDeepSeekBtn.disabled = false;
+                batchDeepSeekBtn.innerHTML = '<i class="fas fa-brain"></i> 批量DeepSeek处理';
+            }
+        }
+
+        // 修改原有的showResult函数以支持两步处理
+        function showResult(result) {
+            const resultContainer = document.getElementById('resultContainer');
+            const resultText = document.getElementById('resultText');
+
+            // 存储视频分析结果
+            videoAnalysisResults = [result];
+
+            resultText.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${result}</pre>`;
+            resultContainer.style.display = 'block';
+            resultContainer.classList.add('fade-in');
+
+            // 完成第一步，显示下一步按钮
+            setStepStatus(1, 'completed', '已完成');
+            updateStepProgress(1, 100);
+
+            // 显示下一步按钮
+            document.getElementById('nextStepButtonContainer').style.display = 'block';
+        }
+
+        // 修改原有的showBatchResults函数以支持两步处理
+        function showBatchResults(results, totalCount) {
+            console.log('=== 第一个showBatchResults函数被调用 ==='); // 调试信息
+            console.log('results:', results); // 调试信息
+            console.log('totalCount:', totalCount); // 调试信息
+
+            const batchResultContainer = document.getElementById('batchResultContainer');
+            const batchResults = document.getElementById('batchResults');
+
+            // 存储视频分析结果
+            videoAnalysisResults = [];
+            let resultIndex = 0;
+            for (const [taskId, result] of Object.entries(results)) {
+                console.log(`Processing result ${resultIndex}:`, result); // 调试信息
+                if (result.success && result.result) {
+                    videoAnalysisResults[resultIndex] = result.result;
+                    resultIndex++;
+                } else {
+                    videoAnalysisResults[resultIndex] = `分析失败: ${result.error || '未知错误'}`;
+                    resultIndex++;
+                }
+            }
+
+            let html = `
+                <div class="mb-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        共分析了 <strong>${totalCount}</strong> 个视频文件
+                    </div>
+                </div>
+                <div class="accordion" id="batchAccordion">
+            `;
+
+            resultIndex = 0;
+            for (const [taskId, result] of Object.entries(results)) {
+                const isSuccess = result.success;
+                const filename = result.filename || '未知文件';
+                const accordionId = `collapse${resultIndex}`;
+
+                html += `
+                    <div class="accordion-item mb-3">
+                        <h2 class="accordion-header" id="heading${resultIndex}">
+                            <button class="accordion-button ${resultIndex > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-file-video me-2"></i>
+                                        <strong>${filename}</strong>
+                                        ${isSuccess ?
+                                            '<span class="badge bg-success ms-2">分析成功</span>' :
+                                            '<span class="badge bg-danger ms-2">分析失败</span>'
+                                        }
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="${accordionId}" class="accordion-collapse collapse ${resultIndex === 0 ? 'show' : ''}" data-bs-parent="#batchAccordion">
+                            <div class="accordion-body">
+                                ${isSuccess ?
+                                    `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>` :
+                                    `<div class="alert alert-danger">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        ${result.error || '分析过程中发生错误'}
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+                resultIndex++;
+            }
+
+            html += '</div>';
+            batchResults.innerHTML = html;
+            batchResultContainer.style.display = 'block';
+            batchResultContainer.classList.add('fade-in');
+
+            // 完成第一步，显示下一步按钮
+            setStepStatus(1, 'completed', '已完成');
+            updateStepProgress(1, 100);
+
+            // 显示批量下一步按钮
+            document.getElementById('batchNextStepButtonContainer').style.display = 'block';
+
+            console.log('=== showBatchResults函数完成 ==='); // 调试信息
+            console.log('最终videoAnalysisResults:', videoAnalysisResults); // 调试信息
+            console.log('videoAnalysisResults length:', videoAnalysisResults.length); // 调试信息
+        }
+
+        // 修改原有的resetInterface函数以重置步骤
+        function resetInterface() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const batchBtn = document.getElementById('batchBtn');
+
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '<i class="fas fa-play"></i> 开始分析';
+
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> 上传并分析';
+
+            batchBtn.disabled = false;
+            batchBtn.innerHTML = '<i class="fas fa-layer-group"></i> 批量上传并分析';
+
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+
+            currentTaskId = null;
+            currentBatchId = null;
+            currentTaskIds = [];
+
+            // 重置步骤
+            resetSteps();
+
+            // 重置DeepSeek界面
+            resetDeepSeekInterface();
+            resetBatchDeepSeekInterface();
+
+            // 隐藏下一步按钮
+            const nextStepButtonContainer = document.getElementById('nextStepButtonContainer');
+            if (nextStepButtonContainer) {
+                nextStepButtonContainer.style.display = 'none';
+            }
+
+            const batchNextStepButtonContainer = document.getElementById('batchNextStepButtonContainer');
+            if (batchNextStepButtonContainer) {
+                batchNextStepButtonContainer.style.display = 'none';
+            }
+
+            // 隐藏DeepSeek结果
+            const deepSeekResultContainer = document.getElementById('deepSeekResultContainer');
+            if (deepSeekResultContainer) {
+                deepSeekResultContainer.style.display = 'none';
+            }
+
+            const batchDeepSeekResultContainer = document.getElementById('batchDeepSeekResultContainer');
+            if (batchDeepSeekResultContainer) {
+                batchDeepSeekResultContainer.style.display = 'none';
+            }
+        }
+
         function startUrlAnalysis() {
+            // 重置步骤但不重置状态，避免状态冲突
+            currentStep = 1;
+            videoAnalysisResults = [];
+            deepSeekTaskIds = [];
+
+            // 设置步骤1为处理中状态
+            setStepStatus(1, 'processing', '视频分析中');
+            updateStepProgress(1, 10);
+
             const videoUrl = document.getElementById('videoUrl').value.trim();
             const textPrompt = document.getElementById('textPrompt').value.trim();
 
             if (!videoUrl) {
                 showError('请输入视频URL');
+                setStepStatus(1, 'error', '输入错误');
                 return;
             }
 
@@ -1131,10 +2561,15 @@
             hideResult();
             showProgress();
 
-            // 禁用按钮
+            // 确保进度条显示
+            document.getElementById('stepProgress').style.display = 'block';
+            updateStepProgress(1, 30);
+
+            // 禁用按钮并更新状态
             const analyzeBtn = document.getElementById('analyzeBtn');
             analyzeBtn.disabled = true;
             analyzeBtn.innerHTML = '<span class="loading-spinner"></span>分析中...';
+            updateStepProgress(1, 50);
 
             // 发送分析请求
             fetch('/analyze', {
@@ -1151,30 +2586,49 @@
             .then(data => {
                 if (data.success) {
                     currentTaskId = data.task_id;
+                    updateStepProgress(1, 80);
                     startStatusCheck();
                 } else {
+                    setStepStatus(1, 'error', '分析失败');
                     showError(data.error || '分析请求失败');
                     resetInterface();
                 }
             })
             .catch(error => {
+                setStepStatus(1, 'error', '分析失败');
                 showError('网络错误：' + error.message);
                 resetInterface();
             });
         }
 
         function startUploadAnalysis() {
+            console.log('startUploadAnalysis function called'); // 调试信息
+
+            // 重置步骤但不重置状态，避免状态冲突
+            currentStep = 1;
+            videoAnalysisResults = [];
+            deepSeekTaskIds = [];
+
+            // 设置步骤1为处理中状态
+            setStepStatus(1, 'processing', '视频上传分析中');
+            updateStepProgress(1, 10);
+
             const videoFile = document.getElementById('videoFile').files[0];
             const textPrompt = document.getElementById('uploadTextPrompt').value.trim();
 
+            console.log('videoFile:', videoFile); // 调试信息
+            console.log('textPrompt length:', textPrompt.length); // 调试信息
+
             if (!videoFile) {
                 showError('请选择视频文件');
+                setStepStatus(1, 'error', '上传失败');
                 return;
             }
 
             // 检查文件大小
             if (videoFile.size > 100 * 1024 * 1024) {
                 showError('文件大小超过100MB限制');
+                setStepStatus(1, 'error', '文件过大');
                 return;
             }
 
@@ -1182,6 +2636,7 @@
             const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv'];
             if (!allowedTypes.includes(videoFile.type) && !videoFile.name.match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/i)) {
                 showError('不支持的文件格式。支持格式: MP4, AVI, MOV, WMV, FLV, WebM, MKV');
+                setStepStatus(1, 'error', '格式不支持');
                 return;
             }
 
@@ -1190,10 +2645,15 @@
             hideResult();
             showProgress();
 
-            // 禁用按钮
+            // 确保进度条显示
+            document.getElementById('stepProgress').style.display = 'block';
+            updateStepProgress(1, 30);
+
+            // 禁用按钮并更新状态
             const uploadBtn = document.getElementById('uploadBtn');
             uploadBtn.disabled = true;
             uploadBtn.innerHTML = '<span class="loading-spinner"></span>上传并分析中...';
+            updateStepProgress(1, 50);
 
             // 创建FormData
             const formData = new FormData();
@@ -1209,13 +2669,16 @@
             .then(data => {
                 if (data.success) {
                     currentTaskId = data.task_id;
+                    updateStepProgress(1, 80);
                     startStatusCheck();
                 } else {
+                    setStepStatus(1, 'error', '上传分析失败');
                     showError(data.error || '上传失败');
                     resetInterface();
                 }
             })
             .catch(error => {
+                setStepStatus(1, 'error', '上传分析失败');
                 showError('网络错误：' + error.message);
                 resetInterface();
             });
@@ -1329,11 +2792,21 @@
         }
 
         function startBatchAnalysis() {
+            // 重置步骤但不重置状态，避免状态冲突
+            currentStep = 1;
+            videoAnalysisResults = [];
+            deepSeekTaskIds = [];
+
+            // 设置步骤1为处理中状态
+            setStepStatus(1, 'processing', '批量视频分析中');
+            updateStepProgress(1, 10);
+
             const videoFiles = document.getElementById('videoFiles').files;
             const textPrompt = document.getElementById('batchTextPrompt').value.trim();
 
             if (!videoFiles || videoFiles.length === 0) {
                 showError('请选择至少一个视频文件');
+                setStepStatus(1, 'error', '选择错误');
                 return;
             }
 
@@ -1341,18 +2814,21 @@
             const files = Array.from(videoFiles);
             if (files.length > 10) {
                 showError('最多只能同时上传10个视频文件');
+                setStepStatus(1, 'error', '文件过多');
                 return;
             }
 
             const totalSize = files.reduce((sum, file) => sum + file.size, 0);
             if (totalSize > 500 * 1024 * 1024) {
                 showError('所有文件总大小超过500MB限制');
+                setStepStatus(1, 'error', '总大小过大');
                 return;
             }
 
             const oversizedFiles = files.filter(file => file.size > 100 * 1024 * 1024);
             if (oversizedFiles.length > 0) {
                 showError(`有${oversizedFiles.length}个文件超过100MB限制`);
+                setStepStatus(1, 'error', '文件过大');
                 return;
             }
 
@@ -1362,6 +2838,7 @@
             );
             if (invalidFiles.length > 0) {
                 showError(`有${invalidFiles.length}个文件格式不支持`);
+                setStepStatus(1, 'error', '格式不支持');
                 return;
             }
 
@@ -1371,10 +2848,15 @@
             hideBatchResult();
             showProgress();
 
-            // 禁用按钮
+            // 确保进度条显示
+            document.getElementById('stepProgress').style.display = 'block';
+            updateStepProgress(1, 30);
+
+            // 禁用按钮并更新状态
             const batchBtn = document.getElementById('batchBtn');
             batchBtn.disabled = true;
             batchBtn.innerHTML = '<span class="loading-spinner"></span>批量上传并分析中...';
+            updateStepProgress(1, 50);
 
             // 创建FormData
             const formData = new FormData();
@@ -1393,13 +2875,16 @@
                 if (data.success) {
                     currentBatchId = data.batch_id;
                     currentTaskIds = data.tasks.map(task => task.task_id);
+                    updateStepProgress(1, 80);
                     startBatchStatusCheck();
                 } else {
+                    setStepStatus(1, 'error', '批量分析失败');
                     showError(data.error || '批量上传失败');
                     resetBatchInterface();
                 }
             })
             .catch(error => {
+                setStepStatus(1, 'error', '批量分析失败');
                 showError('网络错误：' + error.message);
                 resetBatchInterface();
             });
@@ -1465,67 +2950,9 @@
             statusText.textContent = statusMap[status] || '处理中...';
         }
 
-        function showBatchResults(results, totalCount) {
-            const batchResultContainer = document.getElementById('batchResultContainer');
-            const batchResults = document.getElementById('batchResults');
+        // 重复的showBatchResults函数已删除，只保留第一个带有调试信息和videoAnalysisResults保存逻辑的函数
 
-            let html = `
-                <div class="mb-3">
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i>
-                        共分析了 <strong>${totalCount}</strong> 个视频文件
-                    </div>
-                </div>
-                <div class="accordion" id="batchAccordion">
-            `;
-
-            let resultIndex = 0;
-            for (const [taskId, result] of Object.entries(results)) {
-                const isSuccess = result.success;
-                const filename = result.filename || '未知文件';
-                const accordionId = `collapse${resultIndex}`;
-
-                html += `
-                    <div class="accordion-item mb-3">
-                        <h2 class="accordion-header" id="heading${resultIndex}">
-                            <button class="accordion-button ${resultIndex > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
-                                <div class="d-flex w-100 justify-content-between align-items-center">
-                                    <div>
-                                        <i class="fas fa-file-video me-2"></i>
-                                        <strong>${filename}</strong>
-                                        ${isSuccess ?
-                                            '<span class="badge bg-success ms-2">分析成功</span>' :
-                                            '<span class="badge bg-danger ms-2">分析失败</span>'
-                                        }
-                                    </div>
-                                </div>
-                            </button>
-                        </h2>
-                        <div id="${accordionId}" class="accordion-collapse collapse ${resultIndex === 0 ? 'show' : ''}" data-bs-parent="#batchAccordion">
-                            <div class="accordion-body">
-                                ${isSuccess ?
-                                    `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>` :
-                                    `<div class="alert alert-danger">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                        ${result.error || '分析过程中发生错误'}
-                                    </div>`
-                                }
-                            </div>
-                        </div>
-                    </div>
-                `;
-                resultIndex++;
-            }
-
-            html += '</div>';
-            batchResults.innerHTML = html;
-            batchResultContainer.style.display = 'block';
-            batchResultContainer.classList.add('fade-in');
-
-            hideProgress();
-        }
-
-        function hideBatchResult() {
+            function hideBatchResult() {
             document.getElementById('batchResultContainer').style.display = 'none';
         }
 
@@ -1572,6 +2999,9 @@
 
         // 页面加载完成后的初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 初始化步骤系统
+            resetSteps();
+
             // 检查服务健康状态
             fetch('/health')
             .then(response => response.json())
