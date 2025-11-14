@@ -3980,8 +3980,8 @@ Now, I give you the json:</textarea>
                 console.log(`📤 [${i + 1}/${totalResults}] Sending request to DeepSeek API`);
                 console.log(`📝 [${i + 1}] Prompt length: ${fullPrompt.length}`);
 
-                // 使用DeepSeek处理器进行JSON拼接
-                fetch('/deepseek/process/batch', {
+                // 使用JSON拼接处理器进行JSON拼接
+                fetch('/json-merge/process', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3992,8 +3992,17 @@ Now, I give you the json:</textarea>
                     })
                 })
                 .then(response => {
-                    console.log(`📡 [${i + 1}] DeepSeek response status:`, response.status);
-                    return response.json();
+                    console.log(`📡 [${i + 1}] JSON Merge response status:`, response.status);
+                    console.log(`📋 [${i + 1}] JSON Merge response headers:`, response.headers);
+                    return response.text().then(text => {
+                        console.log(`📝 [${i + 1}] JSON Merge response text (raw):`, text);
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            console.error(`❌ [${i + 1}] JSON parse error:`, e);
+                            return {error: 'JSON parse error', rawText: text};
+                        }
+                    });
                 })
                 .then(data => {
                     completedCount++;
@@ -4007,21 +4016,20 @@ Now, I give you the json:</textarea>
                         totalResults
                     );
 
-                    if (data.success && data.results && data.results.length > 0) {
-                        const result = data.results[0];
+                    if (data.success) {
                         jsonMergeResults.push({
                             index: i,
                             videoResult: videoResult,
                             personResult: personResult,
-                            mergedResult: result.success ? result.result : result.error,
-                            success: result.success
+                            mergedResult: data.result,
+                            success: true
                         });
                     } else {
                         jsonMergeResults.push({
                             index: i,
                             videoResult: videoResult,
                             personResult: personResult,
-                            error: data.error || 'DeepSeek处理失败',
+                            error: data.error || 'JSON拼接处理失败',
                             success: false
                         });
                     }

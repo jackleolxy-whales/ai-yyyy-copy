@@ -629,6 +629,62 @@ def get_deepseek_batch_result(batch_id):
     except Exception as e:
         return jsonify({"success": False, "error": f"获取批量DeepSeek结果失败: {str(e)}"})
 
+@app.route('/json-merge/process', methods=['POST'])
+def json_merge_process():
+    """第四步JSON拼接处理接口"""
+    try:
+        data = request.json
+        text_prompt = data.get('text_prompt', '').strip()
+        batch_id = data.get('batch_id', '').strip()
+
+        if not text_prompt:
+            return jsonify({"success": False, "error": "文本提示词不能为空"})
+
+        # 生成任务ID
+        task_id = str(int(time.time() * 1000))
+
+        # 设置状态
+        deepseek_status[task_id] = {"status": "processing", "progress": 50}
+
+        try:
+            # 直接调用DeepSeek处理
+            result = deepseek_processor.process_video_analysis_result(
+                video_analysis_text=text_prompt,  # 这里传入完整的拼接文本
+                user_prompt="",  # 不需要额外的用户提示词
+                model="deepseek-chat",
+                stream=False
+            )
+
+            # 保存结果
+            deepseek_status[task_id] = {"status": "completed", "progress": 100}
+            deepseek_results[task_id] = {
+                "success": True,
+                "result": result,
+                "prompt": text_prompt,
+                "type": "json_merge",
+                "batch_id": batch_id
+            }
+
+            return jsonify({
+                "success": True,
+                "task_id": task_id,
+                "result": result
+            })
+
+        except Exception as e:
+            deepseek_status[task_id] = {"status": "error", "progress": 0}
+            deepseek_results[task_id] = {
+                "success": False,
+                "error": str(e),
+                "prompt": text_prompt,
+                "type": "json_merge",
+                "batch_id": batch_id
+            }
+            return jsonify({"success": False, "error": f"JSON拼接处理失败: {str(e)}"})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
+
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy", "service": "Video Analyzer API"})
