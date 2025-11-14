@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频内容分析工具</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            position: relative;
+            overflow-x: hidden;
+            color: #e8e8e8;
+        }
+
+        /* 微妙的渐变背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 25% 25%, rgba(138, 43, 226, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(30, 144, 255, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 50% 10%, rgba(147, 51, 234, 0.04) 0%, transparent 40%);
+            z-index: -1;
+        }
+
+        .main-container {
+            padding: 2rem 0;
+        }
+
+        .card {
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            border-radius: 16px;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(138, 43, 226, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            background: linear-gradient(135deg,
+                rgba(22, 22, 35, 0.95) 0%,
+                rgba(28, 28, 45, 0.9) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(138, 43, 226, 0.4),
+                rgba(147, 51, 234, 0.4),
+                transparent);
+            animation: card-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes card-glow {
+            0%, 100% { opacity: 0.3; transform: translateX(-20%); }
+            50% { opacity: 0.8; transform: translateX(20%); }
+        }
+
+        .card-body {
+            position: relative;
+            z-index: 1;
+            padding: 2rem;
+        }
+
+        .header-title {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-size: 3rem;
+            letter-spacing: -0.02em;
+        }
+
+        .lead {
+            color: rgba(229, 231, 235, 0.9);
+            font-weight: 400;
+            font-size: 1.25rem;
+        }
+
+        .card-title, .form-label, h5, h6 {
+            color: #f3f4f6;
+            font-weight: 600;
+        }
+
+        .form-control {
+            background: rgba(30, 30, 45, 0.8);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            color: #f3f4f6;
+            border-radius: 12px;
+            padding: 14px 18px;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .form-control:focus {
+            background: rgba(35, 35, 55, 0.9);
+            border: 1px solid rgba(138, 43, 226, 0.4);
+            box-shadow:
+                0 0 0 3px rgba(138, 43, 226, 0.1),
+                0 4px 12px rgba(0, 0, 0, 0.15);
+            color: #ffffff;
+            outline: none;
+        }
+
+        .form-control::placeholder {
+            color: rgba(229, 231, 235, 0.4);
+        }
+
+        .btn-analyze {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: white;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-analyze::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.15),
+                transparent);
+            transition: left 0.6s ease;
+        }
+
+        .btn-analyze:hover::before {
+            left: 100%;
+        }
+
+        .btn-analyze:hover {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-analyze:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-analyze:disabled {
+            background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+            border: 1px solid rgba(75, 85, 99, 0.3);
+            color: rgba(229, 231, 235, 0.6);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .progress {
+            height: 8px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .progress-bar {
+            background: linear-gradient(45deg,
+                #ff006e, #8338ec, #3a86ff, #06c, #ffbe0b, #fb5607, #ff006e);
+            background-size: 300% 300%;
+            border-radius: 10px;
+            animation: rainbow-progress 2s ease-in-out infinite;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.4),
+                transparent);
+            animation: progress-shimmer 2s infinite;
+        }
+
+        @keyframes rainbow-progress {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        @keyframes progress-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .result-container {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-left: 4px solid;
+            border-image: linear-gradient(45deg, #ff006e, #8338ec, #3a86ff, #06c, #ffbe0b) 1;
+            background: linear-gradient(135deg,
+                rgba(20, 20, 20, 0.9) 0%,
+                rgba(30, 30, 30, 0.85) 100%);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .result-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 0, 255, 0.5),
+                transparent);
+            animation: result-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes result-glow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .result-card pre {
+            color: #ffffff;
+            background: transparent;
+            border: none;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .feature-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            background: linear-gradient(135deg,
+                rgba(20, 20, 20, 0.8) 0%,
+                rgba(30, 30, 30, 0.7) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 0, 255, 0.1),
+                transparent);
+            transition: left 0.5s;
+        }
+
+        .feature-card:hover::before {
+            left: 100%;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(255, 0, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .feature-card h6, .feature-card small {
+            color: #ffffff;
+            position: relative;
+            z-index: 1;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg,
+                #ff006e, #8338ec, #3a86ff, #06c, #ffbe0b, #fb5607);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+            animation: rainbow-icon 3s ease-in-out infinite;
+            position: relative;
+            z-index: 1;
+        }
+
+        @keyframes rainbow-icon {
+            0%, 100% { filter: hue-rotate(0deg) brightness(1); }
+            50% { filter: hue-rotate(180deg) brightness(1.2); }
+        }
+
+        .url-input, .prompt-input {
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 15px;
+            transition: all 0.3s ease;
+        }
+
+        .url-input:focus, .prompt-input:focus {
+            border-color: transparent;
+            box-shadow:
+                0 0 20px rgba(255, 0, 255, 0.3),
+                0 0 40px rgba(0, 255, 255, 0.2);
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 10px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .error-message {
+            background: linear-gradient(135deg,
+                rgba(139, 0, 0, 0.8) 0%,
+                rgba(180, 0, 0, 0.7) 100%);
+            border: 1px solid rgba(255, 100, 100, 0.3);
+            color: #ffcccc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            backdrop-filter: blur(10px);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .sample-urls {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 10px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            border-top: 3px solid;
+            border-top-color: #ff006e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            position: relative;
+        }
+
+        .loading-spinner::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border: 2px solid transparent;
+            border-top-color: rgba(0, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: spin 1.5s linear infinite reverse;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 按钮组样式 */
+        .btn-group {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-group .btn-check:checked + .btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            border-color: rgba(139, 92, 246, 0.3);
+            color: white;
+            box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-group .btn-check:checked + .btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(124, 58, 237, 0.1));
+            border-radius: inherit;
+            z-index: -1;
+        }
+
+        .btn-group .btn-outline-primary {
+            background: rgba(30, 30, 45, 0.8);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: rgba(229, 231, 235, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 12px 24px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-group .btn-outline-primary:hover {
+            background: rgba(35, 35, 55, 0.9);
+            border-color: rgba(139, 92, 246, 0.4);
+            color: #ffffff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-group .btn-outline-primary:first-child {
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
+        }
+
+        .btn-group .btn-outline-primary:last-child {
+            border-top-right-radius: 12px;
+            border-bottom-right-radius: 12px;
+        }
+
+        /* 批量结果手风琴样式 */
+        .accordion-item {
+            background: linear-gradient(135deg,
+                rgba(22, 22, 35, 0.95) 0%,
+                rgba(28, 28, 45, 0.9) 100%);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .accordion-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(138, 43, 226, 0.3),
+                transparent);
+            animation: accordion-glow 4s ease-in-out infinite;
+        }
+
+        @keyframes accordion-glow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+
+        .accordion-button {
+            background: transparent;
+            color: #f3f4f6;
+            border: none;
+            padding: 20px;
+            font-weight: 600;
+            font-size: 16px;
+            position: relative;
+            z-index: 1;
+            transition: all 0.2s ease;
+        }
+
+        .accordion-button:hover {
+            background: rgba(139, 43, 226, 0.05);
+            color: #ffffff;
+        }
+
+        .accordion-button:not(.collapsed) {
+            background: rgba(139, 43, 226, 0.1);
+            color: #ffffff;
+            box-shadow: none;
+        }
+
+        .accordion-button:focus {
+            box-shadow:
+                0 0 0 3px rgba(139, 43, 226, 0.2),
+                0 0 12px rgba(0, 0, 0, 0.1);
+            border-color: transparent;
+            background: rgba(139, 43, 226, 0.15);
+        }
+
+        .accordion-button::after {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23f3f4f6'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+            transition: all 0.2s ease;
+        }
+
+        .accordion-button:not(.collapsed)::after {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23f3f4f6'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+        }
+
+        .accordion-body {
+            background: rgba(20, 20, 35, 0.6);
+            color: #e8e8e8;
+            border-top: 1px solid rgba(138, 43, 226, 0.15);
+            padding: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* 列表组样式适配 */
+        .list-group-item {
+            background: rgba(30, 30, 45, 0.8);
+            border: 1px solid rgba(138, 43, 226, 0.15);
+            color: #f3f4f6;
+            transition: all 0.2s ease;
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .list-group-item:hover {
+            background: rgba(35, 35, 55, 0.9);
+            border-color: rgba(138, 43, 226, 0.3);
+            transform: translateX(4px);
+            color: #ffffff;
+        }
+
+        .list-group-item-danger {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.1) 0%,
+                rgba(220, 38, 38, 0.05) 100%);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fecaca;
+        }
+
+        /* Alert样式适配 */
+        .alert {
+            background: rgba(30, 30, 45, 0.9);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            color: #f3f4f6;
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 16px 20px;
+            font-weight: 500;
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg,
+                rgba(59, 130, 246, 0.1) 0%,
+                rgba(37, 99, 235, 0.05) 100%);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #dbeafe;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg,
+                rgba(34, 197, 94, 0.1) 0%,
+                rgba(22, 163, 74, 0.05) 100%);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: #d1fae5;
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg,
+                rgba(245, 158, 11, 0.1) 0%,
+                rgba(217, 119, 6, 0.05) 100%);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: #fef3c7;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.1) 0%,
+                rgba(220, 38, 38, 0.05) 100%);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fecaca;
+        }
+
+        /* 进度条样式优化 */
+        .progress {
+            height: 8px;
+            border-radius: 6px;
+            background: rgba(30, 30, 45, 0.8);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #8b5cf6, #7c3aed, #6d28d9);
+            border-radius: 6px;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent);
+            animation: progress-shimmer 2s infinite;
+        }
+
+        @keyframes progress-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        /* 状态文本优化 */
+        .status-text {
+            font-size: 14px;
+            color: rgba(229, 231, 235, 0.8);
+            margin-top: 12px;
+            font-weight: 500;
+        }
+
+        /* 错误消息优化 */
+        .error-message {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.1) 0%,
+                rgba(220, 38, 38, 0.05) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fecaca;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+            backdrop-filter: blur(10px);
+            font-weight: 500;
+        }
+
+        /* 示例文本优化 */
+        .sample-urls {
+            font-size: 13px;
+            color: rgba(229, 231, 235, 0.6);
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        /* 加载动画优化 */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(139, 92, 246, 0.2);
+            border-top: 2px solid #8b5cf6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <!-- 标题区域 -->
+                <div class="text-center mb-5">
+                    <h1 class="header-title display-4">
+                        <i class="fas fa-video"></i> 视频内容分析工具
+                    </h1>
+                    <p class="lead text-white">基于AI的智能视频内容识别与分析</p>
+                </div>
+
+                <!-- 功能特性 -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-link"></i>
+                            </div>
+                            <h6>在线URL支持</h6>
+                            <small class="text-muted">支持各种视频链接</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                            <h6>AI智能分析</h6>
+                            <small class="text-muted">Gemini 2.5 Flash驱动</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-edit"></i>
+                            </div>
+                            <h6>自定义要求</h6>
+                            <small class="text-muted">个性化分析指令</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="feature-card">
+                            <div class="feature-icon">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <h6>快速处理</h6>
+                            <small class="text-muted">实时进度反馈</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 主要分析界面 -->
+                <div class="card">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-4">
+                            <i class="fas fa-search"></i> 开始分析视频
+                        </h5>
+
+                        <!-- 输入方式选择 -->
+                        <div class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="inputMethod" id="methodUrl" value="url" checked>
+                                <label class="btn btn-outline-primary" for="methodUrl">
+                                    <i class="fas fa-link"></i> 在线URL
+                                </label>
+
+                                <input type="radio" class="btn-check" name="inputMethod" id="methodUpload" value="upload">
+                                <label class="btn btn-outline-primary" for="methodUpload">
+                                    <i class="fas fa-upload"></i> 本地上传
+                                </label>
+
+                                <input type="radio" class="btn-check" name="inputMethod" id="methodBatch" value="batch">
+                                <label class="btn btn-outline-primary" for="methodBatch">
+                                    <i class="fas fa-layer-group"></i> 批量上传
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- URL输入方式 -->
+                        <div id="urlInput">
+                            <form id="analyzeForm">
+                                <div class="mb-4">
+                                    <label for="videoUrl" class="form-label fw-bold">
+                                        <i class="fas fa-video"></i> 视频URL
+                                    </label>
+                                    <input
+                                        type="url"
+                                        class="form-control url-input"
+                                        id="videoUrl"
+                                        placeholder="请输入视频的在线URL，例如：https://example.com/video.mp4"
+                                        required
+                                    >
+                                    <div class="sample-urls">
+                                        <i class="fas fa-info-circle"></i>
+                                        示例URL: https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label for="textPrompt" class="form-label fw-bold">
+                                        <i class="fas fa-comment-dots"></i> 分析要求
+                                    </label>
+                                    <textarea
+                                        class="form-control prompt-input"
+                                        id="textPrompt"
+                                        rows="4"
+                                        placeholder="请描述你希望AI如何分析这个视频，例如：详细描述视频内容、分析视频中的场景和人物、总结视频主题等..."
+                                    >请详细描述这个视频的内容，包括场景、人物、动作和整体主题</textarea>
+                                </div>
+
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-analyze btn-lg" id="analyzeBtn">
+                                        <i class="fas fa-play"></i> 开始分析
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- 文件上传方式 -->
+                        <div id="uploadInput" style="display: none;">
+                            <form id="uploadForm" enctype="multipart/form-data">
+                                <div class="mb-4">
+                                    <label for="videoFile" class="form-label fw-bold">
+                                        <i class="fas fa-file-video"></i> 选择视频文件
+                                    </label>
+                                    <input
+                                        type="file"
+                                        class="form-control url-input"
+                                        id="videoFile"
+                                        accept="video/*"
+                                        required
+                                    >
+                                    <div class="sample-urls">
+                                        <i class="fas fa-info-circle"></i>
+                                        支持格式: MP4, AVI, MOV, WMV, FLV, WebM, MKV | 最大文件: 100MB
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label for="uploadTextPrompt" class="form-label fw-bold">
+                                        <i class="fas fa-comment-dots"></i> 分析要求
+                                    </label>
+                                    <textarea
+                                        class="form-control prompt-input"
+                                        id="uploadTextPrompt"
+                                        rows="4"
+                                        placeholder="请描述你希望AI如何分析这个视频，例如：详细描述视频内容、分析视频中的场景和人物、总结视频主题等..."
+                                    >请详细描述这个视频的内容，包括场景、人物、动作和整体主题</textarea>
+                                </div>
+
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-analyze btn-lg" id="uploadBtn">
+                                        <i class="fas fa-upload"></i> 上传并分析
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- 批量上传方式 -->
+                        <div id="batchInput" style="display: none;">
+                            <form id="batchForm" enctype="multipart/form-data">
+                                <div class="mb-4">
+                                    <label for="videoFiles" class="form-label fw-bold">
+                                        <i class="fas fa-layer-group"></i> 选择多个视频文件
+                                    </label>
+                                    <input
+                                        type="file"
+                                        class="form-control url-input"
+                                        id="videoFiles"
+                                        accept="video/*"
+                                        multiple
+                                        required
+                                    >
+                                    <div class="sample-urls">
+                                        <i class="fas fa-info-circle"></i>
+                                        支持1-10个视频文件 | 格式: MP4, AVI, MOV, WMV, FLV, WebM, MKV | 单文件最大: 100MB | 总大小最大: 500MB
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label for="batchTextPrompt" class="form-label fw-bold">
+                                        <i class="fas fa-comment-dots"></i> 分析要求（将应用于所有视频）
+                                    </label>
+                                    <textarea
+                                        class="form-control prompt-input"
+                                        id="batchTextPrompt"
+                                        rows="4"
+                                        placeholder="请描述你希望AI如何分析这些视频，例如：详细描述视频内容、分析视频中的场景和人物、总结视频主题等..."
+                                    >请详细描述这个视频的内容，包括场景、人物、动作和整体主题</textarea>
+                                </div>
+
+                                <!-- 文件列表预览 -->
+                                <div class="mb-4" id="filePreview" style="display: none;">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-list"></i> 待分析文件列表
+                                    </label>
+                                    <div id="fileList" class="border rounded p-3" style="max-height: 200px; overflow-y: auto; background: rgba(20, 20, 20, 0.5);">
+                                    </div>
+                                </div>
+
+                                <div class="text-center">
+                                    <button type="submit" class="btn btn-analyze btn-lg" id="batchBtn">
+                                        <i class="fas fa-layer-group"></i> 批量上传并分析
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- 进度条 -->
+                        <div class="progress-container" id="progressContainer">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="status-text" id="statusText">正在处理...</span>
+                                <span class="status-text" id="progressText">0%</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                     id="progressBar"
+                                     role="progressbar"
+                                     style="width: 0%">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 错误信息 -->
+                        <div class="error-message" id="errorMessage" style="display: none;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span id="errorText"></span>
+                        </div>
+
+                        <!-- 分析结果 -->
+                        <div class="result-container" id="resultContainer">
+                            <h5 class="mb-3">
+                                <i class="fas fa-check-circle text-success"></i> 分析结果
+                            </h5>
+                            <div class="card result-card">
+                                <div class="card-body">
+                                    <div id="resultText"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 批量分析结果 -->
+                        <div class="result-container" id="batchResultContainer" style="display: none;">
+                            <h5 class="mb-3">
+                                <i class="fas fa-layer-group text-success"></i> 批量分析结果
+                            </h5>
+                            <div id="batchResults"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 使用说明 -->
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-info-circle"></i> 使用说明
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-link" style="color: #06c; text-shadow: 0 0 10px rgba(0, 102, 204, 0.5);"></i> 在线URL方式</h6>
+                                <ul class="small">
+                                    <li>支持主流视频格式：MP4、AVI、MOV、WMV、FLV、WebM、MKV</li>
+                                    <li>视频URL必须是可直接访问的在线链接</li>
+                                    <li>自动下载并分析视频内容</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-upload" style="color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);"></i> 本地上传方式</h6>
+                                <ul class="small">
+                                    <li>支持文件大小：最大100MB</li>
+                                    <li>支持格式：MP4、AVI、MOV、WMV、FLV、WebM、MKV</li>
+                                    <li>直接上传本地文件进行分析</li>
+                                    <li>文件自动清理，保护隐私</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6><i class="fas fa-layer-group" style="color: #ff006e; text-shadow: 0 0 10px rgba(255, 0, 110, 0.5);"></i> 批量上传方式</h6>
+                                <ul class="small">
+                                    <li>支持1-10个视频同时上传</li>
+                                    <li>总大小限制：最大500MB</li>
+                                    <li>分别调用API，独立分析每个视频</li>
+                                    <li>分区域展示所有分析结果</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <hr>
+                        <ul class="mb-0">
+                            <li><i class="fas fa-clock" style="color: #ffbe0b; text-shadow: 0 0 10px rgba(255, 190, 11, 0.5);"></i> 分析过程可能需要几分钟，请耐心等待</li>
+                            <li><i class="fas fa-edit" style="color: #06c; text-shadow: 0 0 10px rgba(0, 102, 204, 0.5);"></i> 可以自定义分析要求，获得针对性的分析结果</li>
+                            <li><i class="fas fa-shield-alt" style="color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);"></i> 所有文件在分析完成后会自动删除</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentTaskId = null;
+        let statusCheckInterval = null;
+
+        // 输入方式切换
+        document.querySelectorAll('input[name="inputMethod"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const method = this.value;
+                document.getElementById('urlInput').style.display = 'none';
+                document.getElementById('uploadInput').style.display = 'none';
+                document.getElementById('batchInput').style.display = 'none';
+
+                if (method === 'url') {
+                    document.getElementById('urlInput').style.display = 'block';
+                } else if (method === 'upload') {
+                    document.getElementById('uploadInput').style.display = 'block';
+                } else if (method === 'batch') {
+                    document.getElementById('batchInput').style.display = 'block';
+                }
+
+                hideError();
+                hideResult();
+                hideBatchResult();
+                hideProgress();
+            });
+        });
+
+        // URL表单提交处理
+        document.getElementById('analyzeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startUrlAnalysis();
+        });
+
+        // 上传表单提交处理
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startUploadAnalysis();
+        });
+
+        // 批量上传表单提交处理
+        document.getElementById('batchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            startBatchAnalysis();
+        });
+
+        // 文件选择预览
+        document.getElementById('videoFiles').addEventListener('change', function(e) {
+            const files = Array.from(e.target.files);
+            const filePreview = document.getElementById('filePreview');
+            const fileList = document.getElementById('fileList');
+
+            if (files.length > 0) {
+                filePreview.style.display = 'block';
+
+                // 计算总大小
+                const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+                const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
+
+                let html = `
+                    <div class="mb-2">
+                        <strong>已选择 ${files.length} 个文件</strong> | 总大小: ${totalSizeMB} MB
+                    </div>
+                    <div class="list-group">
+                `;
+
+                files.forEach((file, index) => {
+                    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                    const isOversized = file.size > 100 * 1024 * 1024;
+
+                    html += `
+                        <div class="list-group-item d-flex justify-content-between align-items-center ${isOversized ? 'list-group-item-danger' : ''}">
+                            <div>
+                                <i class="fas fa-file-video me-2"></i>
+                                <strong>${file.name}</strong>
+                                <small class="text-muted ms-2">(${fileSizeMB} MB)</small>
+                                ${isOversized ? '<span class="badge bg-danger ms-2">超过限制</span>' : ''}
+                            </div>
+                            <div>
+                                <span class="badge bg-primary">视频 ${index + 1}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                fileList.innerHTML = html;
+
+                // 检查文件限制
+                if (files.length > 10) {
+                    fileList.innerHTML += `
+                        <div class="alert alert-warning mt-2">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            最多只能选择10个文件，当前选择了${files.length}个
+                        </div>
+                    `;
+                }
+
+                if (files.some(file => file.size > 100 * 1024 * 1024)) {
+                    fileList.innerHTML += `
+                        <div class="alert alert-danger mt-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            有文件超过100MB限制，请检查文件大小
+                        </div>
+                    `;
+                }
+
+                if (totalSize > 500 * 1024 * 1024) {
+                    fileList.innerHTML += `
+                        <div class="alert alert-danger mt-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            总大小超过500MB限制，当前为${totalSizeMB}MB
+                        </div>
+                    `;
+                }
+            } else {
+                filePreview.style.display = 'none';
+                fileList.innerHTML = '';
+            }
+        });
+
+        function startUrlAnalysis() {
+            const videoUrl = document.getElementById('videoUrl').value.trim();
+            const textPrompt = document.getElementById('textPrompt').value.trim();
+
+            if (!videoUrl) {
+                showError('请输入视频URL');
+                return;
+            }
+
+            // 重置界面
+            hideError();
+            hideResult();
+            showProgress();
+
+            // 禁用按钮
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<span class="loading-spinner"></span>分析中...';
+
+            // 发送分析请求
+            fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    video_url: videoUrl,
+                    text_prompt: textPrompt
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentTaskId = data.task_id;
+                    startStatusCheck();
+                } else {
+                    showError(data.error || '分析请求失败');
+                    resetInterface();
+                }
+            })
+            .catch(error => {
+                showError('网络错误：' + error.message);
+                resetInterface();
+            });
+        }
+
+        function startUploadAnalysis() {
+            const videoFile = document.getElementById('videoFile').files[0];
+            const textPrompt = document.getElementById('uploadTextPrompt').value.trim();
+
+            if (!videoFile) {
+                showError('请选择视频文件');
+                return;
+            }
+
+            // 检查文件大小
+            if (videoFile.size > 100 * 1024 * 1024) {
+                showError('文件大小超过100MB限制');
+                return;
+            }
+
+            // 检查文件类型
+            const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv'];
+            if (!allowedTypes.includes(videoFile.type) && !videoFile.name.match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/i)) {
+                showError('不支持的文件格式。支持格式: MP4, AVI, MOV, WMV, FLV, WebM, MKV');
+                return;
+            }
+
+            // 重置界面
+            hideError();
+            hideResult();
+            showProgress();
+
+            // 禁用按钮
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="loading-spinner"></span>上传并分析中...';
+
+            // 创建FormData
+            const formData = new FormData();
+            formData.append('video_file', videoFile);
+            formData.append('text_prompt', textPrompt);
+
+            // 发送上传请求
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentTaskId = data.task_id;
+                    startStatusCheck();
+                } else {
+                    showError(data.error || '上传失败');
+                    resetInterface();
+                }
+            })
+            .catch(error => {
+                showError('网络错误：' + error.message);
+                resetInterface();
+            });
+        }
+
+        function startStatusCheck() {
+            statusCheckInterval = setInterval(() => {
+                if (currentTaskId) {
+                    checkStatus();
+                }
+            }, 1000);
+        }
+
+        function checkStatus() {
+            fetch(`/status/${currentTaskId}`)
+            .then(response => response.json())
+            .then(data => {
+                updateProgress(data.status, data.progress || 0);
+
+                if (data.status === 'completed') {
+                    clearInterval(statusCheckInterval);
+                    setTimeout(() => {
+                        getResult();
+                    }, 500);
+                } else if (data.status === 'error') {
+                    clearInterval(statusCheckInterval);
+                    showError('分析过程中出现错误，请重试');
+                    resetInterface();
+                } else if (data.status === 'not_found') {
+                    clearInterval(statusCheckInterval);
+                    showError('分析任务未找到，请重新开始');
+                    resetInterface();
+                }
+            })
+            .catch(error => {
+                console.error('Status check error:', error);
+            });
+        }
+
+        function getResult() {
+            fetch(`/result/${currentTaskId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResult(data.result);
+                } else {
+                    showError(data.error || '获取结果失败');
+                }
+                resetInterface();
+            })
+            .catch(error => {
+                showError('获取结果时发生错误：' + error.message);
+                resetInterface();
+            });
+        }
+
+        function updateProgress(status, progress) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const statusText = document.getElementById('statusText');
+
+            progressBar.style.width = progress + '%';
+            progressText.textContent = progress + '%';
+
+            const statusMap = {
+                'downloading': '正在下载视频...',
+                'processing': '正在处理上传文件...',
+                'encoding': '正在转换格式...',
+                'analyzing': '正在分析内容...',
+                'completed': '分析完成！'
+            };
+
+            statusText.textContent = statusMap[status] || '处理中...';
+        }
+
+        function showProgress() {
+            document.getElementById('progressContainer').style.display = 'block';
+            updateProgress('downloading', 20);
+        }
+
+        function hideProgress() {
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        function showResult(result) {
+            const resultContainer = document.getElementById('resultContainer');
+            const resultText = document.getElementById('resultText');
+
+            resultText.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${result}</pre>`;
+            resultContainer.style.display = 'block';
+            resultContainer.classList.add('fade-in');
+
+            hideProgress();
+        }
+
+        function hideResult() {
+            document.getElementById('resultContainer').style.display = 'none';
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+
+            errorText.textContent = message;
+            errorMessage.style.display = 'block';
+            errorMessage.classList.add('fade-in');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function startBatchAnalysis() {
+            const videoFiles = document.getElementById('videoFiles').files;
+            const textPrompt = document.getElementById('batchTextPrompt').value.trim();
+
+            if (!videoFiles || videoFiles.length === 0) {
+                showError('请选择至少一个视频文件');
+                return;
+            }
+
+            // 验证文件
+            const files = Array.from(videoFiles);
+            if (files.length > 10) {
+                showError('最多只能同时上传10个视频文件');
+                return;
+            }
+
+            const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+            if (totalSize > 500 * 1024 * 1024) {
+                showError('所有文件总大小超过500MB限制');
+                return;
+            }
+
+            const oversizedFiles = files.filter(file => file.size > 100 * 1024 * 1024);
+            if (oversizedFiles.length > 0) {
+                showError(`有${oversizedFiles.length}个文件超过100MB限制`);
+                return;
+            }
+
+            const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv'];
+            const invalidFiles = files.filter(file =>
+                !allowedTypes.includes(file.type) && !file.name.match(/\.(mp4|avi|mov|wmv|flv|webm|mkv)$/i)
+            );
+            if (invalidFiles.length > 0) {
+                showError(`有${invalidFiles.length}个文件格式不支持`);
+                return;
+            }
+
+            // 重置界面
+            hideError();
+            hideResult();
+            hideBatchResult();
+            showProgress();
+
+            // 禁用按钮
+            const batchBtn = document.getElementById('batchBtn');
+            batchBtn.disabled = true;
+            batchBtn.innerHTML = '<span class="loading-spinner"></span>批量上传并分析中...';
+
+            // 创建FormData
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('video_files', file);
+            });
+            formData.append('text_prompt', textPrompt);
+
+            // 发送批量上传请求
+            fetch('/upload/batch', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentBatchId = data.batch_id;
+                    currentTaskIds = data.tasks.map(task => task.task_id);
+                    startBatchStatusCheck();
+                } else {
+                    showError(data.error || '批量上传失败');
+                    resetBatchInterface();
+                }
+            })
+            .catch(error => {
+                showError('网络错误：' + error.message);
+                resetBatchInterface();
+            });
+        }
+
+        function startBatchStatusCheck() {
+            statusCheckInterval = setInterval(() => {
+                if (currentBatchId) {
+                    checkBatchStatus();
+                }
+            }, 2000);
+        }
+
+        function checkBatchStatus() {
+            fetch(`/batch/status/${currentBatchId}`)
+            .then(response => response.json())
+            .then(data => {
+                updateBatchProgress(data.overall_status, data.overall_progress, data);
+
+                if (data.overall_status === 'completed' || data.overall_status === 'completed_with_errors') {
+                    clearInterval(statusCheckInterval);
+                    setTimeout(() => {
+                        getBatchResults();
+                    }, 500);
+                }
+            })
+            .catch(error => {
+                console.error('Batch status check error:', error);
+            });
+        }
+
+        function getBatchResults() {
+            fetch(`/batch/results/${currentBatchId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showBatchResults(data.results, data.total_count);
+                } else {
+                    showError(data.error || '获取批量结果失败');
+                }
+                resetBatchInterface();
+            })
+            .catch(error => {
+                showError('获取批量结果时发生错误：' + error.message);
+                resetBatchInterface();
+            });
+        }
+
+        function updateBatchProgress(status, progress, batchData) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const statusText = document.getElementById('statusText');
+
+            progressBar.style.width = progress + '%';
+            progressText.textContent = progress + '%';
+
+            const statusMap = {
+                'processing': `正在批量处理... (${batchData.completed_count}/${batchData.total_tasks})`,
+                'completed': '所有分析完成！',
+                'completed_with_errors': `分析完成 (${batchData.error_count}个失败)`
+            };
+
+            statusText.textContent = statusMap[status] || '处理中...';
+        }
+
+        function showBatchResults(results, totalCount) {
+            const batchResultContainer = document.getElementById('batchResultContainer');
+            const batchResults = document.getElementById('batchResults');
+
+            let html = `
+                <div class="mb-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        共分析了 <strong>${totalCount}</strong> 个视频文件
+                    </div>
+                </div>
+                <div class="accordion" id="batchAccordion">
+            `;
+
+            let resultIndex = 0;
+            for (const [taskId, result] of Object.entries(results)) {
+                const isSuccess = result.success;
+                const filename = result.filename || '未知文件';
+                const accordionId = `collapse${resultIndex}`;
+
+                html += `
+                    <div class="accordion-item mb-3">
+                        <h2 class="accordion-header" id="heading${resultIndex}">
+                            <button class="accordion-button ${resultIndex > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-file-video me-2"></i>
+                                        <strong>${filename}</strong>
+                                        ${isSuccess ?
+                                            '<span class="badge bg-success ms-2">分析成功</span>' :
+                                            '<span class="badge bg-danger ms-2">分析失败</span>'
+                                        }
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="${accordionId}" class="accordion-collapse collapse ${resultIndex === 0 ? 'show' : ''}" data-bs-parent="#batchAccordion">
+                            <div class="accordion-body">
+                                ${isSuccess ?
+                                    `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>` :
+                                    `<div class="alert alert-danger">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        ${result.error || '分析过程中发生错误'}
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+                resultIndex++;
+            }
+
+            html += '</div>';
+            batchResults.innerHTML = html;
+            batchResultContainer.style.display = 'block';
+            batchResultContainer.classList.add('fade-in');
+
+            hideProgress();
+        }
+
+        function hideBatchResult() {
+            document.getElementById('batchResultContainer').style.display = 'none';
+        }
+
+        function resetBatchInterface() {
+            const batchBtn = document.getElementById('batchBtn');
+            batchBtn.disabled = false;
+            batchBtn.innerHTML = '<i class="fas fa-layer-group"></i> 批量上传并分析';
+
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+
+            currentBatchId = null;
+            currentTaskIds = [];
+        }
+
+        let currentBatchId = null;
+        let currentTaskIds = [];
+
+        function resetInterface() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const batchBtn = document.getElementById('batchBtn');
+
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerHTML = '<i class="fas fa-play"></i> 开始分析';
+
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-upload"></i> 上传并分析';
+
+            batchBtn.disabled = false;
+            batchBtn.innerHTML = '<i class="fas fa-layer-group"></i> 批量上传并分析';
+
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+
+            currentTaskId = null;
+            currentBatchId = null;
+            currentTaskIds = [];
+        }
+
+        // 页面加载完成后的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查服务健康状态
+            fetch('/health')
+            .then(response => response.json())
+            .then(data => {
+                console.log('服务状态:', data);
+            })
+            .catch(error => {
+                console.error('服务检查失败:', error);
+            });
+        });
+    </script>
+</body>
+</html>
