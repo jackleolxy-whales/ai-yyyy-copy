@@ -696,6 +696,348 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* 步骤指示器样式 */
+        .step-indicator {
+            background: linear-gradient(135deg,
+                rgba(30, 30, 45, 0.8) 0%,
+                rgba(40, 40, 60, 0.7) 100%);
+            border: 1px solid rgba(138, 43, 226, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(138, 43, 226, 0.3),
+                transparent);
+            animation: step-glow 3s ease-in-out infinite;
+        }
+
+        @keyframes step-glow {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+
+        .step-item {
+            text-align: center;
+            flex: 1;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .step-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg,
+                rgba(50, 50, 70, 0.9) 0%,
+                rgba(60, 60, 80, 0.8) 100%);
+            border: 3px solid rgba(138, 43, 226, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            position: relative;
+            transition: all 0.4s ease;
+            color: rgba(229, 231, 235, 0.6);
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .step-item.active .step-circle {
+            background: linear-gradient(135deg,
+                rgba(139, 92, 246, 0.2) 0%,
+                rgba(124, 58, 237, 0.15) 100%);
+            border-color: rgba(139, 92, 246, 0.6);
+            color: #8b5cf6;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+            animation: step-active-pulse 2s ease-in-out infinite;
+        }
+
+        .step-item.completed .step-circle {
+            background: linear-gradient(135deg,
+                rgba(34, 197, 94, 0.2) 0%,
+                rgba(22, 163, 74, 0.15) 100%);
+            border-color: rgba(34, 197, 94, 0.6);
+            color: #22c55e;
+        }
+
+        .step-item.processing .step-circle {
+            background: linear-gradient(135deg,
+                rgba(59, 130, 246, 0.2) 0%,
+                rgba(37, 99, 235, 0.15) 100%);
+            border-color: rgba(59, 130, 246, 0.6);
+            color: #3b82f6;
+            animation: step-processing-spin 2s linear infinite;
+        }
+
+        @keyframes step-active-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+        }
+
+        @keyframes step-processing-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .step-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+        }
+
+        .step-number {
+            transition: opacity 0.3s ease;
+        }
+
+        .step-item.completed .step-number,
+        .step-item.processing .step-number {
+            opacity: 0;
+        }
+
+        .step-item.completed .step-icon,
+        .step-item.processing .step-icon {
+            display: block !important;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: rgba(229, 231, 235, 0.6);
+            font-size: 14px;
+            margin-bottom: 4px;
+            transition: color 0.3s ease;
+        }
+
+        .step-item.active .step-title,
+        .step-item.completed .step-title,
+        .step-item.processing .step-title {
+            color: #f3f4f6;
+        }
+
+        .step-status {
+            font-size: 12px;
+            color: rgba(229, 231, 235, 0.5);
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .step-item.active .step-status {
+            color: #8b5cf6;
+        }
+
+        .step-item.completed .step-status {
+            color: #22c55e;
+        }
+
+        .step-item.processing .step-status {
+            color: #3b82f6;
+        }
+
+        .step-connector {
+            flex: 0 0 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 16px;
+        }
+
+        .step-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(138, 43, 226, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .step-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-progress-fill::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent);
+            animation: step-progress-shimmer 2s infinite;
+        }
+
+        @keyframes step-progress-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        /* 步骤进度条样式 */
+        .step-progress-container {
+            margin-top: 16px;
+            padding: 0 40px;
+        }
+
+        .step-progress-bar {
+            height: 8px;
+            background: rgba(138, 43, 226, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .step-progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6, #7c3aed, #6d28d9);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step-progress-bar-fill::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent);
+            animation: step-bar-shimmer 1.5s infinite;
+        }
+
+        @keyframes step-bar-shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .step-progress-text {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 12px;
+            color: rgba(229, 231, 235, 0.7);
+            font-weight: 500;
+        }
+
+        /* 步骤区域样式 */
+        .step-section {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(138, 43, 226, 0.1);
+            background: linear-gradient(135deg,
+                rgba(25, 25, 40, 0.5) 0%,
+                rgba(35, 35, 50, 0.4) 100%);
+            backdrop-filter: blur(5px);
+            position: relative;
+        }
+
+        .step-section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(138, 43, 226, 0.1);
+        }
+
+        .step-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f3f4f6;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .step-section-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg,
+                rgba(139, 92, 246, 0.2) 0%,
+                rgba(124, 58, 237, 0.15) 100%);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #8b5cf6;
+            font-size: 12px;
+        }
+
+        .step-section.completed .step-section-icon {
+            background: linear-gradient(135deg,
+                rgba(34, 197, 94, 0.2) 0%,
+                rgba(22, 163, 74, 0.15) 100%);
+            border-color: rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+
+        .step-section.processing .step-section-icon {
+            background: linear-gradient(135deg,
+                rgba(59, 130, 246, 0.2) 0%,
+                rgba(37, 99, 235, 0.15) 100%);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #3b82f6;
+            animation: step-icon-spin 2s linear infinite;
+        }
+
+        @keyframes step-icon-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .step-section-badge {
+            margin-left: auto;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .step-section-badge.waiting {
+            background: rgba(107, 114, 128, 0.2);
+            color: rgba(229, 231, 235, 0.6);
+        }
+
+        .step-section-badge.processing {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .step-section-badge.completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
     </style>
 </head>
 <body>
@@ -753,6 +1095,33 @@
                 <!-- 主要分析界面 -->
                 <div class="card">
                     <div class="card-body p-4">
+                        <!-- 步骤指示器 -->
+                        <div class="step-indicator mb-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <div class="step-item active" id="step1">
+                                    <div class="step-circle">
+                                        <span class="step-number">1</span>
+                                        <i class="fas fa-video step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">视频分析</div>
+                                    <div class="step-status" id="step1Status">进行中</div>
+                                </div>
+                                <div class="step-connector">
+                                    <div class="step-progress" id="stepProgress">
+                                        <div class="step-progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="step-item" id="step2">
+                                    <div class="step-circle">
+                                        <span class="step-number">2</span>
+                                        <i class="fas fa-brain step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">DeepSeek处理</div>
+                                    <div class="step-status" id="step2Status">等待中</div>
+                                </div>
+                            </div>
+                        </div>
+
                         <h5 class="card-title mb-4">
                             <i class="fas fa-search"></i> 开始分析视频
                         </h5>
@@ -918,6 +1287,50 @@
                                      id="progressBar"
                                      role="progressbar"
                                      style="width: 0%">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 第一步进度 -->
+                        <div class="step-progress-container" id="step1ProgressContainer" style="display: none;">
+                            <div class="step-section processing" id="step1Section">
+                                <div class="step-section-header">
+                                    <h6 class="step-section-title">
+                                        <div class="step-section-icon">
+                                            <i class="fas fa-video"></i>
+                                        </div>
+                                        第一步：视频内容分析
+                                    </h6>
+                                    <span class="step-section-badge processing" id="step1Badge">处理中</span>
+                                </div>
+                                <div class="step-progress-bar">
+                                    <div class="step-progress-bar-fill" id="step1ProgressBar"></div>
+                                </div>
+                                <div class="step-progress-text">
+                                    <span id="step1StatusText">正在分析视频内容...</span>
+                                    <span id="step1ProgressText">0%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 第二步进度 -->
+                        <div class="step-progress-container" id="step2ProgressContainer" style="display: none;">
+                            <div class="step-section" id="step2Section">
+                                <div class="step-section-header">
+                                    <h6 class="step-section-title">
+                                        <div class="step-section-icon">
+                                            <i class="fas fa-brain"></i>
+                                        </div>
+                                        第二步：DeepSeek智能处理
+                                    </h6>
+                                    <span class="step-section-badge waiting" id="step2Badge">等待中</span>
+                                </div>
+                                <div class="step-progress-bar">
+                                    <div class="step-progress-bar-fill" id="step2ProgressBar"></div>
+                                </div>
+                                <div class="step-progress-text">
+                                    <span id="step2StatusText">等待视频分析完成...</span>
+                                    <span id="step2ProgressText">0%</span>
                                 </div>
                             </div>
                         </div>
@@ -1195,6 +1608,8 @@ Now, I give you the user's JSON data: </textarea>
                 hideResult();
                 hideBatchResult();
                 hideProgress();
+                // 重置步骤状态
+                resetSteps();
             });
         });
 
@@ -1303,7 +1718,7 @@ Now, I give you the user's JSON data: </textarea>
             // 重置界面
             hideError();
             hideResult();
-            showProgress();
+            startStep1();
 
             // 禁用按钮
             const analyzeBtn = document.getElementById('analyzeBtn');
@@ -1411,21 +1826,25 @@ Now, I give you the user's JSON data: </textarea>
 
                 if (data.status === 'completed') {
                     clearInterval(statusCheckInterval);
+                    completeStep1(); // 标记第一步完成
                     setTimeout(() => {
                         getResult();
                     }, 500);
                 } else if (data.status === 'error') {
                     clearInterval(statusCheckInterval);
+                    stepError(1, '视频分析过程中出现错误');
                     showError('分析过程中出现错误，请重试');
                     resetInterface();
                 } else if (data.status === 'not_found') {
                     clearInterval(statusCheckInterval);
+                    stepError(1, '分析任务未找到');
                     showError('分析任务未找到，请重新开始');
                     resetInterface();
                 }
             })
             .catch(error => {
                 console.error('Status check error:', error);
+                stepError(1, '网络连接错误');
             });
         }
 
@@ -1447,12 +1866,15 @@ Now, I give you the user's JSON data: </textarea>
         }
 
         function updateProgress(status, progress) {
+            // 更新原有进度条（保持兼容性）
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
             const statusText = document.getElementById('statusText');
 
-            progressBar.style.width = progress + '%';
-            progressText.textContent = progress + '%';
+            if (progressBar) {
+                progressBar.style.width = progress + '%';
+                progressText.textContent = progress + '%';
+            }
 
             const statusMap = {
                 'downloading': '正在下载视频...',
@@ -1462,7 +1884,20 @@ Now, I give you the user's JSON data: </textarea>
                 'completed': '分析完成！'
             };
 
-            statusText.textContent = statusMap[status] || '处理中...';
+            if (statusText) {
+                statusText.textContent = statusMap[status] || '处理中...';
+            }
+
+            // 更新第一步进度
+            const stepStatusMap = {
+                'downloading': '正在下载视频...',
+                'processing': '正在处理上传文件...',
+                'encoding': '正在转换格式...',
+                'analyzing': '正在分析视频内容...',
+                'completed': '视频分析完成！'
+            };
+
+            updateStepProgress(1, progress, stepStatusMap[status] || '处理中...');
         }
 
         function showProgress() {
@@ -1497,6 +1932,8 @@ Now, I give you the user's JSON data: </textarea>
 
         function hideResult() {
             document.getElementById('resultContainer').style.display = 'none';
+            // 重置步骤到初始状态
+            resetSteps();
         }
 
         function showError(message) {
@@ -1728,6 +2165,8 @@ Now, I give you the user's JSON data: </textarea>
 
         function hideBatchResult() {
             document.getElementById('batchResultContainer').style.display = 'none';
+            // 重置步骤到初始状态
+            resetSteps();
         }
 
         function resetBatchInterface() {
@@ -1769,6 +2208,167 @@ Now, I give you the user's JSON data: </textarea>
             currentTaskId = null;
             currentBatchId = null;
             currentTaskIds = [];
+
+            // 重置步骤状态
+            resetSteps();
+        }
+
+        // 步骤控制功能
+        function resetSteps() {
+            // 重置所有步骤状态
+            const step1 = document.getElementById('step1');
+            const step2 = document.getElementById('step2');
+
+            step1.className = 'step-item active';
+            step2.className = 'step-item';
+
+            document.getElementById('step1Status').textContent = '进行中';
+            document.getElementById('step2Status').textContent = '等待中';
+
+            // 重置步骤进度条
+            document.getElementById('stepProgressFill').style.width = '0%';
+
+            // 隐藏步骤进度区域
+            document.getElementById('step1ProgressContainer').style.display = 'none';
+            document.getElementById('step2ProgressContainer').style.display = 'none';
+        }
+
+        function setStepStatus(stepNumber, status) {
+            const step = document.getElementById(`step${stepNumber}`);
+            const statusElement = document.getElementById(`step${stepNumber}Status`);
+            const circle = step.querySelector('.step-circle');
+            const number = step.querySelector('.step-number');
+            const icon = step.querySelector('.step-icon');
+
+            // 移除所有状态类
+            step.className = 'step-item';
+            circle.className = 'step-circle';
+
+            switch(status) {
+                case 'waiting':
+                    step.classList.add('active');
+                    statusElement.textContent = '等待中';
+                    number.style.display = 'block';
+                    icon.style.display = 'none';
+                    break;
+                case 'processing':
+                    step.classList.add('processing');
+                    statusElement.textContent = '处理中';
+                    number.style.display = 'none';
+                    icon.style.display = 'block';
+                    break;
+                case 'completed':
+                    step.classList.add('completed');
+                    statusElement.textContent = '已完成';
+                    number.style.display = 'none';
+                    icon.style.display = 'block';
+                    break;
+                case 'error':
+                    step.classList.add('error');
+                    statusElement.textContent = '处理失败';
+                    number.style.display = 'block';
+                    icon.style.display = 'none';
+                    break;
+            }
+        }
+
+        function updateStepProgress(stepNumber, progress, statusText) {
+            const progressContainer = document.getElementById(`step${stepNumber}ProgressContainer`);
+            const progressBar = document.getElementById(`step${stepNumber}ProgressBar`);
+            const progressText = document.getElementById(`step${stepNumber}ProgressText`);
+            const statusTextElement = document.getElementById(`step${stepNumber}StatusText`);
+            const section = document.getElementById(`step${stepNumber}Section`);
+            const badge = document.getElementById(`step${stepNumber}Badge`);
+
+            // 显示步骤进度容器
+            progressContainer.style.display = 'block';
+
+            // 更新进度条
+            progressBar.style.width = progress + '%';
+            progressText.textContent = progress + '%';
+            statusTextElement.textContent = statusText;
+
+            // 更新步骤状态样式
+            section.className = 'step-section';
+            badge.className = 'step-section-badge';
+
+            if (progress === 0) {
+                section.classList.add('waiting');
+                badge.classList.add('waiting');
+                badge.textContent = '等待中';
+                setStepStatus(stepNumber, 'waiting');
+            } else if (progress < 100) {
+                section.classList.add('processing');
+                badge.classList.add('processing');
+                badge.textContent = '处理中';
+                setStepStatus(stepNumber, 'processing');
+            } else {
+                section.classList.add('completed');
+                badge.classList.add('completed');
+                badge.textContent = '已完成';
+                setStepStatus(stepNumber, 'completed');
+            }
+
+            // 更新总体步骤进度
+            updateOverallStepProgress();
+        }
+
+        function updateOverallStepProgress() {
+            const step1Progress = parseInt(document.getElementById('step1ProgressBar').style.width) || 0;
+            const step2Progress = parseInt(document.getElementById('step2ProgressBar').style.width) || 0;
+
+            // 计算总体进度 (第一步权重50%，第二步权重50%)
+            const overallProgress = Math.round((step1Progress * 0.5) + (step2Progress * 0.5));
+
+            // 更新步骤连接线进度
+            const progressFill = document.getElementById('stepProgressFill');
+            if (progressFill) {
+                progressFill.style.width = overallProgress + '%';
+            }
+        }
+
+        function startStep1() {
+            resetSteps();
+            document.getElementById('step1ProgressContainer').style.display = 'block';
+            updateStepProgress(1, 0, '准备开始视频分析...');
+
+            // 隐藏原有的进度条，显示步骤进度
+            document.getElementById('progressContainer').style.display = 'none';
+        }
+
+        function completeStep1() {
+            updateStepProgress(1, 100, '视频分析完成');
+
+            // 延迟后自动开始第二步准备
+            setTimeout(() => {
+                setStepStatus(2, 'waiting');
+            }, 500);
+        }
+
+        function startStep2() {
+            document.getElementById('step2ProgressContainer').style.display = 'block';
+            updateStepProgress(2, 0, '准备开始DeepSeek处理...');
+            setStepStatus(2, 'processing');
+        }
+
+        function completeStep2() {
+            updateStepProgress(2, 100, 'DeepSeek处理完成');
+        }
+
+        function stepError(stepNumber, errorMessage) {
+            const progressContainer = document.getElementById(`step${stepNumber}ProgressContainer`);
+            const statusTextElement = document.getElementById(`step${stepNumber}StatusText`);
+            const section = document.getElementById(`step${stepNumber}Section`);
+            const badge = document.getElementById(`step${stepNumber}Badge`);
+
+            progressContainer.style.display = 'block';
+            statusTextElement.textContent = errorMessage;
+
+            section.className = 'step-section';
+            badge.className = 'step-section-badge';
+            badge.textContent = '处理失败';
+
+            setStepStatus(stepNumber, 'error');
         }
 
         // DeepSeek处理功能
@@ -1790,10 +2390,23 @@ Now, I give you the user's JSON data: </textarea>
                 return;
             }
 
+            // 开始第二步处理
+            startStep2();
+
             // 禁用按钮
             const deepSeekBtn = document.getElementById('deepSeekBtn');
             deepSeekBtn.disabled = true;
             deepSeekBtn.innerHTML = '<span class="loading-spinner"></span>DeepSeek处理中...';
+
+            // 模拟进度更新（因为DeepSeek API没有进度回调）
+            let progress = 10;
+            const progressInterval = setInterval(() => {
+                if (progress < 80) {
+                    progress += Math.random() * 15;
+                    progress = Math.min(progress, 80);
+                    updateStepProgress(2, Math.round(progress), '正在调用DeepSeek API处理...');
+                }
+            }, 500);
 
             // 发送处理请求
             fetch('/deepseek/process', {
@@ -1808,14 +2421,25 @@ Now, I give you the user's JSON data: </textarea>
             })
             .then(response => response.json())
             .then(data => {
+                clearInterval(progressInterval);
+
                 if (data.success) {
-                    showDeepSeekResult(data.result);
+                    // 完成进度
+                    updateStepProgress(2, 95, '处理完成，正在生成结果...');
+
+                    setTimeout(() => {
+                        completeStep2();
+                        showDeepSeekResult(data.result);
+                    }, 300);
                 } else {
+                    stepError(2, 'DeepSeek处理失败: ' + (data.error || '未知错误'));
                     showError('DeepSeek处理失败: ' + (data.error || '未知错误'));
                 }
                 resetDeepSeekInterface();
             })
             .catch(error => {
+                clearInterval(progressInterval);
+                stepError(2, '网络连接错误');
                 showError('DeepSeek处理网络错误: ' + error.message);
                 resetDeepSeekInterface();
             });
@@ -1849,10 +2473,23 @@ Now, I give you the user's JSON data: </textarea>
                 return;
             }
 
+            // 开始批量第二步处理
+            startStep2();
+
             // 禁用按钮
             const batchDeepSeekBtn = document.getElementById('batchDeepSeekBtn');
             batchDeepSeekBtn.disabled = true;
             batchDeepSeekBtn.innerHTML = '<span class="loading-spinner"></span>批量DeepSeek处理中...';
+
+            // 模拟批量处理进度
+            let progress = 10;
+            const progressInterval = setInterval(() => {
+                if (progress < 80) {
+                    progress += Math.random() * 10;
+                    progress = Math.min(progress, 80);
+                    updateStepProgress(2, Math.round(progress), `正在批量处理 ${videoResults.length} 个视频...`);
+                }
+            }, 600);
 
             // 发送批量处理请求
             fetch('/deepseek/process/batch', {
@@ -1867,14 +2504,25 @@ Now, I give you the user's JSON data: </textarea>
             })
             .then(response => response.json())
             .then(data => {
+                clearInterval(progressInterval);
+
                 if (data.success) {
-                    showBatchDeepSeekResults(data.results);
+                    // 完成进度
+                    updateStepProgress(2, 95, '批量处理完成，正在生成结果...');
+
+                    setTimeout(() => {
+                        completeStep2();
+                        showBatchDeepSeekResults(data.results);
+                    }, 300);
                 } else {
+                    stepError(2, '批量DeepSeek处理失败: ' + (data.error || '未知错误'));
                     showError('批量DeepSeek处理失败: ' + (data.error || '未知错误'));
                 }
                 resetBatchDeepSeekInterface();
             })
             .catch(error => {
+                clearInterval(progressInterval);
+                stepError(2, '网络连接错误');
                 showError('批量DeepSeek处理网络错误: ' + error.message);
                 resetBatchDeepSeekInterface();
             });
