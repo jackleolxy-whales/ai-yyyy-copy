@@ -2178,10 +2178,16 @@ Now, I give you the json:</textarea>
         let videoAnalysisResults = []; // 存储视频分析结果
         let deepSeekTaskIds = []; // 存储DeepSeek处理任务ID
 
+        // 初始化全局变量日志
+        console.log('🎯 [初始化] 全局变量已初始化');
+        console.log('📊 [初始化] videoAnalysisResults 初始值:', videoAnalysisResults);
+
         // 步骤控制函数
         function resetSteps() {
+            console.log('🔄 [重置] resetSteps 被调用，重置全局变量');
             currentStep = 1;
             videoAnalysisResults = [];
+            console.log('📊 [重置] videoAnalysisResults 已重置为空数组');
             deepSeekTaskIds = [];
 
             // 重置所有步骤状态
@@ -2635,18 +2641,22 @@ Now, I give you the json:</textarea>
             const batchResults = document.getElementById('batchResults');
 
             // 存储视频分析结果
+            console.log('🔄 [第一步] 开始存储视频分析结果到全局变量 videoAnalysisResults');
             videoAnalysisResults = [];
             let resultIndex = 0;
             for (const [taskId, result] of Object.entries(results)) {
-                console.log(`Processing result ${resultIndex}:`, result); // 调试信息
+                console.log(`📋 [第一步] Processing result ${resultIndex}:`, result); // 调试信息
                 if (result.success && result.result) {
                     videoAnalysisResults[resultIndex] = result.result;
+                    console.log(`✅ [第一步] 成功存储结果 ${resultIndex}:`, videoAnalysisResults[resultIndex]);
                     resultIndex++;
                 } else {
                     videoAnalysisResults[resultIndex] = `分析失败: ${result.error || '未知错误'}`;
+                    console.log(`❌ [第一步] 存储失败结果 ${resultIndex}:`, videoAnalysisResults[resultIndex]);
                     resultIndex++;
                 }
             }
+            console.log(`🎯 [第一步] videoAnalysisResults存储完成，共${resultIndex}个结果:`, videoAnalysisResults);
 
             let html = `
                 <div class="mb-3">
@@ -3671,7 +3681,13 @@ Now, I give you the json:</textarea>
             }
 
             // 存储人物分析结果供第四步使用
+            console.log('🔄 [第三步] 开始存储人物分析结果到全局变量 personAnalysisResults');
+            console.log('📋 [第三步] 接收到的results数据:', results);
+            console.log('📋 [第三步] results类型:', typeof results);
+            console.log('📋 [第三步] results是否为数组:', Array.isArray(results));
+            console.log('📋 [第三步] results长度:', results?.length);
             personAnalysisResults = results;
+            console.log('✅ [第三步] personAnalysisResults存储完成:', personAnalysisResults);
 
             // 显示结果
             showPersonAnalysisBatchResults(results);
@@ -3882,16 +3898,20 @@ Now, I give you the json:</textarea>
 
         // 开始JSON拼接
         function startJsonMerge() {
-            console.log('startJsonMerge function called');
+            console.log('🚀 [第四步] startJsonMerge function called');
 
             const mergePrompt = document.getElementById('jsonMergePrompt').value.trim();
 
             console.log('=== 第四步JSON拼接调试信息 ===');
-            console.log('mergePrompt length:', mergePrompt.length);
-            console.log('videoAnalysisResults length:', videoAnalysisResults.length);
-            console.log('personAnalysisResults length:', personAnalysisResults.length);
-            console.log('videoAnalysisResults:', videoAnalysisResults);
-            console.log('personAnalysisResults:', personAnalysisResults);
+            console.log('📝 mergePrompt length:', mergePrompt.length);
+            console.log('📊 videoAnalysisResults length:', videoAnalysisResults?.length || 'undefined');
+            console.log('👥 personAnalysisResults length:', personAnalysisResults?.length || 'undefined');
+            console.log('📋 videoAnalysisResults类型:', typeof videoAnalysisResults);
+            console.log('📋 personAnalysisResults类型:', typeof personAnalysisResults);
+            console.log('📋 videoAnalysisResults是否为数组:', Array.isArray(videoAnalysisResults));
+            console.log('📋 personAnalysisResults是否为数组:', Array.isArray(personAnalysisResults));
+            console.log('📋 videoAnalysisResults内容:', videoAnalysisResults);
+            console.log('📋 personAnalysisResults内容:', personAnalysisResults);
 
             // 验证数据
             if (videoAnalysisResults.length === 0) {
@@ -3926,7 +3946,13 @@ Now, I give you the json:</textarea>
 
         // 处理JSON拼接批量
         function processJsonMergeBatch(basePrompt) {
+            console.log('🔄 [第四步] processJsonMergeBatch 开始执行');
+            console.log('📊 [第四步] videoAnalysisResults.length:', videoAnalysisResults?.length);
+            console.log('👥 [第四步] personAnalysisResults.length:', personAnalysisResults?.length);
+
             const totalResults = Math.min(videoAnalysisResults.length, personAnalysisResults.length);
+            console.log('🎯 [第四步] totalResults (要处理的数量):', totalResults);
+
             let completedCount = 0;
             const jsonMergeResults = [];
 
@@ -3935,10 +3961,12 @@ Now, I give you the json:</textarea>
 
             // 为每对结果调用DeepSeek接口
             for (let i = 0; i < totalResults; i++) {
+                console.log(`🔄 [第四步] 开始处理第 ${i + 1}/${totalResults} 个JSON拼接`);
                 const videoResult = videoAnalysisResults[i];
                 const personResult = personAnalysisResults[i];
 
-                console.log(`Processing JSON merge ${i + 1}/${totalResults}`);
+                console.log(`📋 [第四步] 第${i}个videoResult:`, videoResult);
+                console.log(`📋 [第四步] 第${i}个personResult:`, personResult);
 
                 // 构建完整的提示词：用户提示词 + 第一步结果 + 第三步结果
                 const videoText = typeof videoResult === 'string' ? videoResult :
