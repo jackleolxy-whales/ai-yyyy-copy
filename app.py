@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import os
 from video_analyzer import VideoAnalyzer
+from deepseek_processor import DeepSeekProcessor
 import threading
 import time
 import base64
@@ -25,6 +26,8 @@ def allowed_file(filename):
 # 全局变量存储分析结果
 analysis_results = {}
 analysis_status = {}
+deepseek_results = {}
+deepseek_status = {}
 
 class VideoAnalyzerWeb:
     def __init__(self):
@@ -119,6 +122,7 @@ class VideoAnalyzerWeb:
 
 # 初始化Web分析器
 web_analyzer = VideoAnalyzerWeb()
+deepseek_processor = DeepSeekProcessor()
 
 @app.route('/')
 def index():
@@ -394,6 +398,179 @@ def get_result(task_id):
     else:
         return jsonify({"success": False, "error": "结果未找到"})
 
+# DeepSeek处理端点
+@app.route('/deepseek/process', methods=['POST'])
+def deepseek_process():
+    """单个视频分析结果的DeepSeek处理"""
+    try:
+        data = request.json
+        video_result = data.get('video_result', '').strip()
+        user_prompt = data.get('user_prompt', '').strip()
+
+        if not video_result:
+            return jsonify({"success": False, "error": "视频分析结果不能为空"})
+
+        # 生成任务ID
+        task_id = str(int(time.time() * 1000))
+
+        # 设置状态
+        deepseek_status[task_id] = {"status": "processing", "progress": 50}
+
+        try:
+            # 调用DeepSeek处理
+            result = deepseek_processor.process_video_analysis_result(
+                video_analysis_text=video_result,
+                user_prompt=user_prompt,
+                model="deepseek-reasoner",
+                stream=False
+            )
+
+            # 保存结果
+            deepseek_status[task_id] = {"status": "completed", "progress": 100}
+            deepseek_results[task_id] = {
+                "success": True,
+                "result": result,
+                "video_result": video_result,
+                "prompt": user_prompt,
+                "type": "single"
+            }
+
+            return jsonify({
+                "success": True,
+                "task_id": task_id,
+                "result": result
+            })
+
+        except Exception as e:
+            deepseek_status[task_id] = {"status": "error", "progress": 0}
+            deepseek_results[task_id] = {
+                "success": False,
+                "error": str(e),
+                "video_result": video_result,
+                "prompt": user_prompt,
+                "type": "single"
+            }
+            return jsonify({"success": False, "error": f"DeepSeek处理失败: {str(e)}"})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
+
+@app.route('/deepseek/process/batch', methods=['POST'])
+def deepseek_process_batch():
+    """批量视频分析结果的DeepSeek处理"""
+    try:
+        data = request.json
+        video_results = data.get('video_results', [])
+        user_prompt = data.get('user_prompt', '').strip()
+
+        if not video_results:
+            return jsonify({"success": False, "error": "视频分析结果列表不能为空"})
+
+        # 生成批次ID
+        batch_id = str(int(time.time() * 1000))
+
+        # 处理每个视频结果
+        batch_results = []
+
+        for i, video_result in enumerate(video_results):
+            try:
+                task_id = f"{batch_id}_{i}"
+                deepseek_status[task_id] = {"status": "processing", "progress": 50}
+
+                # 调用DeepSeek处理
+                result = deepseek_processor.process_video_analysis_result(
+                    video_analysis_text=video_result,
+                    user_prompt=user_prompt,
+                    model="deepseek-reasoner",
+                    stream=False
+                )
+
+                deepseek_status[task_id] = {"status": "completed", "progress": 100}
+                deepseek_results[task_id] = {
+                    "success": True,
+                    "result": result,
+                    "video_result": video_result,
+                    "prompt": user_prompt,
+                    "type": "batch",
+                    "batch_id": batch_id,
+                    "video_index": i
+                }
+
+                batch_results.append({
+                    "video_index": i,
+                    "success": True,
+                    "result": result
+                })
+
+            except Exception as e:
+                task_id = f"{batch_id}_{i}"
+                deepseek_status[task_id] = {"status": "error", "progress": 0}
+                deepseek_results[task_id] = {
+                    "success": False,
+                    "error": str(e),
+                    "video_result": video_result,
+                    "prompt": user_prompt,
+                    "type": "batch",
+                    "batch_id": batch_id,
+                    "video_index": i
+                }
+
+                batch_results.append({
+                    "video_index": i,
+                    "success": False,
+                    "error": str(e)
+                })
+
+        return jsonify({
+            "success": True,
+            "batch_id": batch_id,
+            "results": batch_results,
+            "total_count": len(batch_results)
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"批量处理失败: {str(e)}"})
+
+@app.route('/deepseek/status/<task_id>')
+def get_deepseek_status(task_id):
+    """获取DeepSeek处理状态"""
+    status = deepseek_status.get(task_id, {"status": "not_found", "progress": 0})
+    return jsonify(status)
+
+@app.route('/deepseek/result/<task_id>')
+def get_deepseek_result(task_id):
+    """获取DeepSeek处理结果"""
+    result = deepseek_results.get(task_id)
+    if result:
+        return jsonify(result)
+    else:
+        return jsonify({"success": False, "error": "DeepSeek结果未找到"})
+
+@app.route('/deepseek/batch/result/<batch_id>')
+def get_deepseek_batch_result(batch_id):
+    """获取批量DeepSeek处理结果"""
+    try:
+        batch_results = {}
+
+        for task_id, result in deepseek_results.items():
+            if batch_id in task_id:  # 检查是否属于该批次
+                video_index = result.get("video_index", 0)
+                batch_results[video_index] = {
+                    "success": result.get("success", False),
+                    "result": result.get("result") if result.get("success", False) else None,
+                    "error": result.get("error") if not result.get("success", False) else None
+                }
+
+        return jsonify({
+            "success": True,
+            "batch_id": batch_id,
+            "results": batch_results,
+            "total_count": len(batch_results)
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"获取批量DeepSeek结果失败: {str(e)}"})
+
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy", "service": "Video Analyzer API"})
@@ -407,8 +584,9 @@ if __name__ == '__main__':
     if not os.path.exists('static'):
         os.makedirs('static')
 
-    print("🚀 视频分析Web服务启动中...")
-    print("📱 请在浏览器中访问: http://localhost:5000")
+    print("🚀 AI视频分析工具启动中...")
+    print("📱 请在浏览器中访问: http://localhost:8080")
     print("⚠️  确保你的API密钥已正确配置")
+    print("🧠 新功能：DeepSeek智能处理已集成！")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)
