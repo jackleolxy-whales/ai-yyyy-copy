@@ -120,6 +120,22 @@ class VideoAnalyzerWeb:
                 "type": "upload"
             }
 
+  def analyze_direct(self, text_prompt, model="gemini-2.5-flash", max_tokens=None, stream=False):
+        """
+        直接分析文本内容，不处理视频
+        用于第三步的人物分析，基于已有的DeepSeek结果进行AI分析
+
+        Args:
+            text_prompt: 分析要求的文字描述
+            model: 使用的模型名称
+            max_tokens: 最大token数（None表示无限制）
+            stream: 是否使用流式响应
+
+        Returns:
+            AI分析结果
+        """
+        return self.analyzer.analyze_direct(text_prompt, model, max_tokens, stream)
+
 # 初始化Web分析器
 web_analyzer = VideoAnalyzerWeb()
 deepseek_processor = DeepSeekProcessor()
@@ -151,6 +167,48 @@ def analyze():
     thread.start()
 
     return jsonify({"success": True, "task_id": task_id})
+
+@app.route('/analyze/batch', methods=['POST'])
+def analyze_batch():
+    """批量人物分析接口，用于第三步"""
+    data = request.json
+    text_prompt = data.get('text_prompt', '').strip()
+    batch_id = data.get('batch_id', '').strip()
+
+    if not text_prompt:
+        text_prompt = "请详细描述这个视频的内容"
+
+    if not batch_id:
+        return jsonify({"success": False, "error": "未提供批次ID"})
+
+    # 生成任务ID
+    task_id = str(int(time.time() * 1000))
+
+    try:
+        # 直接调用AI分析，不进行视频下载
+        # 因为第三步是基于第二步的结果进行分析，不需要重新处理视频
+        result = web_analyzer.analyze_direct(
+            text_prompt=text_prompt,
+            model="claude-3-5-sonnet-20241022"
+        )
+
+        analysis_results[task_id] = {
+            "success": True,
+            "result": result,
+            "type": "batch_person_analysis"
+        }
+
+        return jsonify({
+            "success": True,
+            "task_id": task_id,
+            "result": result  # 直接返回结果，因为是同步处理
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
 
 @app.route('/upload', methods=['POST'])
 def upload_video():

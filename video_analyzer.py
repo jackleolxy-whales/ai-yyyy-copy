@@ -334,6 +334,55 @@ def main():
         else:
             print("无效选择，请重新输入")
 
+    def analyze_direct(self, text_prompt, model="gemini-2.5-flash", max_tokens=None, stream=False):
+        """
+        直接分析文本内容，不处理视频
+        用于第三步的人物分析，基于已有的DeepSeek结果进行AI分析
+
+        Args:
+            text_prompt: 分析要求的文字描述
+            model: 使用的模型名称
+            max_tokens: 最大token数（None表示无限制）
+            stream: 是否使用流式响应
+
+        Returns:
+            AI分析结果
+        """
+        try:
+            print(f"🤖 开始直接文本分析...")
+            print(f"📝 提示词: {text_prompt[:100]}...")
+            print(f"🧠 使用模型: {model}")
+
+            messages = [
+                {"role": "user", "content": text_prompt}
+            ]
+
+            # 调用API进行文本分析
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                stream=stream
+            )
+
+            if stream:
+                # 流式响应
+                def generate():
+                    for chunk in response:
+                        if chunk.choices[0].delta.content is not None:
+                            yield chunk.choices[0].delta.content
+                return generate()
+            else:
+                # 非流式响应
+                result = response.choices[0].message.content
+                print(f"✅ 分析完成，结果长度: {len(result)} 字符")
+                return result
+
+        except Exception as e:
+            error_msg = f"❌ 直接分析失败: {str(e)}"
+            print(error_msg)
+            return error_msg
+
 
 if __name__ == "__main__":
     main()

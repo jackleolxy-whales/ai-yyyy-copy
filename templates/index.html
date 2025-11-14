@@ -1104,6 +1104,19 @@
                                     <div class="step-title">DeepSeek处理</div>
                                     <div class="step-status" id="step2Status">等待中</div>
                                 </div>
+                                <div class="step-connector">
+                                    <div class="step-progress" id="stepProgress2">
+                                        <div class="step-progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="step-item" id="step3">
+                                    <div class="step-circle">
+                                        <span class="step-number">3</span>
+                                        <i class="fas fa-users step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">分时间戳人物分析</div>
+                                    <div class="step-status" id="step3Status">等待中</div>
+                                </div>
                             </div>
                         </div>
 
@@ -1802,6 +1815,144 @@ Now, I give you the user's JSON data: </textarea>
                                     <div id="batchDeepSeekResults"></div>
                                 </div>
                             </div>
+
+                            <!-- 第三步：分时间戳人物分析 -->
+                            <div class="mt-4" id="personAnalysisSection" style="display: none;">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-users text-success"></i> 第三步：分时间戳人物分析
+                                </h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle"></i>
+                                            基于第二步的DeepSeek处理结果，对指定时间片段内的人物进行详细分析
+                                        </div>
+
+                                        <!-- 分析要求 -->
+                                        <div class="mb-3">
+                                            <label for="personAnalysisPrompt" class="form-label fw-bold">
+                                                <i class="fas fa-edit"></i> 分析要求
+                                            </label>
+                                            <textarea
+                                                class="form-control prompt-input"
+                                                id="personAnalysisPrompt"
+                                                rows="8"
+                                                placeholder="分析要求将自动拼接DeepSeek处理结果..."
+                                            >Your primary mission is to extract detailed information about all individuals
+present within a specified time range `["A", "B"]`(The unit of the timestamp is in
+the format of MM:SS.), based on the video context or transcript I provide.
+
+**Your Objective:**
+
+You must accurately identify every key person appearing between timestamp `A` and
+timestamp `B`. For **each** person identified, you must extract the following four
+pieces of information:
+
+1.  **Name (name):** The person's name. If the name is unknown or not mentioned, use
+ a clear descriptive label (e.g., "Woman in red dress," "Man with glasses,"
+"Bystander 1").
+2.  **Action (action):** The **primary** physical action the person is performing
+during this time segment (e.g., "Picking up a cup from the table," "Running across
+the street," "Pointing at the whiteboard and explaining," "Typing on a keyboard").
+3.  **Expression (expression):** The person's facial expression or the emotional
+state being conveyed (e.g., "Smiling happily," "Frowning in confusion," "Looks
+focused," "Glancing around anxiously").
+4.  **Dialogue (dialogue):** The **complete** lines spoken by this person *within*
+this time segment. If the person does not speak, you must enter "None".
+
+**Output Format Requirements:**
+
+You must strictly adhere to the following JSON format for your response. The root
+object must contain the time segment information and an **array** named
+`analysis_results`, which will hold the objects for all analyzed individuals.
+
+**JSON Structure Template:**
+
+```json
+{
+  "time_segment": {
+    "start": "A",
+    "end": "B"
+  },
+  "analysis_results": [
+    {
+      "person_id": 1,
+      "name": "Name or description of Person A",
+      "action": "Detailed action description of Person A",
+      "expression": "Specific expression description of Person A",
+      "dialogue": "Complete dialogue from Person A during this segment"
+    },
+    {
+      "person_id": 2,
+      "name": "Name or description of Person B",
+      "action": "Detailed action description of Person B",
+      "expression": "Specific expression description of Person B",
+      "dialogue": "Complete dialogue from Person B during this segment"
+    }
+    // Continue to add objects here if more people are present
+  ]
+}
+```
+
+**Important Constraints and Rules:**
+
+  * All extracted information (especially actions and dialogue) must be **strictly
+limited** to the `["A", "B"]` timestamp range.
+  * `analysis_results` **must** be an array, even if there is only one person or no
+one in the segment.
+  * If no key individuals are identifiable in this time segment, you must return an
+empty `analysis_results` array (i.e., `[]`).
+  * Ensure all dialogue is captured completely and accurately; do not omit any lines
+ spoken within the segment.
+
+Now, I give you the json:</textarea>
+                                        </div>
+
+                                        <!-- 待分析视频列表 -->
+                                        <div class="mb-3" id="videoListContainer" style="display: none;">
+                                            <label class="form-label fw-bold">
+                                                <i class="fas fa-video"></i> 待分析视频
+                                                <span class="badge bg-primary ms-2" id="videoCount">0</span>
+                                            </label>
+                                            <div id="videoList" class="border rounded p-3 bg-light">
+                                                <!-- 视频列表将在这里动态生成 -->
+                                            </div>
+                                        </div>
+
+                                        <!-- 分析进度 -->
+                                        <div class="mb-3" id="analysisProgressContainer" style="display: none;">
+                                            <label class="form-label fw-bold">
+                                                <i class="fas fa-chart-line"></i> 分析进度
+                                            </label>
+                                            <div class="progress mb-2" style="height: 25px;">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                                     id="personAnalysisProgressBar"
+                                                     role="progressbar"
+                                                     style="width: 0%">
+                                                    <span id="progressText">0%</span>
+                                                </div>
+                                            </div>
+                                            <div class="text-muted small" id="progressStatus">
+                                                准备开始分析...
+                                            </div>
+                                        </div>
+
+                                        <div class="text-center">
+                                            <button type="button" class="btn btn-success btn-lg" id="startPersonAnalysisBtn" onclick="startPersonAnalysis()">
+                                                <i class="fas fa-users"></i> 开始人物分析
+                                            </button>
+                                        </div>
+
+                                        <!-- 人物分析结果 -->
+                                        <div class="mt-3" id="personAnalysisResultContainer" style="display: none;">
+                                            <h6 class="mb-2">
+                                                <i class="fas fa-check-circle text-success"></i> 人物分析结果
+                                            </h6>
+                                            <div id="personAnalysisResults"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2191,6 +2342,11 @@ Now, I give you the user's JSON data: </textarea>
                     showDeepSeekResult(data.result);
                     setStepStatus(2, 'completed', '已完成');
                     updateStepProgress(2, 100);
+
+                    // 显示第三步入口按钮
+                    setTimeout(() => {
+                        showThirdStepEntrance();
+                    }, 1000);
                 } else {
                     setStepStatus(2, 'error', '处理失败');
                     showError(data.error || 'DeepSeek处理失败');
@@ -2275,6 +2431,11 @@ Now, I give you the user's JSON data: </textarea>
                     showBatchDeepSeekResults(data.results, data.total_count);
                     setStepStatus(2, 'completed', '已完成');
                     updateStepProgress(2, 100);
+
+                    // 显示第三步入口按钮
+                    setTimeout(() => {
+                        showThirdStepEntrance();
+                    }, 1000);
                 } else {
                     setStepStatus(2, 'error', '批量处理失败');
                     showError(data.error || '批量DeepSeek处理失败');
@@ -2787,6 +2948,17 @@ Now, I give you the user's JSON data: </textarea>
             errorMessage.classList.add('fade-in');
         }
 
+        function showMessage(type, message) {
+            if (type === 'error') {
+                showError(message);
+                return;
+            }
+
+            // 对于其他类型的消息，使用 console.log 暂时显示
+            // 可以根据需要扩展支持 success, info, warning 等类型
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+
         function hideError() {
             document.getElementById('errorMessage').style.display = 'none';
         }
@@ -3012,6 +3184,519 @@ Now, I give you the user's JSON data: </textarea>
                 console.error('服务检查失败:', error);
             });
         });
+
+        // 第三步：分时间戳人物分析相关函数
+        let deepSeekResults = []; // 存储第二步的DeepSeek处理结果
+
+        // 显示第三步入口按钮
+        function showThirdStepEntrance() {
+            console.log('showThirdStepEntrance function called');
+
+            // 创建第三步入口按钮容器
+            const entranceContainer = document.createElement('div');
+            entranceContainer.className = 'text-center mt-4 fade-in';
+            entranceContainer.id = 'thirdStepEntranceContainer';
+
+            entranceContainer.innerHTML = `
+                <button type="button" class="btn btn-success btn-lg" id="thirdStepEntranceBtn" onclick="proceedToStep3()">
+                    <i class="fas fa-users"></i> 下一步：分时间戳人物分析
+                </button>
+                <div class="mt-2 text-muted">
+                    <small>基于第二步的DeepSeek处理结果，对指定时间片段内的人物进行详细分析</small>
+                </div>
+            `;
+
+            // 将按钮添加到DeepSeek结果容器后面
+            const deepSeekSection = document.getElementById('deepSeekSection');
+            if (deepSeekSection) {
+                deepSeekSection.appendChild(entranceContainer);
+            }
+
+            // 同时添加到批量DeepSeek结果后面
+            const batchDeepSeekSection = document.getElementById('batchDeepSeekSection');
+            if (batchDeepSeekSection) {
+                const batchEntranceContainer = entranceContainer.cloneNode(true);
+                batchEntranceContainer.id = 'batchThirdStepEntranceContainer';
+                batchDeepSeekSection.appendChild(batchEntranceContainer);
+            }
+        }
+
+        // 进入第三步
+        function proceedToStep3() {
+            console.log('进入第三步：分时间戳人物分析');
+
+            // 隐藏第三步入口按钮
+            const entranceContainer = document.getElementById('thirdStepEntranceContainer');
+            if (entranceContainer) {
+                entranceContainer.style.display = 'none';
+            }
+
+            const batchEntranceContainer = document.getElementById('batchThirdStepEntranceContainer');
+            if (batchEntranceContainer) {
+                batchEntranceContainer.style.display = 'none';
+            }
+
+            // 移动到第三步
+            moveToNextStep();
+
+            // 显示第三步分析界面
+            showPersonAnalysisSection();
+
+            // 填充DeepSeek结果到提示词中
+            fillDeepSeekResultsToPrompt();
+        }
+
+        // 显示第三步分析界面
+        function showPersonAnalysisSection() {
+            const personAnalysisSection = document.getElementById('personAnalysisSection');
+            if (personAnalysisSection) {
+                personAnalysisSection.style.display = 'block';
+            }
+
+            // 显示待分析视频列表
+            showVideoList();
+        }
+
+        // 显示待分析视频列表
+        function showVideoList() {
+            const videoListContainer = document.getElementById('videoListContainer');
+            const videoList = document.getElementById('videoList');
+            const videoCount = document.getElementById('videoCount');
+
+            if (!videoListContainer || !videoList || !videoCount) {
+                return;
+            }
+
+            // 获取原始视频文件名
+            const videoFileNames = getOriginalVideoFileNames();
+
+            if (videoFileNames.length === 0) {
+                videoListContainer.style.display = 'none';
+                return;
+            }
+
+            // 更新视频数量
+            videoCount.textContent = videoFileNames.length;
+
+            // 生成视频列表HTML
+            let videoListHTML = '';
+            videoFileNames.forEach((fileName, index) => {
+                videoListHTML += `
+                    <div class="d-flex align-items-center mb-2 p-2 border rounded bg-white">
+                        <div class="me-3">
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center"
+                                 style="width: 40px; height: 40px; font-weight: bold;">
+                                ${index + 1}
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">${fileName}</div>
+                            <div class="text-muted small">等待进行人物分析</div>
+                        </div>
+                        <div class="me-2">
+                            <span class="badge bg-secondary" id="videoStatus${index}">
+                                <i class="fas fa-clock"></i> 等待中
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            videoList.innerHTML = videoListHTML;
+            videoListContainer.style.display = 'block';
+        }
+
+        // 获取原始视频文件名
+        function getOriginalVideoFileNames() {
+            const fileNames = [];
+
+            // 尝试从不同的全局变量获取视频文件名
+            if (typeof videoAnalysisResults !== 'undefined' && Array.isArray(videoAnalysisResults)) {
+                // 如果有视频分析结果，说明是批量上传
+                const batchResultElement = document.querySelector('#batchResults .accordion-item:first-child .accordion-button strong');
+                if (batchResultElement) {
+                    // 从批量结果中提取文件名
+                    const accordionItems = document.querySelectorAll('#batchResults .accordion-item');
+                    accordionItems.forEach((item, index) => {
+                        const titleElement = item.querySelector('.accordion-button strong');
+                        if (titleElement) {
+                            const title = titleElement.textContent;
+                            // 提取文件名 (格式通常是 "视频 X: filename")
+                            const match = title.match(/视频\s*\d+:\s*(.+)/);
+                            if (match) {
+                                fileNames.push(match[1].trim());
+                            } else {
+                                fileNames.push(title.trim());
+                            }
+                        }
+                    });
+                }
+            } else {
+                // 单个视频情况，从input字段获取
+                const videoUrlInput = document.getElementById('videoUrl');
+                if (videoUrlInput && videoUrlInput.value.trim()) {
+                    const url = videoUrlInput.value.trim();
+                    // 从URL中提取文件名
+                    const fileName = url.split('/').pop().split('?')[0] || '未知视频';
+                    fileNames.push(fileName);
+                }
+            }
+
+            return fileNames;
+        }
+
+        // 填充DeepSeek结果到提示词中
+        function fillDeepSeekResultsToPrompt() {
+            // 不再修改文本框内容，只显示提示信息
+            if (deepSeekResults.length > 0) {
+                if (deepSeekResults.length === 1) {
+                    showMessage('info', '已准备好1个DeepSeek处理结果，将在分析时自动拼接');
+                } else {
+                    showMessage('info', `已准备好${deepSeekResults.length}个DeepSeek处理结果，将分别为每个结果进行人物分析`);
+                }
+            }
+        }
+
+        // 开始人物分析
+        function startPersonAnalysis() {
+            console.log('startPersonAnalysis function called');
+
+            const analysisPrompt = document.getElementById('personAnalysisPrompt').value.trim();
+            const originalVideoUrl = document.getElementById('videoUrl').value.trim();
+
+            console.log('analysisPrompt length:', analysisPrompt.length);
+            console.log('originalVideoUrl:', originalVideoUrl);
+            console.log('deepSeekResults length:', deepSeekResults.length);
+            console.log('deepSeekResults content:', deepSeekResults);
+
+            if (!analysisPrompt) {
+                console.log('Error: 分析要求为空');
+                showError('请输入分析要求');
+                return;
+            }
+
+            // 对于批量上传，不需要原始视频URL
+            if (!originalVideoUrl && !videoAnalysisResults) {
+                console.log('Error: 原始视频URL为空且不是批量上传');
+                showError('未找到原始视频URL，请重新开始');
+                return;
+            }
+
+            console.log('URL validation passed - using batch upload mode');
+
+            if (deepSeekResults.length === 0) {
+                console.log('Error: DeepSeek结果为空');
+                showError('未找到DeepSeek处理结果，请先完成第二步');
+                return;
+            }
+
+            console.log('All validations passed, proceeding with analysis...');
+
+            // 禁用按钮并显示加载状态
+            const startBtn = document.getElementById('startPersonAnalysisBtn');
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="loading-spinner"></span> 人物分析中...';
+            }
+
+            // 更新步骤状态
+            setStepStatus(3, 'processing', '人物分析中');
+            updateStepProgress(3, 10);
+
+            // 分别处理每个DeepSeek结果
+            processPersonAnalysisBatch(analysisPrompt, originalVideoUrl);
+        }
+
+        // 批量处理人物分析
+        function processPersonAnalysisBatch(basePrompt, videoUrl) {
+            const totalResults = deepSeekResults.length;
+            let completedCount = 0;
+            const personAnalysisResults = [];
+
+            // 显示进度条
+            showPersonAnalysisProgress('正在启动人物分析...', 0, totalResults);
+
+            // 对于批量上传，使用占位符URL或空字符串
+            const effectiveVideoUrl = videoUrl || 'batch_upload';
+
+            console.log('Starting batch person analysis with URL:', effectiveVideoUrl);
+
+            // 为每个DeepSeek结果调用分析接口
+            deepSeekResults.forEach((deepSeekResult, index) => {
+                // 更新视频状态为 "处理中"
+                updateVideoStatus(index, 'processing');
+
+                // 构建完整的分析提示词
+                const fullPrompt = basePrompt + '\n\n' + deepSeekResult;
+
+                console.log(`Processing video ${index + 1}/${totalResults}`);
+
+                // 使用新的批量分析接口
+                fetch('/analyze/batch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text_prompt: fullPrompt,
+                        batch_id: 'person_analysis_batch'
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    completedCount++;
+
+                    // 更新进度条和状态
+                    const progress = Math.round((completedCount / totalResults) * 100);
+                    updateStepProgress(3, progress);
+                    showPersonAnalysisProgress(
+                        `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                        completedCount,
+                        totalResults
+                    );
+
+                    if (data.success) {
+                        // 更新视频状态为 "已完成"
+                        updateVideoStatus(index, 'completed');
+                        personAnalysisResults.push({
+                            index: index,
+                            result: data.result,
+                            deepSeekInput: deepSeekResult,
+                            success: true
+                        });
+                    } else {
+                        // 更新视频状态为 "失败"
+                        updateVideoStatus(index, 'error', data.error || '分析失败');
+                        personAnalysisResults.push({
+                            index: index,
+                            error: data.error || '分析失败',
+                            deepSeekInput: deepSeekResult,
+                            success: false
+                        });
+                    }
+
+                    // 检查是否所有处理都已完成
+                    if (completedCount === totalResults) {
+                        finishPersonAnalysisBatch(personAnalysisResults);
+                    }
+                })
+                .catch(error => {
+                    completedCount++;
+
+                    // 更新进度条和状态
+                    const progress = Math.round((completedCount / totalResults) * 100);
+                    updateStepProgress(3, progress);
+                    showPersonAnalysisProgress(
+                        `正在处理第 ${completedCount}/${totalResults} 个结果...`,
+                        completedCount,
+                        totalResults
+                    );
+
+                    // 更新视频状态为 "失败"
+                    updateVideoStatus(index, 'error', error.message || '处理失败');
+                    personAnalysisResults.push({
+                        index: index,
+                        error: error.message || '处理失败',
+                        deepSeekInput: deepSeekResult,
+                        success: false
+                    });
+
+                    // 检查是否所有处理都已完成
+                    if (completedCount === totalResults) {
+                        finishPersonAnalysisBatch(personAnalysisResults);
+                    }
+                });
+            });
+        }
+
+        // 更新视频状态
+        function updateVideoStatus(index, status, errorMessage = null) {
+            const statusElement = document.getElementById(`videoStatus${index}`);
+            if (!statusElement) return;
+
+            switch (status) {
+                case 'processing':
+                    statusElement.className = 'badge bg-warning';
+                    statusElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中';
+                    break;
+                case 'completed':
+                    statusElement.className = 'badge bg-success';
+                    statusElement.innerHTML = '<i class="fas fa-check"></i> 已完成';
+                    break;
+                case 'error':
+                    statusElement.className = 'badge bg-danger';
+                    statusElement.innerHTML = '<i class="fas fa-times"></i> 失败';
+                    if (errorMessage) {
+                        statusElement.title = errorMessage;
+                    }
+                    break;
+            }
+        }
+
+        // 完成批量人物分析
+        function finishPersonAnalysisBatch(results) {
+            const successCount = results.filter(r => r.success).length;
+            const totalCount = results.length;
+
+            if (successCount === totalCount) {
+                setStepStatus(3, 'completed', '已完成');
+            } else if (successCount > 0) {
+                setStepStatus(3, 'completed', '部分完成');
+            } else {
+                setStepStatus(3, 'error', '分析失败');
+            }
+
+            updateStepProgress(3, 100);
+            showPersonAnalysisBatchResults(results);
+            resetPersonAnalysisInterface();
+        }
+
+        // 显示人物分析结果
+        function showPersonAnalysisResult(result) {
+            const resultContainer = document.getElementById('personAnalysisResultContainer');
+            const resultsDiv = document.getElementById('personAnalysisResults');
+
+            if (resultContainer && resultsDiv) {
+                resultsDiv.innerHTML = `
+                    <div class="card result-card">
+                        <pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result}</pre>
+                    </div>
+                `;
+                resultContainer.style.display = 'block';
+            }
+        }
+
+        // 显示批量人物分析结果
+        function showPersonAnalysisBatchResults(results) {
+            const resultContainer = document.getElementById('personAnalysisResultContainer');
+            const resultsDiv = document.getElementById('personAnalysisResults');
+
+            if (resultContainer && resultsDiv) {
+                let html = '';
+
+                if (results.length === 1) {
+                    // 单个结果，直接显示
+                    const result = results[0];
+                    if (result.success) {
+                        html = `
+                            <div class="card result-card">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0">人物分析结果</h6>
+                                </div>
+                                <div class="card-body">
+                                    <pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        html = `
+                            <div class="card result-card">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="mb-0">分析失败</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-danger">错误：${result.error}</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    // 多个结果，使用手风琴显示
+                    html = '<div class="accordion" id="personAnalysisAccordion">';
+
+                    results.forEach((result, index) => {
+                        const accordionId = `personAnalysisCollapse${index}`;
+                        const isLast = index === results.length - 1;
+
+                        html += `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="personAnalysisHeading${index}">
+                                    <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                                        <div class="d-flex w-100 justify-content-between align-items-center">
+                                            <div>
+                                                <i class="fas fa-users me-2"></i>
+                                                <strong>人物分析结果 ${index + 1}</strong>
+                                                ${result.success ?
+                                                    '<span class="badge bg-success ms-2">分析成功</span>' :
+                                                    '<span class="badge bg-danger ms-2">分析失败</span>'
+                                                }
+                                            </div>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="${accordionId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#personAnalysisAccordion">
+                                    <div class="accordion-body">
+                                        ${result.success ?
+                                            `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>` :
+                                            `<div class="alert alert-danger"><strong>错误：</strong> ${result.error}</div>`
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += '</div>';
+                }
+
+                resultsDiv.innerHTML = html;
+                resultContainer.style.display = 'block';
+            }
+        }
+
+        // 显示人物分析进度
+        function showPersonAnalysisProgress(message, current = 0, total = 0) {
+            console.log('人物分析进度:', message);
+
+            // 更新进度条界面
+            const progressContainer = document.getElementById('analysisProgressContainer');
+            const progressBar = document.getElementById('personAnalysisProgressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+
+            if (progressContainer && progressBar && progressText && progressStatus) {
+                progressContainer.style.display = 'block';
+                progressStatus.textContent = message;
+
+                if (total > 0) {
+                    const percentage = Math.round((current / total) * 100);
+                    progressBar.style.width = percentage + '%';
+                    progressText.textContent = percentage + '%';
+                }
+            }
+        }
+
+        // 重置人物分析界面
+        function resetPersonAnalysisInterface() {
+            const startBtn = document.getElementById('startPersonAnalysisBtn');
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-users"></i> 开始人物分析';
+            }
+        }
+
+        // 存储DeepSeek结果
+        function storeDeepSeekResults(results) {
+            if (Array.isArray(results)) {
+                deepSeekResults = results.map(result => result.success ? result.result : `处理失败: ${result.error || '未知错误'}`);
+            } else {
+                deepSeekResults = [results];
+            }
+        }
+
+        // 修改showDeepSeekResult函数以存储结果
+        const originalShowDeepSeekResult = showDeepSeekResult;
+        showDeepSeekResult = function(result) {
+            originalShowDeepSeekResult(result);
+            storeDeepSeekResults(result);
+        };
+
+        // 修改showBatchDeepSeekResults函数以存储结果
+        const originalShowBatchDeepSeekResults = showBatchDeepSeekResults;
+        showBatchDeepSeekResults = function(results, totalCount) {
+            originalShowBatchDeepSeekResults(results, totalCount);
+            storeDeepSeekResults(results);
+        };
     </script>
 </body>
 </html>
