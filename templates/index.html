@@ -2186,6 +2186,25 @@ Now, I give you the json:</textarea>
         }
 
         function updateStepProgress(stepNumber, progress) {
+            // 防止第三步进度回退 - 只允许增加或重置到0（仅在重新开始时）
+            if (stepNumber === 3) {
+                const stepProgress = document.getElementById('stepProgress');
+                const stepProgressFill = stepProgress.querySelector('.step-progress-fill');
+                const currentWidth = stepProgressFill ? parseInt(stepProgressFill.style.width) || 0 : 0;
+
+                // 如果当前进度已经是100%，不允许回退
+                if (currentWidth === 100 && progress < 100) {
+                    console.log(`⚠️ [Step 3] Blocking progress rollback from ${currentWidth}% to ${progress}%`);
+                    return;
+                }
+
+                // 如果试图回退但不是重置到0，阻止
+                if (currentWidth > 0 && progress === 0 && currentWidth !== 100) {
+                    console.log(`⚠️ [Step 3] Blocking progress reset from ${currentWidth}% to ${progress}%`);
+                    return;
+                }
+            }
+
             const stepProgress = document.getElementById('stepProgress');
             const stepProgressFill = stepProgress.querySelector('.step-progress-fill');
 
