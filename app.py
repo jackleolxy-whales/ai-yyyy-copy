@@ -120,7 +120,7 @@ class VideoAnalyzerWeb:
                 "type": "upload"
             }
 
-  def analyze_direct(self, text_prompt, model="gemini-2.5-flash", max_tokens=None, stream=False):
+    def analyze_direct(self, text_prompt, model="gemini-2.5-flash", max_tokens=None, stream=False):
         """
         直接分析文本内容，不处理视频
         用于第三步的人物分析，基于已有的DeepSeek结果进行AI分析
