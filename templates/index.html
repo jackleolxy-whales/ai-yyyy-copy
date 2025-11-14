@@ -3886,9 +3886,12 @@ Now, I give you the json:</textarea>
 
             const mergePrompt = document.getElementById('jsonMergePrompt').value.trim();
 
+            console.log('=== 第四步JSON拼接调试信息 ===');
             console.log('mergePrompt length:', mergePrompt.length);
             console.log('videoAnalysisResults length:', videoAnalysisResults.length);
             console.log('personAnalysisResults length:', personAnalysisResults.length);
+            console.log('videoAnalysisResults:', videoAnalysisResults);
+            console.log('personAnalysisResults:', personAnalysisResults);
 
             // 验证数据
             if (videoAnalysisResults.length === 0) {
@@ -3938,10 +3941,13 @@ Now, I give you the json:</textarea>
                 console.log(`Processing JSON merge ${i + 1}/${totalResults}`);
 
                 // 构建完整的提示词：用户提示词 + 第一步结果 + 第三步结果
-                const fullPrompt = basePrompt + '\n\n第一步结果（视频分析）：\n' +
-                    (typeof videoResult === 'string' ? videoResult : videoResult.result) +
-                    '\n\n第三步结果（人物分析）：\n' +
-                    (personResult.success ? personResult.result : personResult.error);
+                const videoText = typeof videoResult === 'string' ? videoResult :
+                                  (videoResult && videoResult.result ? videoResult.result : String(videoResult));
+                const personText = personResult && personResult.success ? personResult.result :
+                                   (personResult && personResult.error ? personResult.error : String(personResult));
+
+                const fullPrompt = basePrompt + '\n\n第一步结果（视频分析）：\n' + videoText +
+                    '\n\n第三步结果（人物分析）：\n' + personText;
 
                 console.log(`📤 [${i + 1}/${totalResults}] Sending request to DeepSeek API`);
                 console.log(`📝 [${i + 1}] Prompt length: ${fullPrompt.length}`);
