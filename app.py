@@ -685,6 +685,70 @@ def json_merge_process():
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
 
+@app.route('/script/generate', methods=['POST'])
+def script_generate():
+    try:
+        data = request.json
+        script_prompt = data.get('script_prompt', '').strip()
+        batch_id = data.get('batch_id', '').strip()
+
+        if not script_prompt:
+            return jsonify({"success": False, "error": "脚本提示词不能为空"})
+
+        if not batch_id:
+            return jsonify({"success": False, "error": "未提供批次ID"})
+
+        merged_texts = []
+        for task_id, result in deepseek_results.items():
+            if result.get("type") == "json_merge" and result.get("success", False):
+                if not batch_id or result.get("batch_id") == batch_id:
+                    merged_texts.append(result.get("result", ""))
+
+        if not merged_texts:
+            return jsonify({"success": False, "error": "未找到第4步的JSON拼接结果"})
+
+        combined_input = "\n\n".join([t for t in merged_texts if t])
+
+        task_id = str(int(time.time() * 1000))
+        deepseek_status[task_id] = {"status": "processing", "progress": 50}
+
+        try:
+            result = deepseek_processor.process_video_analysis_result(
+                video_analysis_text=combined_input,
+                user_prompt=script_prompt,
+                model="deepseek-chat",
+                stream=False
+            )
+
+            deepseek_status[task_id] = {"status": "completed", "progress": 100}
+            deepseek_results[task_id] = {
+                "success": True,
+                "result": result,
+                "prompt": script_prompt,
+                "type": "script_generate",
+                "batch_id": batch_id
+            }
+
+            return jsonify({
+                "success": True,
+                "task_id": task_id,
+                "result": result
+            })
+
+        except Exception as e:
+            deepseek_status[task_id] = {"status": "error", "progress": 0}
+            deepseek_results[task_id] = {
+                "success": False,
+                "error": str(e),
+                "prompt": script_prompt,
+                "type": "script_generate",
+                "batch_id": batch_id
+            }
+            return jsonify({"success": False, "error": f"脚本生成失败: {str(e)}"})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
+
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy", "service": "Video Analyzer API"})

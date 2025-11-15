@@ -1073,9 +1073,105 @@
                             </div>
                             <h6>快速处理</h6>
                             <small class="text-muted">实时进度反馈</small>
-                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4" id="scriptNextStepButtonContainer" style="display: none;">
+            <button type="button" class="btn btn-primary btn-lg" id="scriptNextStepBtn" onclick="proceedToStep5()">
+                <i class="fas fa-arrow-right"></i> 下一步：脚本生成
+            </button>
+            <div class="mt-2 text-muted">
+                <small>基于第4步的所有结果生成高能回顾脚本</small>
+            </div>
+        </div>
+
+        <div class="mt-4" id="scriptSection" style="display: none;">
+            <h5 class="mb-3">
+                <i class="fas fa-file-alt text-warning"></i> 第五步：脚本生成
+            </h5>
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="scriptPrompt" class="form-label fw-bold">
+                            <i class="fas fa-edit"></i> 生成指令
+                        </label>
+                        <textarea class="form-control prompt-input" id="scriptPrompt" rows="12">**[ Role ]** 
+You are a professional "high-energy recap" video editor and scriptwriter specializing in short dramas. You are a master of the **gold-standard "5-second hook."** You are highly skilled at grabbing an audience's attention *immediately*, using extreme suspense, injustice, and conflict to "sell" a drama and stop users from scrolling. 
+
+**[ Background ]** 
+I am going to provide you with the JSON files for **all episodes** of a short drama. These files contain detailed analyses of each timestamp, including visuals, dialogue, emotions, and key plot points (marked as `isHighlight`, `isKeyPoint`). 
+
+**[ Core Task ]** 
+Your task is to analyze **all** the provided JSON files, extract the single **most explosive, compelling, and engaging** core storyline, and then generate a "high-energy recap" script based on it. 
+
+⚡ **Your single most important objective is to ensure the first 1-2 lines of narration (the hook) are so powerful that the user cannot possibly scroll away.** 
+
+--- 
+
+**[ ⚡ Key Principle: The 'Golden 5-Second' Hook ]** 
+This is your most critical task. The first part of the narration (the Hook) must **immediately** ignite conflict or suspense. 
+
+* **[ DO ]** 
+    * **Start at the Peak:** Immediately begin with the **most unjust, face-slapping, reversed, or high-conflict "highlight" moment** (`isHighlight: true`) from the entire drama. 
+    * **In Media Res (Start in the middle):** Do not build up! Show the result or action *first*. 
+        * *Example (Good):* "This woman was just forced to kneel by her mother-in-law, but the next second, her bodyguard..." 
+        * *Example (Good):* "This man is pretending to be a poor guy, but his real identity is actually..." 
+    * **Create "Why?":** Your opening line must instantly make the user's brain ask "Why?" or "What happens next?!" 
+
+* **[ DO NOT ]** 
+    * **No Flat Exposition:** Absolutely no "This woman's name is XX, and she is..." or "The story begins with..." 
+    * **No Background First:** Do not waste time explaining character relationships or backstory. Weave that information in *after* the hook. 
+
+--- 
+
+**[ Key Constraints ]** 
+1.  **Total Duration:** The 'total duration' of the entire voiceover script must be **strictly controlled to 1 minute (i.e., 60 seconds)**. 
+2.  **Content Metric:** To achieve this 1-minute duration, the script must be extremely concise, assuming a fast-paced narration. Please strictly limit the total word count of the narration (script) to **200-220 words**. 
+
+**[ Workflow & Methodology ]** 
+1.  **Analyze:** First, quickly scan all JSON files to identify and extract the "core storyline" that runs through the entire drama (e.g., the heroine's revenge plot, the male lead's redemption arc/chase, a complex love triangle, a double-identity mystery, etc.). 
+2.  **Extract Hook:** Identify the single **most shocking visual/plot point** from *any* episode (prioritizing `isHighlight: true`) to serve as your opening. 
+3.  **Write Script (Structured):** Based on the core line, write the narration script, ensuring it flows logically: 
+    * **Part 1: The 'Golden 5-Second' Hook** (As defined in the Key Principle above. Approx. 15-30 words) 
+    * **Part 2: Plot Conflict & Escalation** (Introduce the main problem and how it gets worse. Approx. 100-120 words) 
+    * **Part 3: Climactic Twist** (A major reveal or turning point. Approx. 40-50 words) 
+    * **Part 4: Final Cliffhanger** (A final tease that leaves the audience wanting more. Approx. 20-30 words) 
+4.  **Match:** For every line of your script, you must precisely match it with the best visual footage from the JSONs that conveys the required emotion and plot. Prioritize using clips that are marked as `isHighlight: true` or `isKeyPoint: true`. 
+
+**[ Output Format Requirement ]** 
+You **must** use the table format we previously discussed. The output must include the following four columns: 
+
+| Narration (Script) | Visual Description | Footage Source | Rationale | 
+| :--- | :--- | :--- | :--- | 
+| (e.g., This woman's life is tragic...) | (Close-up of the heroine being pushed to the ground) | (From `Episode_01.json`, `00:45-00:47`) | (JSON `analysis` notes `Agony`) | 
+| (e.g., But she's not done...) | (Heroine's eyes instantly sharpen with defiance) | (From `Episode_03.json`, `01:10-01:12`) | (JSON `isKeyPoint: true`, `description` mentions `defiance`) | 
+| ... | ... | ... | ... | 
+
+**[ Final Check ]** 
+Ensure the final narration script, when read at a normal-to-fast recap pace, strictly adheres to the 1-minute total duration (total word count: 200-220 words). 
+
+Now, I give you these JSONs, please begin analyzing the JSON I will provide and generate the script:</textarea>
+                    </div>
+                    <div class="text-center">
+                        <button type="button" class="btn btn-warning btn-lg" id="scriptGenerateBtn" onclick="startScriptGeneration()">
+                            <i class="fas fa-play"></i> 开始脚本生成
+                        </button>
                     </div>
                 </div>
+            </div>
+
+            <div class="mt-3" id="scriptResultContainer" style="display: none;">
+                <h6 class="mb-2">
+                    <i class="fas fa-check-circle text-warning"></i> 脚本生成结果
+                </h6>
+                <div class="card result-card">
+                    <div class="card-body">
+                        <div id="scriptResultText"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
                 <!-- 主要分析界面 -->
                 <div class="card">
@@ -1124,6 +1220,19 @@
                                     </div>
                                     <div class="step-title">JSON拼接</div>
                                     <div class="step-status" id="step4Status">等待中</div>
+                                </div>
+                                <div class="step-connector">
+                                    <div class="step-progress" id="stepProgress3">
+                                        <div class="step-progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="step-item" id="step5">
+                                    <div class="step-circle">
+                                        <span class="step-number">5</span>
+                                        <i class="fas fa-file-alt step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">脚本生成</div>
+                                    <div class="step-status" id="step5Status">等待中</div>
                                 </div>
                             </div>
                         </div>
@@ -2059,6 +2168,7 @@ Now, I give you these two JSONs:</textarea>
     <script>
         let currentTaskId = null;
         let statusCheckInterval = null;
+        let jsonMergeBatchId = null;
 
         // 输入方式切换
         document.querySelectorAll('input[name="inputMethod"]').forEach(radio => {
@@ -2274,7 +2384,7 @@ Now, I give you these two JSONs:</textarea>
         }
 
         function moveToNextStep() {
-            if (currentStep < 4) {
+            if (currentStep < 5) {
                 // 完成当前步骤
                 setStepStatus(currentStep, 'completed', '已完成');
                 updateStepProgress(currentStep, 100);
@@ -2343,6 +2453,15 @@ Now, I give you these two JSONs:</textarea>
 
             // 移动到第二步
             moveToNextStep();
+        }
+
+        function proceedToStep5() {
+            document.getElementById('scriptNextStepButtonContainer').style.display = 'none';
+            moveToNextStep();
+            const section = document.getElementById('scriptSection');
+            if (section) {
+                section.style.display = 'block';
+            }
         }
 
         function fillVideoAnalysisResults() {
@@ -2527,6 +2646,120 @@ Now, I give you these two JSONs:</textarea>
                 showError('批量DeepSeek处理错误：' + error.message);
                 resetBatchDeepSeekInterface();
             });
+        }
+
+        function startScriptGeneration() {
+            const prompt = document.getElementById('scriptPrompt').value.trim();
+            if (!prompt) {
+                showError('脚本提示词不能为空');
+                return;
+            }
+            if (!jsonMergeBatchId) {
+                showError('缺少JSON拼接批次ID，请先完成第4步JSON拼接');
+                return;
+            }
+            setStepStatus(5, 'processing', '脚本生成中');
+            updateStepProgress(5, 30);
+            const btn = document.getElementById('scriptGenerateBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading-spinner"></span>脚本生成中...';
+            }
+            updateStepProgress(5, 60);
+            fetch('/script/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ script_prompt: prompt, batch_id: jsonMergeBatchId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    updateStepProgress(5, 90);
+                    renderScriptResult(data.result);
+                    setStepStatus(5, 'completed', '已完成');
+                    updateStepProgress(5, 100);
+                } else {
+                    setStepStatus(5, 'error', '生成失败');
+                    showError(data.error || '脚本生成失败');
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                }
+            })
+            .catch(err => {
+                setStepStatus(5, 'error', '生成失败');
+                showError('脚本生成错误：' + err.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                }
+            });
+        }
+
+        function renderScriptResult(result) {
+            const c = document.getElementById('scriptResultContainer');
+            const t = document.getElementById('scriptResultText');
+            if (!c || !t) return;
+            const parsed = parseMarkdownTable(result);
+            const toolbar = `
+                <div class="mb-2 d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light" id="copyMarkdown">复制Markdown</button>
+                    <button class="btn btn-sm btn-outline-light" id="copyCsv">复制CSV</button>
+                    <button class="btn btn-sm btn-outline-light" id="copyText">复制文本</button>
+                </div>
+            `;
+            const tableHtml = parsed.tableHtml || `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(result)}</pre>`;
+            t.innerHTML = toolbar + tableHtml;
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            const md = parsed.markdown || result;
+            const csv = parsed.csv || '';
+            const btnMd = document.getElementById('copyMarkdown');
+            const btnCsv = document.getElementById('copyCsv');
+            const btnTxt = document.getElementById('copyText');
+            if (btnMd) btnMd.onclick = () => navigator.clipboard.writeText(md);
+            if (btnCsv) btnCsv.onclick = () => navigator.clipboard.writeText(csv || md);
+            if (btnTxt) btnTxt.onclick = () => navigator.clipboard.writeText(result);
+        }
+
+        function parseMarkdownTable(text) {
+            const lines = text.split(/\r?\n/);
+            let start = -1, end = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().startsWith('|')) { if (start === -1) start = i; end = i; } else if (start !== -1) break;
+            }
+            if (start === -1) return { tableHtml: null, csv: null, markdown: null };
+            const tableLines = lines.slice(start, end + 1).filter(l => l.trim().startsWith('|'));
+            if (tableLines.length < 2) return { tableHtml: null, csv: null, markdown: null };
+            const header = splitRow(tableLines[0]);
+            const sep = splitRow(tableLines[1]);
+            const rows = tableLines.slice(2).map(splitRow);
+            const html = ['<div class="table-responsive">','<table class="table table-dark table-striped table-bordered align-middle">','<thead><tr>'];
+            header.forEach(h => html.push('<th>' + escapeHtml(h) + '</th>'));
+            html.push('</tr></thead><tbody>');
+            rows.forEach(r => { html.push('<tr>'); r.forEach(c => html.push('<td>' + escapeHtml(c) + '</td>')); html.push('</tr>'); });
+            html.push('</tbody></table></div>');
+            const csvRows = [toCsvRow(header)].concat(rows.map(toCsvRow));
+            return { tableHtml: html.join(''), csv: csvRows.join('\n'), markdown: tableLines.join('\n') };
+        }
+
+        function splitRow(line) {
+            const parts = line.split('|');
+            const cells = [];
+            for (let i = 1; i < parts.length - 1; i++) cells.push(parts[i].trim());
+            return cells;
+        }
+
+        function toCsvRow(arr) {
+            return arr.map(v => {
+                const s = String(v).replace(/"/g, '""');
+                return '"' + s + '"';
+            }).join(',');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         }
 
         function showDeepSeekResult(result) {
@@ -3797,6 +4030,10 @@ Now, I give you these two JSONs:</textarea>
 
                 resultsDiv.innerHTML = html;
                 resultContainer.style.display = 'block';
+                const scriptEntrance = document.getElementById('scriptNextStepButtonContainer');
+                if (scriptEntrance) {
+                    scriptEntrance.style.display = 'block';
+                }
             }
         }
 
@@ -3945,6 +4182,8 @@ Now, I give you these two JSONs:</textarea>
             updateStepProgress(4, 10);
 
             // 分别处理每对结果
+            // 生成JSON拼接批次ID，确保第5步能准确聚合第4步结果
+            jsonMergeBatchId = currentBatchId ? (`json_merge_${currentBatchId}`) : 'json_merge_single';
             processJsonMergeBatch(mergePrompt);
         }
 
@@ -3992,7 +4231,7 @@ Now, I give you these two JSONs:</textarea>
                     },
                     body: JSON.stringify({
                         text_prompt: fullPrompt,
-                        batch_id: 'json_merge_batch'
+                        batch_id: jsonMergeBatchId
                     })
                 })
                 .then(response => {
