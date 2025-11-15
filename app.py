@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 # 配置文件上传
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB最大文件大小
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # 确保上传目录存在
@@ -691,6 +691,9 @@ def script_generate():
         data = request.json
         script_prompt = data.get('script_prompt', '').strip()
         batch_id = data.get('batch_id', '').strip()
+        source_type = (data.get('source_type', 'json_merge') or 'json_merge').strip()
+        if source_type not in ('json_merge', 'script_generate'):
+            source_type = 'json_merge'
 
         if not script_prompt:
             return jsonify({"success": False, "error": "脚本提示词不能为空"})
@@ -700,12 +703,15 @@ def script_generate():
 
         merged_texts = []
         for task_id, result in deepseek_results.items():
-            if result.get("type") == "json_merge" and result.get("success", False):
-                if not batch_id or result.get("batch_id") == batch_id:
+            if result.get("type") == source_type and result.get("success", False):
+                if result.get("batch_id") == batch_id:
                     merged_texts.append(result.get("result", ""))
 
         if not merged_texts:
-            return jsonify({"success": False, "error": "未找到第4步的JSON拼接结果"})
+            if source_type == 'json_merge':
+                return jsonify({"success": False, "error": "未找到第4步的JSON拼接结果"})
+            else:
+                return jsonify({"success": False, "error": "未找到第5步的脚本生成结果"})
 
         combined_input = "\n\n".join([t for t in merged_texts if t])
 
@@ -725,7 +731,7 @@ def script_generate():
                 "success": True,
                 "result": result,
                 "prompt": script_prompt,
-                "type": "script_generate",
+                "type": ("script_generate" if source_type == 'json_merge' else "script_extract"),
                 "batch_id": batch_id
             }
 
@@ -741,7 +747,7 @@ def script_generate():
                 "success": False,
                 "error": str(e),
                 "prompt": script_prompt,
-                "type": "script_generate",
+                "type": ("script_generate" if source_type == 'json_merge' else "script_extract"),
                 "batch_id": batch_id
             }
             return jsonify({"success": False, "error": f"脚本生成失败: {str(e)}"})

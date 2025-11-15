@@ -1173,6 +1173,70 @@ Now, I give you these JSONs, please begin analyzing the JSON I will provide and 
             </div>
         </div>
 
+        <div class="text-center mt-4" id="scriptExtractNextStepButtonContainer" style="display: none;">
+            <button type="button" class="btn btn-primary btn-lg" id="scriptExtractNextStepBtn" onclick="proceedToStep6()">
+                <i class="fas fa-arrow-right"></i> 下一步：解说台词提取
+            </button>
+            <div class="mt-2 text-muted">
+                <small>从第5步表格中提取 Narration 文本并拼接</small>
+            </div>
+        </div>
+
+        <div class="mt-4" id="scriptExtractSection" style="display: none;">
+            <h5 class="mb-3">
+                <i class="fas fa-comment-dots text-warning"></i> 第六步：解说台词提取
+            </h5>
+            <div class="card">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="scriptExtractPrompt" class="form-label fw-bold">
+                            <i class="fas fa-edit"></i> 提取指令
+                        </label>
+                        <textarea class="form-control prompt-input" id="scriptExtractPrompt" rows="10">### 
+ Task: Text Extraction and Concatenation 
+ 
+ You are an automated data processing routine. Your **sole** task is to parse the table 
+  data provided below and return a result according to the following strict rules. 
+ 
+ ### Processing Rules: 
+ 1.  **Target:** Focus exclusively on the column named `Narration (Script)`. 
+ 2.  **Extract:** Extract the complete text from **every** cell in that column, 
+ maintaining the original top-to-bottom order. 
+ 3.  **Format:** Concatenate all extracted text into a **single** string (one 
+ paragraph). 
+ 4.  **Delimiter:** Use a **single space** (" ") to separate the text from each cell. 
+ **Do not** use newlines or line breaks. 
+ 
+ ### Absolute Output Constraints: 
+ * Your response **must** contain 100% **only** the final concatenated text string. 
+ * **Strictly prohibit** any form of greeting, confirmation, explanation, title, 
+ prefix, or wrapper text (e.g., "Here is the result:"). 
+ * **Strictly prohibit** modifying, summarizing, or rephrasing any of the original 
+ extracted text. 
+ 
+ ### Begin processing data below:
+                        </textarea>
+                    </div>
+                    <div class="text-center">
+                        <button type="button" class="btn btn-warning btn-lg" id="scriptExtractBtn" onclick="startScriptExtraction()">
+                            <i class="fas fa-play"></i> 开始提取
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3" id="scriptExtractResultContainer" style="display: none;">
+                <h6 class="mb-2">
+                    <i class="fas fa-check-circle text-warning"></i> 提取结果
+                </h6>
+                <div class="card result-card">
+                    <div class="card-body">
+                        <div id="scriptExtractResultText"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
                 <!-- 主要分析界面 -->
                 <div class="card">
                     <div class="card-body p-4">
@@ -1233,6 +1297,19 @@ Now, I give you these JSONs, please begin analyzing the JSON I will provide and 
                                     </div>
                                     <div class="step-title">脚本生成</div>
                                     <div class="step-status" id="step5Status">等待中</div>
+                                </div>
+                                <div class="step-connector">
+                                    <div class="step-progress" id="stepProgress4">
+                                        <div class="step-progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="step-item" id="step6">
+                                    <div class="step-circle">
+                                        <span class="step-number">6</span>
+                                        <i class="fas fa-comment-dots step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">解说台词提取</div>
+                                    <div class="step-status" id="step6Status">等待中</div>
                                 </div>
                             </div>
                         </div>
@@ -2384,7 +2461,7 @@ Now, I give you these two JSONs:</textarea>
         }
 
         function moveToNextStep() {
-            if (currentStep < 5) {
+            if (currentStep < 6) {
                 // 完成当前步骤
                 setStepStatus(currentStep, 'completed', '已完成');
                 updateStepProgress(currentStep, 100);
@@ -2462,6 +2539,14 @@ Now, I give you these two JSONs:</textarea>
             if (section) {
                 section.style.display = 'block';
             }
+        }
+
+        function proceedToStep6() {
+            const container = document.getElementById('scriptExtractNextStepButtonContainer');
+            if (container) { container.style.display = 'none'; }
+            moveToNextStep();
+            const section = document.getElementById('scriptExtractSection');
+            if (section) { section.style.display = 'block'; }
         }
 
         function fillVideoAnalysisResults() {
@@ -2669,13 +2754,15 @@ Now, I give you these two JSONs:</textarea>
             fetch('/script/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ script_prompt: prompt, batch_id: jsonMergeBatchId })
+                body: JSON.stringify({ script_prompt: prompt, batch_id: jsonMergeBatchId, source_type: 'json_merge' })
             })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
                     updateStepProgress(5, 90);
                     renderScriptResult(data.result);
+                    const next = document.getElementById('scriptExtractNextStepButtonContainer');
+                    if (next) { next.style.display = 'block'; }
                     setStepStatus(5, 'completed', '已完成');
                     updateStepProgress(5, 100);
                 } else {
@@ -4636,3 +4723,52 @@ Now, I give you these two JSONs:</textarea>
     </script>
 </body>
 </html>
+        function startScriptExtraction() {
+            const prompt = document.getElementById('scriptExtractPrompt').value.trim();
+            if (!prompt) { showError('提取提示词不能为空'); return; }
+            if (!jsonMergeBatchId) { showError('缺少批次ID，请先完成第5步'); return; }
+            setStepStatus(6, 'processing', '台词提取中');
+            updateStepProgress(6, 30);
+            const btn = document.getElementById('scriptExtractBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>提取中...'; }
+            updateStepProgress(6, 60);
+            fetch('/script/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ script_prompt: prompt, batch_id: jsonMergeBatchId, source_type: 'script_generate' })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    updateStepProgress(6, 90);
+                    renderScriptExtractResult(data.result);
+                    setStepStatus(6, 'completed', '已完成');
+                    updateStepProgress(6, 100);
+                } else {
+                    setStepStatus(6, 'error', '提取失败');
+                    showError(data.error || '台词提取失败');
+                }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始提取'; }
+            })
+            .catch(err => {
+                setStepStatus(6, 'error', '提取失败');
+                showError('台词提取错误：' + err.message);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始提取'; }
+            });
+        }
+
+        function renderScriptExtractResult(result) {
+            const c = document.getElementById('scriptExtractResultContainer');
+            const t = document.getElementById('scriptExtractResultText');
+            if (!c || !t) return;
+            const toolbar = `
+                <div class="mb-2 d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-light" id="copyExtract">复制台词文本</button>
+                </div>
+            `;
+            t.innerHTML = toolbar + `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(result)}</pre>`;
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            const btnCopy = document.getElementById('copyExtract');
+            if (btnCopy) btnCopy.onclick = () => navigator.clipboard.writeText(result);
+        }
