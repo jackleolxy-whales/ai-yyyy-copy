@@ -1977,7 +1977,11 @@ Now, I give you the json:</textarea>
                                                 <label for="jsonMergePrompt" class="form-label">
                                                     <i class="fas fa-edit"></i> JSON拼接要求
                                                 </label>
-                                                <textarea class="form-control" id="jsonMergePrompt" rows="6" placeholder="请输入JSON拼接的具体要求...">I'll give you two JSONs. The common feature of these two JSONs is that both have timestamps. One JSON has a timestamp in the form: "timestamp": "00:45-00:47". The other JSON has: "time_segment": { "start": "01:01", "end": "01:02" }. However, in fact, the timestamps involved in these two JSONs correspond one-to-one. I need you to combine these two JSONs into one JSON. Now, I give you these two JSONs:</textarea>
+                                                <textarea class="form-control" id="jsonMergePrompt" rows="6" placeholder="请输入JSON拼接的具体要求...">I'll give you two JSONs. The common feature of these two JSONs is that both have timestamps. One JSON has a timestamp in the form: "timestamp": "00:45-00:47". The other JSON has: "time_segment": { "start": "01:01", "end": "01:02" }. However, in fact, the timestamps involved in these two JSONs correspond one-to-one. I need you to combine these two JSONs into one JSON. # Output Constraints (!!! Must Be Strictly Followed !!!)
+-   Your final response **must** be *only* the JSON array itself.
+-   You **must not** include any explanatory text (e.g., "Here is the data you requested...").
+-   You **must not** include any Markdown formatting (e.g., ```json ... ```).
+Now, I give you these two JSONs:</textarea>
                                                 <div class="form-text">
                                                     <i class="fas fa-lightbulb"></i>
                                                     系统将自动把第一步和第三步的分析结果按顺序拼接到此提示词后面，然后调用DeepSeek进行JSON拼接处理。
