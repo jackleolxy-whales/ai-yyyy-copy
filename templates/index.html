@@ -2340,7 +2340,7 @@ Now, I give you these two JSONs:</textarea>
                 fileList.innerHTML = html;
 
                 // 检查文件限制
-                if (files.length > 10) {
+                if (files.length > 100) {
                     fileList.innerHTML += `
                         <div class="alert alert-warning mt-2">
                             <i class="fas fa-exclamation-triangle"></i>
@@ -2358,11 +2358,11 @@ Now, I give you these two JSONs:</textarea>
                     `;
                 }
 
-                if (totalSize > 500 * 1024 * 1024) {
+                if (totalSize > 10 * 1024 * 1024 * 1024) {
                     fileList.innerHTML += `
                         <div class="alert alert-danger mt-2">
                             <i class="fas fa-exclamation-circle"></i>
-                            总大小超过500MB限制，当前为${totalSizeMB}MB
+                            总大小超过10GB限制，当前为${totalSizeMB}MB
                         </div>
                     `;
                 }
@@ -3409,15 +3409,15 @@ Now, I give you these two JSONs:</textarea>
             const files = Array.from(videoFiles);
             uploadedFilenames = files.map(f => f.name);
             console.log('uploadedFilenames[batch]:', uploadedFilenames);
-            if (files.length > 10) {
+            if (files.length > 100) {
                 showError('最多只能同时上传100个视频文件');
                 setStepStatus(1, 'error', '文件过多');
                 return;
             }
 
             const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-            if (totalSize > 500 * 1024 * 1024) {
-                showError('所有文件总大小超过500MB限制');
+            if (totalSize > 10 * 1024 * 1024 * 1024) {
+                showError('所有文件总大小超过10GB限制');
                 setStepStatus(1, 'error', '总大小过大');
                 return;
             }
