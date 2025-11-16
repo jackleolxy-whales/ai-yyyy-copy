@@ -1097,61 +1097,65 @@
                             <i class="fas fa-edit"></i> 生成指令
                         </label>
                         <textarea class="form-control prompt-input" id="scriptPrompt" rows="12">**[ Role ]** 
-You are a professional "high-energy recap" video editor and scriptwriter specializing in short dramas. You are a master of the **gold-standard "5-second hook."** You are highly skilled at grabbing an audience's attention *immediately*, using extreme suspense, injustice, and conflict to "sell" a drama and stop users from scrolling. 
-
-**[ Background ]** 
-I am going to provide you with the JSON files for **all episodes** of a short drama. These files contain detailed analyses of each timestamp, including visuals, dialogue, emotions, and key plot points (marked as `isHighlight`, `isKeyPoint`). 
-
-**[ Core Task ]** 
-Your task is to analyze **all** the provided JSON files, extract the single **most explosive, compelling, and engaging** core storyline, and then generate a "high-energy recap" script based on it. 
-
-⚡ **Your single most important objective is to ensure the first 1-2 lines of narration (the hook) are so powerful that the user cannot possibly scroll away.** 
-
---- 
-
-**[ ⚡ Key Principle: The 'Golden 5-Second' Hook ]** 
-This is your most critical task. The first part of the narration (the Hook) must **immediately** ignite conflict or suspense. 
-
-* **[ DO ]** 
-    * **Start at the Peak:** Immediately begin with the **most unjust, face-slapping, reversed, or high-conflict "highlight" moment** (`isHighlight: true`) from the entire drama. 
-    * **In Media Res (Start in the middle):** Do not build up! Show the result or action *first*. 
-        * *Example (Good):* "This woman was just forced to kneel by her mother-in-law, but the next second, her bodyguard..." 
-        * *Example (Good):* "This man is pretending to be a poor guy, but his real identity is actually..." 
-    * **Create "Why?":** Your opening line must instantly make the user's brain ask "Why?" or "What happens next?!" 
-
-* **[ DO NOT ]** 
-    * **No Flat Exposition:** Absolutely no "This woman's name is XX, and she is..." or "The story begins with..." 
-    * **No Background First:** Do not waste time explaining character relationships or backstory. Weave that information in *after* the hook. 
-
---- 
-
-**[ Key Constraints ]** 
-1.  **Total Duration:** The 'total duration' of the entire voiceover script must be **strictly controlled to 1 minute (i.e., 60 seconds)**. 
-2.  **Content Metric:** To achieve this 1-minute duration, the script must be extremely concise, assuming a fast-paced narration. Please strictly limit the total word count of the narration (script) to **200-220 words**. 
-
-**[ Workflow & Methodology ]** 
-1.  **Analyze:** First, quickly scan all JSON files to identify and extract the "core storyline" that runs through the entire drama (e.g., the heroine's revenge plot, the male lead's redemption arc/chase, a complex love triangle, a double-identity mystery, etc.). 
-2.  **Extract Hook:** Identify the single **most shocking visual/plot point** from *any* episode (prioritizing `isHighlight: true`) to serve as your opening. 
-3.  **Write Script (Structured):** Based on the core line, write the narration script, ensuring it flows logically: 
-    * **Part 1: The 'Golden 5-Second' Hook** (As defined in the Key Principle above. Approx. 15-30 words) 
-    * **Part 2: Plot Conflict & Escalation** (Introduce the main problem and how it gets worse. Approx. 100-120 words) 
-    * **Part 3: Climactic Twist** (A major reveal or turning point. Approx. 40-50 words) 
-    * **Part 4: Final Cliffhanger** (A final tease that leaves the audience wanting more. Approx. 20-30 words) 
-4.  **Match:** For every line of your script, you must precisely match it with the best visual footage from the JSONs that conveys the required emotion and plot. Prioritize using clips that are marked as `isHighlight: true` or `isKeyPoint: true`. 
-
-**[ Output Format Requirement ]** 
-You **must** use the table format we previously discussed. The output must include the following four columns: 
-
-| Narration (Script) | Visual Description | Footage Source | Rationale | 
-| :--- | :--- | :--- | :--- | 
-| (e.g., This woman's life is tragic...) | (Close-up of the heroine being pushed to the ground) | (From `Episode_01.json`, `00:45-00:47`) | (JSON `analysis` notes `Agony`) | 
-| (e.g., But she's not done...) | (Heroine's eyes instantly sharpen with defiance) | (From `Episode_03.json`, `01:10-01:12`) | (JSON `isKeyPoint: true`, `description` mentions `defiance`) | 
-| ... | ... | ... | ... | 
-
-**[ Final Check ]** 
-Ensure the final narration script, when read at a normal-to-fast recap pace, strictly adheres to the 1-minute total duration (total word count: 200-220 words). 
-
-Now, I give you these JSONs, please begin analyzing the JSON I will provide and generate the script:</textarea>
+ You are a professional "high-energy recap" video editor and scriptwriter specializing in short dramas. You are a master of the **gold-standard "5-second hook."** You are highly skilled at grabbing an audience's attention *immediately*, using extreme suspense, injustice, and conflict to "sell" a drama and stop users from scrolling. 
+ 
+ Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-the-know,'** like a friend spilling the most exciting "tea" (gossip). You are the audience's "mouthpiece" , **creating an interactive feeling** by voicing their outrage ("The audacity!") and excitement ("Here comes the face-slap!"). 
+ 
+ **[ Background ]** 
+ I am going to provide you with the JSON files for **all episodes** of a short drama. These files contain detailed analyses of each timestamp, including visuals, dialogue, emotions, and key plot points (marked as `isHighlight`, `isKeyPoint`). 
+ 
+ **[ Core Task ]** 
+ Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "high-energy recap" script. 
+ 
+ This output includes **both** the narration script *and* the precise visual footage selections required to build the video. 
+ 
+ ⚡ **Your North Star: The 'Golden 5-Second' Hook** ⚡ 
+ This is your most critical task. The first 1-2 lines of narration (the hook) must be so powerful that the user **cannot possibly scroll away.** 
+ 
+ * **[ DO ]** 
+     * **Start 'In Media Res' (In the Middle of the Action):** This is **non-negotiable.** Your script MUST begin at the *peak* of the conflict, humiliation, or twist. Do not build up. Show the *result* or *action* first, then explain the 'why'. 
+         * *Example (Good):* "This woman was just forced to kneel by her mother-in-law, but the next second, her bodyguard..." 
+         * *Example (Good):* "This man is pretending to be a poor guy, but his real identity is actually..." 
+     * **Instantly Create a 'Story Gap':** Your opening line must **force the user's brain to ask "Why?"** or "How did this happen?!" This "curiosity gap" is your primary tool. 
+ 
+ * **[ DO NOT ]** 
+     * **No Flat Exposition:** Absolutely no "This woman's name is XX, and she is..." or "The story begins with..." 
+     * **No Background First:** Do not waste time explaining character relationships or backstory. Weave that information in *after* the hook. 
+ 
+ --- 
+ 
+ **[ 🎬 Key Constraints: Duration & Visual Fidelity ]** 
+ 1.  **Target Duration:** The final video's target duration should be between **50 and 180 seconds**. 
+     * **Recommendation:** For a *single* high-energy "hook" video, aim for the **60-90 second** sweet spot (approx. **220-330 words**). This provides the best balance of "hook" and "story" without losing user retention. 
+ 2.  **Visual Matching Rate (SLA 1):** The selected `Visual Description` **must have a >70% match** with the `Narration (Script)` line. You must find the *precise* visual that matches the action or emotion. Do not use "filler" footage. 
+ 3.  **Visual Fluency (SLA 2):** Laggy, repetitive, or abrupt/jumpy clips must be **<10%** of the final output. Your `Footage Source` selections must flow logically. 
+     * *To achieve this:* Avoid jumping between visually clashing scenes (e.g., a dark, sad room to a bright, happy party) unless the narration *specifically* calls for that contrast (e.g., "But little did she know, her husband was..."). 
+     * *To achieve this:* Use the `isHighlight` tags to build momentum, not create visual chaos. 
+ 
+ --- 
+ 
+ **[ Workflow & Methodology ]** 
+ 1.  **Analyze for Core Conflict:** Scan all JSONs. Identify the main "A-Plot" (e.g., Heroine's revenge, CEO's mistaken identity). Use the `analysis` and `emotion` fields to find the primary emotional thread (e.g., "Anger," "Agony," "Revenge"). 
+ 2.  **Select the Hook:** Scour all `isHighlight: true` and `isKeyPoint: true` tags. Find the *single most shocking* visual/plot point in the *entire* drama to use as your opening. 
+ 3.  **Write Script (Structured):** Write the narration script according to this proven **"Hook + Story + Suspense"** structure, ensuring a colloquial and easy-to-understand tone: 
+     * **Part 1: The 'Golden Hook'** (The peak conflict. Forces the user to stop. Approx. 1-2 lines) 
+     * **Part 2: Story Content & Escalation** (Introduce the characters and the central problem. Detail the injustice, humiliation, and escalating stakes that make the audience "invest" emotionally. This is the main body.) 
+     * **Part 3: Final Suspense/Cliffhanger** (End on a major twist, a new problem, or an "unbearable" question that **guides the audience to the next episode/video**. Never resolve the main conflict.) 
+ 4.  **Match Footage (Crucial):** For *every line* of your script, meticulously scan the JSONs to find the **perfect** visual clip. Prioritize `isHighlight` and `isKeyPoint` tags. You must justify your choice in the `Rationale` column, proving it meets the `>70% Match` and `<10% Abruptness` rules. 
+ 
+ **[ Output Format Requirement ]** 
+ You **must** use the 4-column table format. 
+ 
+ | Narration (Script) | Visual Description | Footage Source | Rationale | 
+ | :--- | :--- | :--- | :--- | 
+ | (Script line: colloquial, high-energy) | (Precise visual action/emotion) | (From `Episode_XX.json`, `00:00-00:00`) | (JSON `analysis` notes `Emotion` or `isHighlight: true`. *Justifies the 70% match.*) | 
+ | ... | ... | ... | ... | 
+ 
+ **[ Final Mandate ]** 
+ Remember: Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"** that makes the viewer *need* to know what happens next. **Do not fail the 5-second test.** Your footage selection must be as compelling as your words. 
+ 
+ Now, I give you these JSONs, please begin analyzing the JSON I will provide and generate the script:
+                        </textarea>
                     </div>
                     <div class="text-center">
                         <button type="button" class="btn btn-warning btn-lg" id="scriptGenerateBtn" onclick="startScriptGeneration()">
@@ -1611,7 +1615,7 @@ You must judge `true` or `false` based *only* on these criteria:
                                     >
                                     <div class="sample-urls">
                                         <i class="fas fa-info-circle"></i>
-                                        支持1-10个视频文件 | 格式: MP4, AVI, MOV, WMV, FLV, WebM, MKV | 单文件最大: 100MB | 总大小最大: 500MB
+                                        支持1-100个视频文件 | 格式: MP4, AVI, MOV, WMV, FLV, WebM, MKV | 单文件最大: 100MB | 总大小最大: 10GB
                                     </div>
                                 </div>
 
@@ -2222,7 +2226,7 @@ Now, I give you these two JSONs:</textarea>
                             <div class="col-md-4">
                                 <h6><i class="fas fa-layer-group" style="color: #ff006e; text-shadow: 0 0 10px rgba(255, 0, 110, 0.5);"></i> 批量上传方式</h6>
                                 <ul class="small">
-                                    <li>支持1-10个视频同时上传</li>
+                                    <li>支持1-100个视频同时上传</li>
                                     <li>总大小限制：最大500MB</li>
                                     <li>分别调用API，独立分析每个视频</li>
                                     <li>分区域展示所有分析结果</li>
@@ -2245,6 +2249,8 @@ Now, I give you these two JSONs:</textarea>
     <script>
         let currentTaskId = null;
         let statusCheckInterval = null;
+        let displayedTaskIds = new Set();
+        let taskIndexMap = {};
         let jsonMergeBatchId = null;
 
         // 输入方式切换
@@ -2292,6 +2298,8 @@ Now, I give you these two JSONs:</textarea>
         // 文件选择预览
         document.getElementById('videoFiles').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
+            uploadedFilenames = files.map(f => f.name);
+            console.log('uploadedFilenames[change]:', uploadedFilenames);
             const filePreview = document.getElementById('filePreview');
             const fileList = document.getElementById('fileList');
 
@@ -2336,7 +2344,7 @@ Now, I give you these two JSONs:</textarea>
                     fileList.innerHTML += `
                         <div class="alert alert-warning mt-2">
                             <i class="fas fa-exclamation-triangle"></i>
-                            最多只能选择10个文件，当前选择了${files.length}个
+                            最多只能选择100个文件，当前选择了${files.length}个
                         </div>
                     `;
                 }
@@ -2368,6 +2376,7 @@ Now, I give you these two JSONs:</textarea>
         let currentStep = 1;
         let videoAnalysisResults = []; // 存储视频分析结果
         let deepSeekTaskIds = []; // 存储DeepSeek处理任务ID
+        let uploadedFilenames = []; // 存储原始文件名列表
 
         // 初始化全局变量日志
         console.log('🎯 [初始化] 全局变量已初始化');
@@ -2735,6 +2744,8 @@ Now, I give you these two JSONs:</textarea>
 
         function startScriptGeneration() {
             const prompt = document.getElementById('scriptPrompt').value.trim();
+            const combined = (typeof window !== 'undefined' && window.jsonMergeCombinedSource) ? String(window.jsonMergeCombinedSource).trim() : '';
+            const finalPrompt = combined ? (prompt + '\n\n' + combined) : prompt;
             if (!prompt) {
                 showError('脚本提示词不能为空');
                 return;
@@ -2754,7 +2765,7 @@ Now, I give you these two JSONs:</textarea>
             fetch('/script/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ script_prompt: prompt, batch_id: jsonMergeBatchId, source_type: 'json_merge' })
+                body: JSON.stringify({ script_prompt: finalPrompt, batch_id: jsonMergeBatchId, source_type: 'json_merge' })
             })
             .then(r => r.json())
             .then(data => {
@@ -2854,7 +2865,10 @@ Now, I give you these two JSONs:</textarea>
             const deepSeekResultText = document.getElementById('deepSeekResultText');
 
             if (deepSeekResultContainer && deepSeekResultText) {
-                deepSeekResultText.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${result}</pre>`;
+                const videoFileInput = document.getElementById('videoFile');
+                const fname = videoFileInput && videoFileInput.files && videoFileInput.files[0] ? escapeHtml(videoFileInput.files[0].name) : '';
+                const nameHtml = fname ? `<div class=\"mb-2\"><i class=\"fas fa-file-video me-2\"></i><strong>${fname}</strong></div>` : '';
+                deepSeekResultText.innerHTML = nameHtml + `<pre style=\"white-space: pre-wrap; font-family: inherit;\">${result}</pre>`;
                 deepSeekResultContainer.style.display = 'block';
                 deepSeekResultContainer.classList.add('fade-in');
             }
@@ -2863,6 +2877,7 @@ Now, I give you these two JSONs:</textarea>
         function showBatchDeepSeekResults(results, totalCount) {
             const batchDeepSeekResultContainer = document.getElementById('batchDeepSeekResultContainer');
             const batchDeepSeekResults = document.getElementById('batchDeepSeekResults');
+            console.log('showBatchDeepSeekResults: totalCount=', totalCount, 'uploadedFilenames=', uploadedFilenames);
 
             if (!batchDeepSeekResultContainer || !batchDeepSeekResults) {
                 return;
@@ -2881,6 +2896,8 @@ Now, I give you these two JSONs:</textarea>
             results.forEach((result, index) => {
                 const isSuccess = result.success;
                 const accordionId = `deepSeekCollapse${index}`;
+                const rawName = uploadedFilenames && uploadedFilenames[index] ? uploadedFilenames[index] : `视频 ${index + 1}`;
+                const fname = escapeHtml(rawName);
 
                 html += `
                     <div class="accordion-item mb-3">
@@ -2889,7 +2906,7 @@ Now, I give you these two JSONs:</textarea>
                                 <div class="d-flex w-100 justify-content-between align-items-center">
                                     <div>
                                         <i class="fas fa-brain me-2"></i>
-                                        <strong>视频 ${index + 1} DeepSeek处理结果</strong>
+                                        <strong>${fname}</strong>
                                         ${isSuccess ?
                                             '<span class="badge bg-success ms-2">处理成功</span>' :
                                             '<span class="badge bg-danger ms-2">处理失败</span>'
@@ -2936,14 +2953,15 @@ Now, I give you these two JSONs:</textarea>
         }
 
         // 修改原有的showResult函数以支持两步处理
-        function showResult(result) {
+        function showResult(result, filename) {
             const resultContainer = document.getElementById('resultContainer');
             const resultText = document.getElementById('resultText');
 
-            // 存储视频分析结果
             videoAnalysisResults = [result];
 
-            resultText.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${result}</pre>`;
+            const safeName = filename ? escapeHtml(filename) : '';
+            const nameHtml = filename ? `<div class="mb-2"><i class="fas fa-file-video me-2"></i><strong>${safeName}</strong></div>` : '';
+            resultText.innerHTML = nameHtml + `<pre style="white-space: pre-wrap; font-family: inherit;">${result}</pre>`;
             resultContainer.style.display = 'block';
             resultContainer.classList.add('fade-in');
 
@@ -3179,6 +3197,8 @@ Now, I give you these two JSONs:</textarea>
 
             const videoFile = document.getElementById('videoFile').files[0];
             const textPrompt = document.getElementById('uploadTextPrompt').value.trim();
+            if (videoFile) { uploadedFilenames = [videoFile.name]; }
+            console.log('uploadedFilenames[single]:', uploadedFilenames);
 
             console.log('videoFile:', videoFile); // 调试信息
             console.log('textPrompt length:', textPrompt.length); // 调试信息
@@ -3287,7 +3307,7 @@ Now, I give you these two JSONs:</textarea>
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showResult(data.result);
+                    showResult(data.result, data.video_url || '未知文件');
                 } else {
                     showError(data.error || '获取结果失败');
                 }
@@ -3387,8 +3407,10 @@ Now, I give you these two JSONs:</textarea>
 
             // 验证文件
             const files = Array.from(videoFiles);
+            uploadedFilenames = files.map(f => f.name);
+            console.log('uploadedFilenames[batch]:', uploadedFilenames);
             if (files.length > 10) {
-                showError('最多只能同时上传10个视频文件');
+                showError('最多只能同时上传100个视频文件');
                 setStepStatus(1, 'error', '文件过多');
                 return;
             }
@@ -3422,6 +3444,8 @@ Now, I give you these two JSONs:</textarea>
             hideResult();
             hideBatchResult();
             showProgress();
+            displayedTaskIds = new Set();
+            videoAnalysisResults = [];
 
             // 确保进度条显示
             document.getElementById('stepProgress').style.display = 'block';
@@ -3450,6 +3474,8 @@ Now, I give you these two JSONs:</textarea>
                 if (data.success) {
                     currentBatchId = data.batch_id;
                     currentTaskIds = data.tasks.map(task => task.task_id);
+                    taskIndexMap = {};
+                    data.tasks.forEach((task, idx) => { taskIndexMap[task.task_id] = idx; });
                     updateStepProgress(1, 80);
                     startBatchStatusCheck();
                 } else {
@@ -3479,8 +3505,61 @@ Now, I give you these two JSONs:</textarea>
             .then(data => {
                 updateBatchProgress(data.overall_status, data.overall_progress, data);
 
+                const batchResultContainer = document.getElementById('batchResultContainer');
+                const batchResults = document.getElementById('batchResults');
+                if (batchResultContainer && batchResults && batchResultContainer.style.display !== 'block') {
+                    batchResultContainer.style.display = 'block';
+                    batchResultContainer.classList.add('fade-in');
+                    if (!batchResults.innerHTML) {
+                        batchResults.innerHTML = `
+                            <div class="mb-3">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    正在分析，已完成 <strong>${data.completed_count}</strong> / <strong>${data.total_tasks}</strong>
+                                </div>
+                            </div>
+                            <div class="accordion" id="batchAccordion"></div>
+                        `;
+                    }
+                }
+
+                // 增量展示每个已完成或失败的任务
+                const tasks = data.tasks || {};
+                Object.entries(tasks).forEach(([taskId, info]) => {
+                    const status = info.status;
+                    if ((status === 'completed' || status === 'error') && !displayedTaskIds.has(taskId)) {
+                        fetch(`/result/${taskId}`)
+                        .then(r => r.json())
+                        .then(resultData => {
+                            appendSingleBatchResult(taskId, info, resultData);
+                            displayedTaskIds.add(taskId);
+                            // 存储视频分析结果到正确索引
+                            const idx = taskIndexMap[taskId];
+                            if (typeof idx === 'number') {
+                                if (resultData && resultData.success && resultData.result) {
+                                    videoAnalysisResults[idx] = resultData.result;
+                                } else {
+                                    videoAnalysisResults[idx] = `分析失败: ${resultData && resultData.error ? resultData.error : '未知错误'}`;
+                                }
+                            }
+
+                            // 当全部展示后，标记步骤完成并显示下一步按钮
+                            if (displayedTaskIds.size === data.total_tasks) {
+                                setStepStatus(1, 'completed', '已完成');
+                                updateStepProgress(1, 100);
+                                const next = document.getElementById('batchNextStepButtonContainer');
+                                if (next) next.style.display = 'block';
+                            }
+                        })
+                        .catch(err => {
+                            console.error('获取单个结果失败:', err);
+                        });
+                    }
+                });
+
                 if (data.overall_status === 'completed' || data.overall_status === 'completed_with_errors') {
                     clearInterval(statusCheckInterval);
+                    // 保留最终一次汇总获取，用于确保展示完整
                     setTimeout(() => {
                         getBatchResults();
                     }, 500);
@@ -3489,6 +3568,49 @@ Now, I give you these two JSONs:</textarea>
             .catch(error => {
                 console.error('Batch status check error:', error);
             });
+        }
+
+        function appendSingleBatchResult(taskId, info, resultData) {
+            const batchResults = document.getElementById('batchResults');
+            const accordion = document.getElementById('batchAccordion');
+            if (!batchResults) return;
+            const index = (typeof taskIndexMap[taskId] === 'number') ? taskIndexMap[taskId] : displayedTaskIds.size;
+            const accordionId = `collapse_${index}`;
+            const headingId = `heading_${index}`;
+            const isSuccess = resultData && resultData.success;
+            const rawName = info.filename || (resultData && resultData.video_url) || '未知文件';
+            const filename = escapeHtml(rawName);
+            const bodyHtml = isSuccess
+                ? `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${resultData.result}</pre>`
+                : `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> ${resultData && resultData.error ? resultData.error : '分析过程中发生错误'}</div>`;
+
+            const itemHtml = `
+                <div class="accordion-item mb-3">
+                    <h2 class="accordion-header" id="${headingId}">
+                        <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${accordionId}">
+                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-file-video me-2"></i>
+                                    <strong>${filename}</strong>
+                                    ${isSuccess ? '<span class="badge bg-success ms-2">分析成功</span>' : '<span class="badge bg-danger ms-2">分析失败</span>'}
+                                </div>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="${accordionId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#batchAccordion">
+                        <div class="accordion-body">${bodyHtml}</div>
+                    </div>
+                </div>
+            `;
+
+            if (accordion) {
+                accordion.insertAdjacentHTML('beforeend', itemHtml);
+            } else {
+                // 初始化容器并加入第一个accordion
+                batchResults.innerHTML = `
+                    <div class="accordion" id="batchAccordion">${itemHtml}</div>
+                `;
+            }
         }
 
         function getBatchResults() {
@@ -4053,11 +4175,12 @@ Now, I give you these two JSONs:</textarea>
                 if (results.length === 1) {
                     // 单个结果，直接显示
                     const result = results[0];
+                    const fname = escapeHtml(uploadedFilenames && uploadedFilenames[0] ? uploadedFilenames[0] : '视频 1');
                     if (result.success) {
                         html = `
                             <div class="card result-card">
                                 <div class="card-header bg-success text-white">
-                                    <h6 class="mb-0">人物分析结果</h6>
+                                    <h6 class="mb-0"><i class="fas fa-file-video me-2"></i>${fname}</h6>
                                 </div>
                                 <div class="card-body">
                                     <pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${result.result}</pre>
@@ -4083,6 +4206,7 @@ Now, I give you these two JSONs:</textarea>
                     results.forEach((result, index) => {
                         const accordionId = `personAnalysisCollapse${index}`;
                         const isLast = index === results.length - 1;
+                        const fname = escapeHtml(uploadedFilenames && uploadedFilenames[index] ? uploadedFilenames[index] : `视频 ${index + 1}`);
 
                         html += `
                             <div class="accordion-item">
@@ -4091,7 +4215,7 @@ Now, I give you these two JSONs:</textarea>
                                         <div class="d-flex w-100 justify-content-between align-items-center">
                                             <div>
                                                 <i class="fas fa-users me-2"></i>
-                                                <strong>人物分析结果 ${index + 1}</strong>
+                                                <strong>${fname}</strong>
                                                 ${result.success ?
                                                     '<span class="badge bg-success ms-2">分析成功</span>' :
                                                     '<span class="badge bg-danger ms-2">分析失败</span>'
@@ -4352,7 +4476,8 @@ Now, I give you these two JSONs:</textarea>
                             videoResult: videoResult,
                             personResult: personResult,
                             mergedResult: data.result,
-                            success: true
+                            success: true,
+                            filename: uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`
                         });
                     } else {
                         jsonMergeResults.push({
@@ -4360,7 +4485,8 @@ Now, I give you these two JSONs:</textarea>
                             videoResult: videoResult,
                             personResult: personResult,
                             error: data.error || 'JSON拼接处理失败',
-                            success: false
+                            success: false,
+                            filename: uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`
                         });
                     }
 
@@ -4386,7 +4512,8 @@ Now, I give you these two JSONs:</textarea>
                         videoResult: videoResult,
                         personResult: personResult,
                         error: `网络错误: ${error.message}`,
-                        success: false
+                        success: false,
+                        filename: uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`
                     });
 
                     // 检查是否所有处理都已完成
@@ -4428,6 +4555,8 @@ Now, I give you these two JSONs:</textarea>
             // 显示结果
             showJsonMergeResults(results);
 
+            try { window.jsonMergeCombinedSource = (results || []).filter(r => r && r.success).map(r => `EpisodeFileName: ${r.filename || ''}\n${r.mergedResult || ''}`).join('\n\n'); } catch (e) { window.jsonMergeCombinedSource = ''; }
+
             // 重置按钮状态
             const startBtn = document.getElementById('startJsonMergeBtn');
             if (startBtn) {
@@ -4447,11 +4576,12 @@ Now, I give you these two JSONs:</textarea>
                 if (results.length === 1) {
                     // 单个结果，直接显示
                     const result = results[0];
+                    const fname = escapeHtml(result.filename || '视频 1');
                     if (result.success) {
                         html = `
                             <div class="card result-card">
                                 <div class="card-header bg-warning text-dark">
-                                    <h6 class="mb-0">JSON拼接结果</h6>
+                                    <h6 class="mb-0"><i class="fas fa-file-video me-2"></i>${fname}</h6>
                                 </div>
                                 <div class="card-body">
                                     <pre style="white-space: pre-wrap; font-family: inherit; color: #333333;">${result.mergedResult}</pre>
@@ -4475,6 +4605,7 @@ Now, I give you these two JSONs:</textarea>
                     html = '<div class="accordion" id="jsonMergeAccordion">';
                     results.forEach((result, index) => {
                         const accordionId = `jsonMergeCollapse${index}`;
+                        const fname = escapeHtml(result.filename || `视频 ${index + 1}`);
                         html += `
                             <div class="accordion-item">
                                 <h2 class="accordion-header" id="jsonMergeHeading${index}">
@@ -4482,7 +4613,7 @@ Now, I give you these two JSONs:</textarea>
                                         <div class="d-flex w-100 justify-content-between align-items-center">
                                             <div>
                                                 <i class="fas fa-code-merge me-2"></i>
-                                                <strong>JSON拼接结果 ${index + 1}</strong>
+                                                <strong>${fname}</strong>
                                                 ${result.success ?
                                                     '<span class="badge bg-success ms-2">拼接成功</span>' :
                                                     '<span class="badge bg-danger ms-2">拼接失败</span>'

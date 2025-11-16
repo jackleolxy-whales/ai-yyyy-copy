@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 # 配置文件上传
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # 确保上传目录存在
@@ -230,8 +230,8 @@ def upload_videos():
             return jsonify({"success": False, "error": "没有选择文件"})
 
         # 验证文件数量
-        if len(files) > 10:
-            return jsonify({"success": False, "error": "最多只能同时上传10个视频文件"})
+        if len(files) > 100:
+            return jsonify({"success": False, "error": "最多只能同时上传100个视频文件"})
 
         if len(files) == 0:
             return jsonify({"success": False, "error": "请至少选择一个视频文件"})
@@ -268,9 +268,9 @@ def upload_videos():
 
             total_size += file_size
 
-        # 检查总大小限制（可选）
-        if total_size > 500 * 1024 * 1024:  # 500MB 总限制
-            return jsonify({"success": False, "error": "所有文件总大小超过500MB限制"})
+        # 检查总大小限制
+        if total_size > 10 * 1024 * 1024 * 1024:  # 10GB 总限制
+            return jsonify({"success": False, "error": "所有文件总大小超过10GB限制"})
 
         if not text_prompt:
             text_prompt = "请详细描述这个视频的内容"
@@ -298,7 +298,7 @@ def upload_videos():
             # 启动异步分析
             thread = threading.Thread(
                 target=web_analyzer.analyze_uploaded_video_async,
-                args=(task_id, video_path, text_prompt, filename)
+                args=(task_id, video_path, text_prompt, file.filename)
             )
             thread.start()
 
@@ -362,7 +362,7 @@ def upload_videos_single():
         # 启动异步分析
         thread = threading.Thread(
             target=web_analyzer.analyze_uploaded_video_async,
-            args=(task_id, video_path, text_prompt, filename)
+            args=(task_id, video_path, text_prompt, file.filename)
         )
         thread.start()
 
