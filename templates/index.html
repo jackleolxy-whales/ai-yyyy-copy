@@ -2698,48 +2698,69 @@ Now, I give you these two JSONs:</textarea>
             }
 
             updateStepProgress(2, 40);
-
-            // 发送批量DeepSeek处理请求
-            console.log('Sending batch DeepSeek request...'); // 调试信息
-            fetch('/deepseek/process/batch', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    video_results: videoResults,
-                    user_prompt: userPrompt
+            const total = videoResults.length;
+            let completed = 0;
+            const c = document.getElementById('batchDeepSeekResultContainer');
+            const d = document.getElementById('batchDeepSeekResults');
+            if (c && d) {
+                c.style.display = 'block';
+                c.classList.add('fade-in');
+                if (!d.innerHTML) d.innerHTML = '<div class="accordion" id="batchDeepSeekAccordion"></div>';
+            }
+            for (let i = 0; i < total; i++) {
+                const vr = videoResults[i];
+                fetch('/deepseek/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_result: vr, user_prompt: userPrompt })
                 })
-            })
-            .then(response => {
-                console.log('Batch DeepSeek response received:', response.status); // 调试信息
-                return response.json();
-            })
-            .then(data => {
-                console.log('Batch DeepSeek data:', data); // 调试信息
-                if (data.success) {
-                    updateStepProgress(2, 70);
-                    // 直接显示批量结果（同步处理）
-                    showBatchDeepSeekResults(data.results, data.total_count);
-                    setStepStatus(2, 'completed', '已完成');
-                    updateStepProgress(2, 100);
-
-                    // 显示第三步入口按钮
-                    setTimeout(() => {
-                        showThirdStepEntrance();
-                    }, 1000);
-                } else {
-                    setStepStatus(2, 'error', '批量处理失败');
-                    showError(data.error || '批量DeepSeek处理失败');
-                }
-                resetBatchDeepSeekInterface();
-            })
-            .catch(error => {
-                console.error('Batch DeepSeek processing error:', error); // 调试信息
-                setStepStatus(2, 'error', '批量处理失败');
-                showError('批量DeepSeek处理错误：' + error.message);
-                resetBatchDeepSeekInterface();
-            });
+                .then(r => r.json())
+                .then(data => {
+                    completed++;
+                    const p = Math.round((completed / total) * 100);
+                    updateStepProgress(2, p);
+                    const isSuccess = !!data.success;
+                    const idx = i;
+                    const acc = document.getElementById('batchDeepSeekAccordion');
+                    if (acc) {
+                        const accordionId = `deepSeekCollapse${idx}`;
+                        const rawName = uploadedFilenames && uploadedFilenames[idx] ? uploadedFilenames[idx] : `视频 ${idx + 1}`;
+                        const fname = escapeHtml(rawName);
+                        const bodyHtml = isSuccess ? `<pre style=\"white-space: pre-wrap; font-family: inherit; color: #ffffff;\">${data.result}</pre>` : `<div class=\"alert alert-danger\"><i class=\"fas fa-exclamation-triangle\"></i> ${data.error || 'DeepSeek处理过程中发生错误'}</div>`;
+                        const itemHtml = `<div class=\"accordion-item mb-3\"><h2 class=\"accordion-header\" id=\"deepSeekHeading${idx}\"><button class=\"accordion-button ${idx > 0 ? 'collapsed' : ''}\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#${accordionId}\"><div class=\"d-flex w-100 justify-content-between align-items-center\"><div><i class=\"fas fa-brain me-2\"></i><strong>${fname}</strong>${isSuccess ? '<span class=\"badge bg-success ms-2\">处理成功</span>' : '<span class=\"badge bg-danger ms-2\">处理失败</span>'}</div></div></button></h2><div id=\"${accordionId}\" class=\"accordion-collapse collapse ${idx === 0 ? 'show' : ''}\" data-bs-parent=\"#batchDeepSeekAccordion\"><div class=\"accordion-body\">${bodyHtml}</div></div></div>`;
+                        acc.insertAdjacentHTML('beforeend', itemHtml);
+                    }
+                    if (isSuccess) { deepSeekResults[idx] = data.result; } else { deepSeekResults[idx] = `处理失败: ${data.error || '未知错误'}`; }
+                    if (completed === total) {
+                        setStepStatus(2, 'completed', '已完成');
+                        updateStepProgress(2, 100);
+                        setTimeout(() => { showThirdStepEntrance(); }, 1000);
+                        resetBatchDeepSeekInterface();
+                    }
+                })
+                .catch(error => {
+                    completed++;
+                    const p = Math.round((completed / total) * 100);
+                    updateStepProgress(2, p);
+                    const idx = i;
+                    const acc = document.getElementById('batchDeepSeekAccordion');
+                    if (acc) {
+                        const accordionId = `deepSeekCollapse${idx}`;
+                        const rawName = uploadedFilenames && uploadedFilenames[idx] ? uploadedFilenames[idx] : `视频 ${idx + 1}`;
+                        const fname = escapeHtml(rawName);
+                        const bodyHtml = `<div class=\"alert alert-danger\"><i class=\"fas fa-exclamation-triangle\"></i> ${error.message}</div>`;
+                        const itemHtml = `<div class=\"accordion-item mb-3\"><h2 class=\"accordion-header\" id=\"deepSeekHeading${idx}\"><button class=\"accordion-button ${idx > 0 ? 'collapsed' : ''}\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#${accordionId}\"><div class=\"d-flex w-100 justify-content-between align-items-center\"><div><i class=\"fas fa-brain me-2\"></i><strong>${fname}</strong><span class=\"badge bg-danger ms-2\">处理失败</span></div></div></button></h2><div id=\"${accordionId}\" class=\"accordion-collapse collapse ${idx === 0 ? 'show' : ''}\" data-bs-parent=\"#batchDeepSeekAccordion\"><div class=\"accordion-body\">${bodyHtml}</div></div></div>`;
+                        acc.insertAdjacentHTML('beforeend', itemHtml);
+                    }
+                    deepSeekResults[idx] = `处理失败: ${error.message}`;
+                    if (completed === total) {
+                        setStepStatus(2, 'completed', '部分完成');
+                        updateStepProgress(2, 100);
+                        setTimeout(() => { showThirdStepEntrance(); }, 1000);
+                        resetBatchDeepSeekInterface();
+                    }
+                });
+            }
         }
 
         function startScriptGeneration() {
@@ -4479,6 +4500,20 @@ Now, I give you these two JSONs:</textarea>
                             success: true,
                             filename: uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`
                         });
+                        const rc = document.getElementById('jsonMergeResultContainer');
+                        const rd = document.getElementById('jsonMergeResults');
+                        if (rc && rd) {
+                            rc.style.display = 'block';
+                            if (!rd.innerHTML) rd.innerHTML = '<div class="accordion" id="jsonMergeAccordion"></div>';
+                            const acc = document.getElementById('jsonMergeAccordion');
+                            if (acc) {
+                                const accordionId = `jsonMergeCollapse${i}`;
+                                const fname = escapeHtml(uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`);
+                                const itemHtml = `<div class=\"accordion-item\"><h2 class=\"accordion-header\" id=\"jsonMergeHeading${i}\"><button class=\"accordion-button ${i > 0 ? 'collapsed' : ''}\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#${accordionId}\"><div class=\"d-flex w-100 justify-content-between align-items-center\"><div><i class=\"fas fa-code-merge me-2\"></i><strong>${fname}</strong><span class=\"badge bg-success ms-2\">拼接成功</span></div></div></button></h2><div id=\"${accordionId}\" class=\"accordion-collapse collapse ${i === 0 ? 'show' : ''}\" data-bs-parent=\"#jsonMergeAccordion\"><div class=\"accordion-body\"><pre style=\"white-space: pre-wrap; font-family: inherit; color: #333333;\">${data.result}</pre></div></div></div>`;
+                                acc.insertAdjacentHTML('beforeend', itemHtml);
+                            }
+                        }
+                        try { window.jsonMergeCombinedSource = (window.jsonMergeCombinedSource ? (window.jsonMergeCombinedSource + '\n\n') : '') + `EpisodeFileName: ${uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : ''}\n${data.result || ''}`; } catch (e) {}
                     } else {
                         jsonMergeResults.push({
                             index: i,
@@ -4488,6 +4523,19 @@ Now, I give you these two JSONs:</textarea>
                             success: false,
                             filename: uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`
                         });
+                        const rc = document.getElementById('jsonMergeResultContainer');
+                        const rd = document.getElementById('jsonMergeResults');
+                        if (rc && rd) {
+                            rc.style.display = 'block';
+                            if (!rd.innerHTML) rd.innerHTML = '<div class="accordion" id="jsonMergeAccordion"></div>';
+                            const acc = document.getElementById('jsonMergeAccordion');
+                            if (acc) {
+                                const accordionId = `jsonMergeCollapse${i}`;
+                                const fname = escapeHtml(uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`);
+                                const itemHtml = `<div class=\"accordion-item\"><h2 class=\"accordion-header\" id=\"jsonMergeHeading${i}\"><button class=\"accordion-button ${i > 0 ? 'collapsed' : ''}\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#${accordionId}\"><div class=\"d-flex w-100 justify-content-between align-items-center\"><div><i class=\"fas fa-code-merge me-2\"></i><strong>${fname}</strong><span class=\"badge bg-danger ms-2\">拼接失败</span></div></div></button></h2><div id=\"${accordionId}\" class=\"accordion-collapse collapse ${i === 0 ? 'show' : ''}\" data-bs-parent=\"#jsonMergeAccordion\"><div class=\"accordion-body\"><p class=\"text-danger\">${data.error || 'JSON拼接处理失败'}</p></div></div></div>`;
+                                acc.insertAdjacentHTML('beforeend', itemHtml);
+                            }
+                        }
                     }
 
                     // 检查是否所有处理都已完成
@@ -4515,6 +4563,19 @@ Now, I give you these two JSONs:</textarea>
                         success: false,
                         filename: uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`
                     });
+                    const rc = document.getElementById('jsonMergeResultContainer');
+                    const rd = document.getElementById('jsonMergeResults');
+                    if (rc && rd) {
+                        rc.style.display = 'block';
+                        if (!rd.innerHTML) rd.innerHTML = '<div class="accordion" id="jsonMergeAccordion"></div>';
+                        const acc = document.getElementById('jsonMergeAccordion');
+                        if (acc) {
+                            const accordionId = `jsonMergeCollapse${i}`;
+                            const fname = escapeHtml(uploadedFilenames && uploadedFilenames[i] ? uploadedFilenames[i] : `视频 ${i + 1}`);
+                            const itemHtml = `<div class=\"accordion-item\"><h2 class=\"accordion-header\" id=\"jsonMergeHeading${i}\"><button class=\"accordion-button ${i > 0 ? 'collapsed' : ''}\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#${accordionId}\"><div class=\"d-flex w-100 justify-content-between align-items-center\"><div><i class=\"fas fa-code-merge me-2\"></i><strong>${fname}</strong><span class=\"badge bg-danger ms-2\">拼接失败</span></div></div></button></h2><div id=\"${accordionId}\" class=\"accordion-collapse collapse ${i === 0 ? 'show' : ''}\" data-bs-parent=\"#jsonMergeAccordion\"><div class=\"accordion-body\"><p class=\"text-danger\">网络错误: ${error.message}</p></div></div></div>`;
+                            acc.insertAdjacentHTML('beforeend', itemHtml);
+                        }
+                    }
 
                     // 检查是否所有处理都已完成
                     if (completedCount === totalResults) {
