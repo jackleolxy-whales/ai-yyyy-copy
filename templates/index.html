@@ -4720,9 +4720,6 @@ Now, I give you these two JSONs:</textarea>
             originalShowBatchDeepSeekResults(results, totalCount);
             storeDeepSeekResults(results);
         };
-    </script>
-</body>
-</html>
         function startScriptExtraction() {
             const prompt = document.getElementById('scriptExtractPrompt').value.trim();
             if (!prompt) { showError('提取提示词不能为空'); return; }
@@ -4762,13 +4759,16 @@ Now, I give you these two JSONs:</textarea>
             const t = document.getElementById('scriptExtractResultText');
             if (!c || !t) return;
             const toolbar = `
-                <div class="mb-2 d-flex gap-2">
-                    <button class="btn btn-sm btn-outline-light" id="copyExtract">复制台词文本</button>
+                <div class=\"mb-2 d-flex gap-2\">
+                    <button class=\"btn btn-sm btn-outline-light\" id=\"copyExtract\">复制台词文本</button>
                 </div>
             `;
-            t.innerHTML = toolbar + `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(result)}</pre>`;
+            t.innerHTML = toolbar + `<pre style=\"white-space: pre-wrap; font-family: inherit;\">${escapeHtml(result)}</pre>`;
             c.style.display = 'block';
             c.classList.add('fade-in');
             const btnCopy = document.getElementById('copyExtract');
             if (btnCopy) btnCopy.onclick = () => navigator.clipboard.writeText(result);
         }
+    </script>
+</body>
+</html>
