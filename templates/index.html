@@ -1128,11 +1128,39 @@
  
  * **[ DO ]** 
      * **Start 'In Media Res' (In the Middle of the Action):** This is **non-negotiable.** Your script MUST begin at the *peak* of the conflict, humiliation, or twist. Do not build up. Show the *result* or *action* first, then explain the 'why'. 
-         * *Example (Good):* "This woman was just forced to kneel by her mother-in-law, but the next second, her bodyguard..." 
-         * *Example (Good):* "This man is pretending to be a poor guy, but his real identity is actually..." 
+    
+    
      * **Instantly Create a 'Story Gap':** Your opening line must **force the user's brain to ask "Why?"** or "How did this happen?!" This "curiosity gap" is your primary tool. 
  
- * **[ DO NOT ]** 
+ ---
+
+**[ 🏆 Gold-Standard Examples (From Proven Clips) ]**
+Study these **proven** examples to understand the *exact* tone and structure to replicate.
+
+* **1. The 'Gossip' Hook (Your Voice):** Use this to pull the viewer in like a friend.
+    * `"Okay buckle up because this drama is WILD"`
+    * `"Alright buckle up because this drama is a whole mess"`
+    * `"Okay spill the tea, this drama is piping hot"`
+
+* **2. The 'In Media Res' Hook (The Action):** Start at the *peak* of the drama.
+    * `"This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"` (Starts with action, *then* explains the context).
+    * `"The villainess literally puts a bounty on her clothes - $100 per strip"` (Starts with the *outrageous* setback).
+    * `"Our CEO just found his mute wife in a wedding dress he *didn't* buy"`
+
+* **3. The 'Twist' (The Turn):** Use short, punchy phrases to mark a reversal.
+    * `"...SIKE!"`
+    * `"...Oh but wait, PLOT TWIST!"`
+    * `"He's whispering 'Annie, I miss you' while holding our girl"` (A perfect *emotional* twist).
+    * `"...and he's not there for her. He's there for her SISTER"` (A devastating reveal).
+
+* **4. The 'Unbearable' Cliffhanger (The Goal):** Force the user to ask "what's next?"
+    * `"...he's realizing he messed up big time. So what happens next?"`
+    * `"Love WHO?! Don't leave me hanging! I need to know what happens next"`
+    * `"He's so close to the truth yet so far away... What will he do?"`
+
+---
+
+* **[ DO NOT ]** 
      * **No Flat Exposition:** Absolutely no "This woman's name is XX, and she is..." or "The story begins with..." 
      * **No Background First:** Do not waste time explaining character relationships or backstory. Weave that information in *after* the hook. 
  
@@ -1150,7 +1178,7 @@
  
  **[ Workflow & Methodology ]** 
  1.  **Analyze for Core Conflict:** Scan all JSONs. Identify the main "A-Plot" (e.g., Heroine's revenge, CEO's mistaken identity). Use the `analysis` and `emotion` fields to find the primary emotional thread (e.g., "Anger," "Agony," "Revenge"). 
- 2.  **Select the Hook:** Scour all `isHighlight: true` and `isKeyPoint: true` tags. Find the *single most shocking* visual/plot point in the *entire* drama to use as your opening. 
+ 2.  **Select the Hook:** Scour all `isHighlight: true` and `isKeyPoint: true` tags. Find the *single most shocking* visual/plot point in the *entire* drama to use as your opening (Refer to the **Gold-Standard Examples**). 
  3.  **Write Script (Structured):** Write the narration script according to this proven **"Hook + Story + Suspense"** structure, ensuring a colloquial and easy-to-understand tone: 
      * **Part 1: The 'Golden Hook'** (The peak conflict. Forces the user to stop. Approx. 1-2 lines) 
      * **Part 2: Story Content & Escalation** (Introduce the characters and the central problem. Detail the injustice, humiliation, and escalating stakes that make the audience "invest" emotionally. This is the main body.) 
@@ -1413,6 +1441,37 @@ Your entire output **must** be a single JSON code block. Do not include *any* in
 
 -----
 
+### ⚠️ CRITICAL CONSTRAINT: The Unit of Analysis (Narrative Beat)
+
+Before you begin your analysis, you must adhere to one paramount rule: **The unit you analyze in the `eventBreakdown` array must be a "Usable Narrative Beat," not a "Micro-Shot."**
+
+The 1-3 second "micro-fragments" identify are **absolutely unacceptable** for the following reasons:
+
+1.  **Incoherent Editing:** Fragments that are too short lead to choppy and disjointed editing in the final product.
+2.  **Audio-Visual Mismatch:** The duration of a voice-over (commentary) for a 1-3 second clip will almost always be longer than the clip itself, making it impossible to sync.
+3.  **Poor User Experience:** Audiences cannot process a complete emotional beat in 1-3 seconds; this is not how "viral" content works.
+
+**【YOUR CORE TASK】**
+You must think like a **short-form drama editor**. You are to extract **"emotionally complete"** segments.
+
+  * **Definition of a "Narrative Beat":** A "Narrative Beat" is the smallest complete event containing a **"Cause-Effect"** or **"Action-Reaction-Consequence"** arc.
+
+      * **WRONG (Micro-Fragment):**
+        `{ "timestamp": "00:05-00:06", "description": "FL's shocked expression" }`
+      * **RIGHT (Narrative Beat):**
+        `{ "timestamp": "00:04-00:09", "description": "ML announces his decision; FL looks up in shock; a tear falls." }`
+        *(This is a 5-second, complete, and usable asset)*
+
+  * **【MANDATORY DURATION REQUIREMENT】**
+    Every single event object in your `eventBreakdown` array **must** have an ideal duration of **5 to 15 seconds**.
+
+      * **You are forbidden** to return an event with a duration of less than 4 seconds.
+      * **You are forbidden** to split a single complete "Narrative Beat" (e.g., "Argument -> Slap -> Shocked Reaction") into multiple event objects.
+
+**You must ensure the "Narrative Beat integrity" first, and only then apply your full analysis to that (5-15 second) clip.**
+
+-----
+
 ### JSON Output Requirement
 
 You must and only provide your complete analysis in the following JSON structure.
@@ -1538,6 +1597,37 @@ Your entire output **must** be a single JSON code block. Do not include *any* in
       * `primaryPsychologicalHook`: The main emotional driver (e.g., 'Revenge Anticipation', 'Emotional Debt', 'Justice Catharsis', 'Forbidden Love').
       * `narrativeArchetypes`: The character templates (e.g., 'Alpha-Male CEO', 'The Vicious Rival', 'The Innocent Victim', 'The Substitute').
       * `commercialStrategy`: The business logic (e.g., 'Hook-First Pacing', 'Paywall-Baiting', 'Extreme Character Tropes').
+
+-----
+
+### ⚠️ CRITICAL CONSTRAINT: The Unit of Analysis (Narrative Beat)
+
+Before you begin your analysis, you must adhere to one paramount rule: **The unit you analyze in the `eventBreakdown` array must be a "Usable Narrative Beat," not a "Micro-Shot."**
+
+The 1-3 second "micro-fragments" identify are **absolutely unacceptable** for the following reasons:
+
+1.  **Incoherent Editing:** Fragments that are too short lead to choppy and disjointed editing in the final product.
+2.  **Audio-Visual Mismatch:** The duration of a voice-over (commentary) for a 1-3 second clip will almost always be longer than the clip itself, making it impossible to sync.
+3.  **Poor User Experience:** Audiences cannot process a complete emotional beat in 1-3 seconds; this is not how "viral" content works.
+
+**【YOUR CORE TASK】**
+You must think like a **short-form drama editor**. You are to extract **"emotionally complete"** segments.
+
+  * **Definition of a "Narrative Beat":** A "Narrative Beat" is the smallest complete event containing a **"Cause-Effect"** or **"Action-Reaction-Consequence"** arc.
+
+      * **WRONG (Micro-Fragment):**
+        `{ "timestamp": "00:05-00:06", "description": "FL's shocked expression" }`
+      * **RIGHT (Narrative Beat):**
+        `{ "timestamp": "00:04-00:09", "description": "ML announces his decision; FL looks up in shock; a tear falls." }`
+        *(This is a 5-second, complete, and usable asset)*
+
+  * **【MANDATORY DURATION REQUIREMENT】**
+    Every single event object in your `eventBreakdown` array **must** have an ideal duration of **5 to 15 seconds**.
+
+      * **You are forbidden** to return an event with a duration of less than 4 seconds.
+      * **You are forbidden** to split a single complete "Narrative Beat" (e.g., "Argument -> Slap -> Shocked Reaction") into multiple event objects.
+
+**You must ensure the "Narrative Beat integrity" first, and only then apply your full analysis to that (5-15 second) clip.**
 
 -----
 
@@ -1667,6 +1757,37 @@ Your entire output **must** be a single JSON code block. Do not include *any* in
       * `primaryPsychologicalHook`: The main emotional driver (e.g., 'Revenge Anticipation', 'Emotional Debt', 'Justice Catharsis', 'Forbidden Love').
       * `narrativeArchetypes`: The character templates (e.g., 'Alpha-Male CEO', 'The Vicious Rival', 'The Innocent Victim', 'The Substitute').
       * `commercialStrategy`: The business logic (e.g., 'Hook-First Pacing', 'Paywall-Baiting', 'Extreme Character Tropes').
+
+-----
+
+### ⚠️ CRITICAL CONSTRAINT: The Unit of Analysis (Narrative Beat)
+
+Before you begin your analysis, you must adhere to one paramount rule: **The unit you analyze in the `eventBreakdown` array must be a "Usable Narrative Beat," not a "Micro-Shot."**
+
+The 1-3 second "micro-fragments" identify are **absolutely unacceptable** for the following reasons:
+
+1.  **Incoherent Editing:** Fragments that are too short lead to choppy and disjointed editing in the final product.
+2.  **Audio-Visual Mismatch:** The duration of a voice-over (commentary) for a 1-3 second clip will almost always be longer than the clip itself, making it impossible to sync.
+3.  **Poor User Experience:** Audiences cannot process a complete emotional beat in 1-3 seconds; this is not how "viral" content works.
+
+**【YOUR CORE TASK】**
+You must think like a **short-form drama editor**. You are to extract **"emotionally complete"** segments.
+
+  * **Definition of a "Narrative Beat":** A "Narrative Beat" is the smallest complete event containing a **"Cause-Effect"** or **"Action-Reaction-Consequence"** arc.
+
+      * **WRONG (Micro-Fragment):**
+        `{ "timestamp": "00:05-00:06", "description": "FL's shocked expression" }`
+      * **RIGHT (Narrative Beat):**
+        `{ "timestamp": "00:04-00:09", "description": "ML announces his decision; FL looks up in shock; a tear falls." }`
+        *(This is a 5-second, complete, and usable asset)*
+
+  * **【MANDATORY DURATION REQUIREMENT】**
+    Every single event object in your `eventBreakdown` array **must** have an ideal duration of **5 to 15 seconds**.
+
+      * **You are forbidden** to return an event with a duration of less than 4 seconds.
+      * **You are forbidden** to split a single complete "Narrative Beat" (e.g., "Argument -> Slap -> Shocked Reaction") into multiple event objects.
+
+**You must ensure the "Narrative Beat integrity" first, and only then apply your full analysis to that (5-15 second) clip.**
 
 -----
 
@@ -2050,74 +2171,75 @@ Now, I give you the user's JSON data: </textarea>
                                                 id="personAnalysisPrompt"
                                                 rows="8"
                                                 placeholder="分析要求将自动拼接DeepSeek处理结果..."
-                                            >Your primary mission is to extract detailed information about all individuals
-present within a specified time range `["A", "B"]`(The unit of the timestamp is in
-the format of MM:SS.), based on the video context or transcript I provide.
-
-**Your Objective:**
-
-You must accurately identify every key person appearing between timestamp `A` and
-timestamp `B`. For **each** person identified, you must extract the following four
-pieces of information:
-
-1.  **Name (name):** The person's name. If the name is unknown or not mentioned, use
- a clear descriptive label (e.g., "Woman in red dress," "Man with glasses,"
-"Bystander 1").
-2.  **Action (action):** The **primary** physical action the person is performing
-during this time segment (e.g., "Picking up a cup from the table," "Running across
-the street," "Pointing at the whiteboard and explaining," "Typing on a keyboard").
-3.  **Expression (expression):** The person's facial expression or the emotional
-state being conveyed (e.g., "Smiling happily," "Frowning in confusion," "Looks
-focused," "Glancing around anxiously").
-4.  **Dialogue (dialogue):** The **complete** lines spoken by this person *within*
-this time segment. If the person does not speak, you must enter "None".
-
-**Output Format Requirements:**
-
-You must strictly adhere to the following JSON format for your response. The root
-object must contain the time segment information and an **array** named
-`analysis_results`, which will hold the objects for all analyzed individuals.
-
-**JSON Structure Template:**
-
-```json
-{
-  "time_segment": {
-    "start": "A",
-    "end": "B"
-  },
-  "analysis_results": [
-    {
-      "person_id": 1,
-      "name": "Name or description of Person A",
-      "action": "Detailed action description of Person A",
-      "expression": "Specific expression description of Person A",
-      "dialogue": "Complete dialogue from Person A during this segment"
-    },
-    {
-      "person_id": 2,
-      "name": "Name or description of Person B",
-      "action": "Detailed action description of Person B",
-      "expression": "Specific expression description of Person B",
-      "dialogue": "Complete dialogue from Person B during this segment"
-    }
-    // Continue to add objects here if more people are present
-  ]
-}
-```
-
-**Important Constraints and Rules:**
-
-  * All extracted information (especially actions and dialogue) must be **strictly
-limited** to the `["A", "B"]` timestamp range.
-  * `analysis_results` **must** be an array, even if there is only one person or no
-one in the segment.
-  * If no key individuals are identifiable in this time segment, you must return an
-empty `analysis_results` array (i.e., `[]`).
-  * Ensure all dialogue is captured completely and accurately; do not omit any lines
- spoken within the segment.
-
-Now, I give you the json:</textarea>
+                                            >Your primary mission is to extract detailed information about all individuals 
+ present within a specified time range `["A", "B"]`(The unit of the timestamp is in 
+ the format of MM:SS.), based on the video context or transcript I provide. 
+ 
+ **Your Objective:** 
+ 
+ You must accurately identify every key person appearing between timestamp `A` and 
+ timestamp `B`. For **each** person identified, you must extract the following four 
+ pieces of information: 
+ 
+ 1.  **Name (name):** The person's name. If the name is unknown or not mentioned, use 
+  a clear descriptive label (e.g., "Woman in red dress," "Man with glasses," 
+ "Bystander 1"). 
+ 2.  **Action (action):** The **primary** physical action the person is performing 
+ during this time segment (e.g., "Picking up a cup from the table," "Running across 
+ the street," "Pointing at the whiteboard and explaining," "Typing on a keyboard"). 
+ 3.  **Expression (expression):** The person's facial expression or the emotional 
+ state being conveyed (e.g., "Smiling happily," "Frowning in confusion," "Looks 
+ focused," "Glancing around anxiously"). 
+ 4.  **Dialogue (dialogue):** The **complete** lines spoken by this person *within* 
+ this time segment. If the person does not speak, you must enter "None". 
+ 
+ **Output Format Requirements:** 
+ 
+ You must strictly adhere to the following JSON format for your response. The root 
+ object must contain the time segment information and an **array** named 
+ `analysis_results`, which will hold the objects for all analyzed individuals. 
+ 
+ **JSON Structure Template:** 
+ 
+ ```json 
+ { 
+   "time_segment": { 
+     "start": "A", 
+     "end": "B" 
+   }, 
+   "analysis_results": [ 
+     { 
+       "person_id": 1, 
+       "name": "Name or description of Person A", 
+       "action": "Detailed action description of Person A", 
+       "expression": "Specific expression description of Person A", 
+       "dialogue": "Complete dialogue from Person A during this segment" 
+     }, 
+     { 
+       "person_id": 2, 
+       "name": "Name or description of Person B", 
+       "action": "Detailed action description of Person B", 
+       "expression": "Specific expression description of Person B", 
+       "dialogue": "Complete dialogue from Person B during this segment" 
+     } 
+     // Continue to add objects here if more people are present 
+   ] 
+ } 
+ ``` 
+ 
+ **Important Constraints and Rules:** 
+ 
+   * All extracted information (especially actions and dialogue) must be **strictly 
+ limited** to the `["A", "B"]` timestamp range. 
+   * `analysis_results` **must** be an array, even if there is only one person or no 
+   one in the segment. 
+   * If no key individuals are identifiable in this time segment, you must return an 
+   empty `analysis_results` array (i.e., `[]`). 
+   * Ensure all dialogue is captured completely and accurately; do not omit any lines 
+   spoken within the segment. 
+   *It is important to emphasize that you should not omit any timestamps in the JSON; that is, you should analyze every single timestamp provided in the JSON. 
+ 
+ Now, I give you the json:</textarea>
                                         </div>
 
                                         <!-- 待分析视频列表 -->
