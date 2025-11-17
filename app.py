@@ -6,6 +6,7 @@ import threading
 import time
 import base64
 from werkzeug.utils import secure_filename
+import requests
 
 app = Flask(__name__)
 
@@ -692,6 +693,7 @@ def script_generate():
         script_prompt = data.get('script_prompt', '').strip()
         batch_id = data.get('batch_id', '').strip()
         source_type = (data.get('source_type', 'json_merge') or 'json_merge').strip()
+        model_provider = (data.get('model_provider', 'deepseek') or 'deepseek').strip()
         if source_type not in ('json_merge', 'script_generate'):
             source_type = 'json_merge'
 
@@ -714,17 +716,97 @@ def script_generate():
                 return jsonify({"success": False, "error": "未找到第5步的脚本生成结果"})
 
         combined_input = "\n\n".join([t for t in merged_texts if t])
+        print(f"[script_generate] batch_id={batch_id} source_type={source_type} provider={model_provider} prompt_len={len(script_prompt)} combined_len={len(combined_input)}")
 
         task_id = str(int(time.time() * 1000))
         deepseek_status[task_id] = {"status": "processing", "progress": 50}
 
         try:
-            result = deepseek_processor.process_video_analysis_result(
-                video_analysis_text=combined_input,
-                user_prompt=script_prompt,
-                model="deepseek-chat",
-                stream=False
-            )
+            if model_provider == 'glm-4-long':
+                print(f"[script_generate] task_id={task_id} call glm-4-long")
+                api_key = os.environ.get('BIGMODEL_API_KEY', '').strip()
+                if not api_key:
+                    raise Exception('缺少GLM-4-Long API密钥')
+                full_input = f"{script_prompt}\n\n{combined_input}"
+                url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+                headers = {
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json'
+                }
+                payload = {
+                    'model': 'glm-4-long',
+                    'messages': [
+                        {'role': 'user', 'content': full_input}
+                    ]
+                }
+                print(f"[script_generate] task_id={task_id} glm payload messages_len={len(payload['messages'])} content_len={len(full_input)}")
+                resp = requests.post(url, headers=headers, json=payload, timeout=60)
+                print(f"[script_generate] task_id={task_id} glm status_code={resp.status_code}")
+                if resp.status_code != 200:
+                    body_preview = resp.text[:500]
+                    raise Exception(f"GLM-4-Long调用失败: HTTP {resp.status_code} body={body_preview}")
+                data_json = resp.json()
+                result = ''
+                try:
+                    choices = data_json.get('choices') or []
+                    if choices:
+                        msg = choices[0].get('message') or {}
+                        result = msg.get('content') or ''
+                except:
+                    pass
+                if not result:
+                    result = str(data_json)
+                print(f"[script_generate] task_id={task_id} glm result_len={len(result)}")
+            elif model_provider in {
+                'o3-pro-2025-06-10',
+                'claude-sonnet-4-5-20250929',
+                'gemini-2.5-pro-preview-06-05',
+                'gemini-2.5-flash',
+                'kimi-k2-250711'
+            }:
+                print(f"[script_generate] task_id={task_id} call laozhang model={model_provider}")
+                api_key = os.environ.get('LAOZHANG_API_KEY', '').strip()
+                if not api_key:
+                    raise Exception('缺少LaoZhang API密钥')
+                full_input = f"{script_prompt}\n\n{combined_input}"
+                url = 'https://api.laozhang.ai/v1/chat/completions'
+                headers = {
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json'
+                }
+                payload = {
+                    'model': model_provider,
+                    'messages': [
+                        {'role': 'user', 'content': full_input}
+                    ]
+                }
+                print(f"[script_generate] task_id={task_id} laozhang payload messages_len={len(payload['messages'])} content_len={len(full_input)}")
+                resp = requests.post(url, headers=headers, json=payload, timeout=60)
+                print(f"[script_generate] task_id={task_id} laozhang status_code={resp.status_code}")
+                if resp.status_code != 200:
+                    body_preview = resp.text[:500]
+                    raise Exception(f"LaoZhang调用失败: HTTP {resp.status_code} body={body_preview}")
+                data_json = resp.json()
+                result = ''
+                try:
+                    choices = data_json.get('choices') or []
+                    if choices:
+                        msg = choices[0].get('message') or {}
+                        result = msg.get('content') or ''
+                except:
+                    pass
+                if not result:
+                    result = str(data_json)
+                print(f"[script_generate] task_id={task_id} laozhang result_len={len(result)}")
+            else:
+                print(f"[script_generate] task_id={task_id} call deepseek")
+                result = deepseek_processor.process_video_analysis_result(
+                    video_analysis_text=combined_input,
+                    user_prompt=script_prompt,
+                    model="deepseek-chat",
+                    stream=False
+                )
+                print(f"[script_generate] task_id={task_id} deepseek result_len={len(str(result))}")
 
             deepseek_status[task_id] = {"status": "completed", "progress": 100}
             deepseek_results[task_id] = {
@@ -743,6 +825,7 @@ def script_generate():
 
         except Exception as e:
             deepseek_status[task_id] = {"status": "error", "progress": 0}
+            print(f"[script_generate] task_id={task_id} error={str(e)}")
             deepseek_results[task_id] = {
                 "success": False,
                 "error": str(e),
