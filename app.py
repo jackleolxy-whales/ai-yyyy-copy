@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
+from flask import stream_with_context
 import os
 from video_analyzer import VideoAnalyzer
 from deepseek_processor import DeepSeekProcessor
@@ -716,7 +717,16 @@ def script_generate():
                 return jsonify({"success": False, "error": "未找到第5步的脚本生成结果"})
 
         combined_input = "\n\n".join([t for t in merged_texts if t])
+        def _preview_text(label, text):
+            try:
+                sample = text[:300]
+                is_ascii = all(ord(ch) < 128 for ch in sample)
+                print(f"[script_generate] {label}_preview(len={len(text)} ascii={is_ascii}) -> {sample}")
+            except Exception as _e:
+                print(f"[script_generate] {label}_preview error={str(_e)}")
         print(f"[script_generate] batch_id={batch_id} source_type={source_type} provider={model_provider} prompt_len={len(script_prompt)} combined_len={len(combined_input)}")
+        _preview_text('script_prompt', script_prompt)
+        _preview_text('combined_input', combined_input)
 
         task_id = str(int(time.time() * 1000))
         deepseek_status[task_id] = {"status": "processing", "progress": 50}
@@ -731,7 +741,8 @@ def script_generate():
                 url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
                 headers = {
                     'Authorization': f'Bearer {api_key}',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Accept-Charset': 'utf-8'
                 }
                 payload = {
                     'model': 'glm-4-long',
@@ -772,32 +783,72 @@ def script_generate():
                 url = 'https://api.laozhang.ai/v1/chat/completions'
                 headers = {
                     'Authorization': f'Bearer {api_key}',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Accept-Charset': 'utf-8'
                 }
                 payload = {
                     'model': model_provider,
                     'messages': [
                         {'role': 'user', 'content': full_input}
-                    ]
+                    ],
+                    'stream': True
                 }
-                print(f"[script_generate] task_id={task_id} laozhang payload messages_len={len(payload['messages'])} content_len={len(full_input)}")
-                resp = requests.post(url, headers=headers, json=payload, timeout=60)
-                print(f"[script_generate] task_id={task_id} laozhang status_code={resp.status_code}")
-                if resp.status_code != 200:
-                    body_preview = resp.text[:500]
-                    raise Exception(f"LaoZhang调用失败: HTTP {resp.status_code} body={body_preview}")
-                data_json = resp.json()
-                result = ''
-                try:
-                    choices = data_json.get('choices') or []
-                    if choices:
-                        msg = choices[0].get('message') or {}
-                        result = msg.get('content') or ''
-                except:
-                    pass
-                if not result:
-                    result = str(data_json)
-                print(f"[script_generate] task_id={task_id} laozhang result_len={len(result)}")
+
+                def stream_laozhang():
+                    final_text = ''
+                    try:
+                        with requests.post(url, headers=headers, json=payload, timeout=300, stream=True) as resp:
+                            print(f"[script_generate] task_id={task_id} laozhang status_code={resp.status_code}")
+                            if resp.status_code != 200:
+                                body_preview = ''
+                                try:
+                                    body_preview = resp.text[:500]
+                                except:
+                                    pass
+                                raise Exception(f"LaoZhang调用失败: HTTP {resp.status_code} body={body_preview}")
+                            for raw_line in resp.iter_lines(decode_unicode=True):
+                                if not raw_line:
+                                    continue
+                                line = raw_line.strip()
+                                if line.startswith('data:'):
+                                    data_str = line[5:].strip()
+                                    if data_str == '[DONE]':
+                                        break
+                                    try:
+                                        import json as _json
+                                        obj = _json.loads(data_str)
+                                        chunk = ''
+                                        choices = obj.get('choices') or []
+                                        if choices:
+                                            delta = choices[0].get('delta') or {}
+                                            if 'content' in delta and delta['content'] is not None:
+                                                chunk = delta['content']
+                                            else:
+                                                msg = choices[0].get('message') or {}
+                                                if 'content' in msg and msg['content'] is not None:
+                                                    chunk = msg['content']
+                                        if chunk:
+                                            final_text += chunk
+                                            yield chunk
+                                    except Exception as _e:
+                                        # 非JSON数据，直接回传文本
+                                        final_text += data_str
+                                        yield data_str
+                                else:
+                                    # 非SSE格式，直接回传
+                                    final_text += line
+                                    yield line
+                    finally:
+                        deepseek_status[task_id] = {"status": "completed", "progress": 100}
+                        deepseek_results[task_id] = {
+                            "success": True,
+                            "result": final_text,
+                            "prompt": script_prompt,
+                            "type": ("script_generate" if source_type == 'json_merge' else "script_extract"),
+                            "batch_id": batch_id
+                        }
+
+                return Response(stream_with_context(stream_laozhang()), mimetype='text/plain; charset=utf-8')
             else:
                 print(f"[script_generate] task_id={task_id} call deepseek")
                 result = deepseek_processor.process_video_analysis_result(

@@ -2777,7 +2777,7 @@ Now, I give you these two JSONs:</textarea>
             }
         }
 
-        function startScriptGeneration() {
+        async function startScriptGeneration() {
             const prompt = document.getElementById('scriptPrompt').value.trim();
             const combined = (typeof window !== 'undefined' && window.jsonMergeCombinedSource) ? String(window.jsonMergeCombinedSource).trim() : '';
             const finalPrompt = combined ? (prompt + '\n\n' + combined) : prompt;
@@ -2798,38 +2798,85 @@ Now, I give you these two JSONs:</textarea>
                 btn.disabled = true;
                 btn.innerHTML = '<span class="loading-spinner"></span>脚本生成中...';
             }
-            updateStepProgress(5, 60);
-            fetch('/script/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ script_prompt: finalPrompt, batch_id: jsonMergeBatchId, source_type: 'json_merge', model_provider: modelProvider })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
+            const laozhangModels = new Set([
+                'o3-pro-2025-06-10',
+                'claude-sonnet-4-5-20250929',
+                'gemini-2.5-pro-preview-06-05',
+                'gemini-2.5-flash',
+                'kimi-k2-250711'
+            ]);
+
+            if (laozhangModels.has(modelProvider)) {
+                try {
+                    updateStepProgress(5, 60);
+                    const res = await fetch('/script/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ script_prompt: finalPrompt, batch_id: jsonMergeBatchId, source_type: 'json_merge', model_provider: modelProvider })
+                    });
+                    if (!res.ok) {
+                        throw new Error('HTTP状态异常: ' + res.status);
+                    }
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    let acc = '';
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const chunk = decoder.decode(value, { stream: true });
+                        if (chunk) {
+                            acc += chunk;
+                            renderScriptResult(acc);
+                        }
+                    }
                     updateStepProgress(5, 90);
-                    renderScriptResult(data.result);
                     const next = document.getElementById('scriptExtractNextStepButtonContainer');
                     if (next) { next.style.display = 'block'; }
                     setStepStatus(5, 'completed', '已完成');
                     updateStepProgress(5, 100);
-                } else {
+                } catch (err) {
                     setStepStatus(5, 'error', '生成失败');
-                    showError(data.error || '脚本生成失败');
+                    showError('脚本生成错误：' + err.message);
+                } finally {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                    }
                 }
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
-                }
-            })
-            .catch(err => {
-                setStepStatus(5, 'error', '生成失败');
-                showError('脚本生成错误：' + err.message);
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
-                }
-            });
+            } else {
+                updateStepProgress(5, 60);
+                fetch('/script/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script_prompt: finalPrompt, batch_id: jsonMergeBatchId, source_type: 'json_merge', model_provider: modelProvider })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        updateStepProgress(5, 90);
+                        renderScriptResult(data.result);
+                        const next = document.getElementById('scriptExtractNextStepButtonContainer');
+                        if (next) { next.style.display = 'block'; }
+                        setStepStatus(5, 'completed', '已完成');
+                        updateStepProgress(5, 100);
+                    } else {
+                        setStepStatus(5, 'error', '生成失败');
+                        showError(data.error || '脚本生成失败');
+                    }
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                    }
+                })
+                .catch(err => {
+                    setStepStatus(5, 'error', '生成失败');
+                    showError('脚本生成错误：' + err.message);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                    }
+                });
+            }
         }
 
         function renderScriptResult(result) {
