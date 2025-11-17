@@ -35,7 +35,7 @@ class VideoAnalyzerWeb:
     def __init__(self):
         self.analyzer = VideoAnalyzer()
 
-    def analyze_video_async(self, task_id, video_url, text_prompt):
+    def analyze_video_async(self, task_id, video_url, text_prompt, model):
         """异步分析视频（URL方式）"""
         try:
             analysis_status[task_id] = {"status": "downloading", "progress": 20}
@@ -51,6 +51,7 @@ class VideoAnalyzerWeb:
             result = self.analyzer.analyze_video_from_url(
                 video_url=video_url,
                 text_prompt=text_prompt,
+                model=model,
                 max_tokens=None,  # 不限制token数量
                 stream=False  # Web应用暂时使用非流式以便获取完整结果
             )
@@ -61,6 +62,7 @@ class VideoAnalyzerWeb:
                 "result": result,
                 "video_url": video_url,
                 "prompt": text_prompt,
+                "model": model,
                 "type": "url"
             }
 
@@ -77,10 +79,11 @@ class VideoAnalyzerWeb:
                 "error": str(e),
                 "video_url": video_url,
                 "prompt": text_prompt,
+                "model": model,
                 "type": "url"
             }
 
-    def analyze_uploaded_video_async(self, task_id, video_path, text_prompt, original_filename):
+    def analyze_uploaded_video_async(self, task_id, video_path, text_prompt, original_filename, model):
         """异步分析上传的视频文件"""
         try:
             analysis_status[task_id] = {"status": "processing", "progress": 30}
@@ -93,6 +96,7 @@ class VideoAnalyzerWeb:
             result = self.analyzer.analyze_video_local(
                 video_path=video_path,
                 text_prompt=text_prompt,
+                model=model,
                 max_tokens=None,  # 不限制token数量
                 stream=False  # Web应用暂时使用非流式以便获取完整结果
             )
@@ -103,6 +107,7 @@ class VideoAnalyzerWeb:
                 "result": result,
                 "video_url": original_filename,
                 "prompt": text_prompt,
+                "model": model,
                 "type": "upload"
             }
 
@@ -119,6 +124,7 @@ class VideoAnalyzerWeb:
                 "error": str(e),
                 "video_url": original_filename,
                 "prompt": text_prompt,
+                "model": model,
                 "type": "upload"
             }
 
@@ -151,6 +157,9 @@ def analyze():
     data = request.json
     video_url = data.get('video_url', '').strip()
     text_prompt = data.get('text_prompt', '').strip()
+    model = (data.get('model') or '').strip()
+    if model not in {"gemini-2.5-flash", "gemini-2.5-pro"}:
+        model = "gemini-2.5-flash"
 
     if not video_url:
         return jsonify({"success": False, "error": "请输入视频URL"})
@@ -164,7 +173,7 @@ def analyze():
     # 启动异步分析
     thread = threading.Thread(
         target=web_analyzer.analyze_video_async,
-        args=(task_id, video_url, text_prompt)
+        args=(task_id, video_url, text_prompt, model)
     )
     thread.start()
 
@@ -227,6 +236,9 @@ def upload_videos():
 
         files = request.files.getlist('video_files')
         text_prompt = request.form.get('text_prompt', '').strip()
+        model = (request.form.get('model') or '').strip()
+        if model not in {"gemini-2.5-flash", "gemini-2.5-pro"}:
+            model = "gemini-2.5-flash"
 
         if not files or files[0].filename == '':
             return jsonify({"success": False, "error": "没有选择文件"})
@@ -300,7 +312,7 @@ def upload_videos():
             # 启动异步分析
             thread = threading.Thread(
                 target=web_analyzer.analyze_uploaded_video_async,
-                args=(task_id, video_path, text_prompt, file.filename)
+                args=(task_id, video_path, text_prompt, file.filename, model)
             )
             thread.start()
 
@@ -329,6 +341,9 @@ def upload_videos_single():
 
         file = request.files['video_file']
         text_prompt = request.form.get('text_prompt', '').strip()
+        model = (request.form.get('model') or '').strip()
+        if model not in {"gemini-2.5-flash", "gemini-2.5-pro"}:
+            model = "gemini-2.5-flash"
 
         # 检查文件名是否为空
         if file.filename == '':
@@ -364,7 +379,7 @@ def upload_videos_single():
         # 启动异步分析
         thread = threading.Thread(
             target=web_analyzer.analyze_uploaded_video_async,
-            args=(task_id, video_path, text_prompt, file.filename)
+            args=(task_id, video_path, text_prompt, file.filename, model)
         )
         thread.start()
 
