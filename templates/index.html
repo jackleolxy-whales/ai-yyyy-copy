@@ -3970,6 +3970,11 @@ Now, I give you these two JSONs:</textarea>
             .catch(error => {
                 console.error('服务检查失败:', error);
             });
+
+            // 动态添加下载按钮（步骤1-4）
+            try {
+                addDownloadButtonsForAllSteps();
+            } catch (e) {}
         });
 
         // 第三步：分时间戳人物分析相关函数
@@ -5155,6 +5160,137 @@ Now, I give you these two JSONs:</textarea>
             originalShowBatchDeepSeekResults(results, totalCount);
             storeDeepSeekResults(results);
         };
+
+        // 新增：下载工具函数
+        function sanitizeFilename(name) {
+            name = (name || 'result').toString();
+            name = name.split('/').pop().split('\\').pop();
+            return name;
+        }
+        function postDownloadTxt(filename, content) {
+            return fetch('/download/txt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: filename, content: content })
+            })
+            .then(resp => resp.blob())
+            .then(blob => {
+                const a = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                a.href = url;
+                a.download = filename.toLowerCase().endsWith('.txt') ? filename : (filename + '.txt');
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                a.remove();
+            });
+        }
+        function postDownloadZip(files, zipName) {
+            return fetch('/download/zip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files: files, zip_name: zipName })
+            })
+            .then(resp => resp.blob())
+            .then(blob => {
+                const a = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                a.href = url;
+                a.download = zipName && zipName.toLowerCase().endsWith('.zip') ? zipName : (zipName || 'results.zip');
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                a.remove();
+            });
+        }
+        function addButton(container, id, text, onClick) {
+            if (!container || document.getElementById(id)) return;
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-sm btn-outline-light me-2';
+            btn.id = id;
+            btn.innerHTML = text;
+            btn.addEventListener('click', onClick);
+            const toolbar = document.createElement('div');
+            toolbar.className = 'mb-2 d-flex flex-wrap gap-2';
+            toolbar.appendChild(btn);
+            container.insertAdjacentElement('afterbegin', toolbar);
+        }
+        function addDownloadButtonsForAllSteps() {
+            // Step 1 单个
+            const step1Single = document.getElementById('resultContainer');
+            addButton(step1Single, 'downloadStep1Single', '<i class="fas fa-download"></i> 下载第1步结果', function() {
+                const name = sanitizeFilename((uploadedFilenames && uploadedFilenames[0]) || '视频_1');
+                const content = (videoAnalysisResults && videoAnalysisResults[0]) || '';
+                postDownloadTxt(name + '.txt', content);
+            });
+            // Step 1 批量
+            const step1Batch = document.getElementById('batchResultContainer');
+            addButton(step1Batch, 'downloadStep1Batch', '<i class="fas fa-file-archive"></i> 下载第1步批量结果ZIP', function() {
+                const files = (videoAnalysisResults || []).map((c, i) => ({ filename: sanitizeFilename((uploadedFilenames && uploadedFilenames[i]) || `视频_${i+1}`) + '.txt', content: c }));
+                postDownloadZip(files, 'step1_results.zip');
+            });
+            // Step 2 单个
+            const step2Single = document.getElementById('deepSeekResultContainer');
+            addButton(step2Single, 'downloadStep2Single', '<i class="fas fa-download"></i> 下载第2步结果', function() {
+                const name = sanitizeFilename((uploadedFilenames && uploadedFilenames[0]) || '视频_1');
+                const content = Array.isArray(deepSeekResults) ? (deepSeekResults[0] || '') : (deepSeekResults || '');
+                postDownloadTxt(name + '.txt', content);
+            });
+            // Step 2 批量
+            const step2Batch = document.getElementById('batchDeepSeekResultContainer');
+            addButton(step2Batch, 'downloadStep2Batch', '<i class="fas fa-file-archive"></i> 下载第2步批量结果ZIP', function() {
+                const list = Array.isArray(deepSeekResults) ? deepSeekResults : [deepSeekResults];
+                const files = list.map((c, i) => ({ filename: sanitizeFilename((uploadedFilenames && uploadedFilenames[i]) || `视频_${i+1}`) + '.txt', content: c || '' }));
+                postDownloadZip(files, 'step2_results.zip');
+            });
+            // Step 3 批量（第三步主要为批量）
+            const step3Batch = document.getElementById('personAnalysisResultContainer');
+            addButton(step3Batch, 'downloadStep3Batch', '<i class="fas fa-file-archive"></i> 下载第3步批量结果ZIP', function() {
+                const files = (personAnalysisResults || []).map((r, i) => ({ filename: sanitizeFilename((uploadedFilenames && uploadedFilenames[i]) || `视频_${i+1}`) + '.txt', content: (r && r.result) || (r && r.error) || '' }));
+                postDownloadZip(files, 'step3_results.zip');
+            });
+            // Step 4 批量
+            const step4Batch = document.getElementById('jsonMergeResultContainer');
+            addButton(step4Batch, 'downloadStep4Batch', '<i class="fas fa-file-archive"></i> 下载第4步批量结果ZIP', function() {
+                const files = getJsonMergeFilesFromDOM();
+                if (!files || files.length === 0) {
+                    const fallback = (uploadedFilenames || []).map((name, i) => ({ filename: sanitizeFilename(name) + '.txt', content: '' }));
+                    postDownloadZip(fallback, 'step4_results.zip');
+                } else {
+                    postDownloadZip(files, 'step4_results.zip');
+                }
+            });
+        }
+
+        // 解析第4步结果DOM，提取文件名与内容
+        function getJsonMergeFilesFromDOM() {
+            const files = [];
+            const acc = document.getElementById('jsonMergeAccordion');
+            if (acc) {
+                const items = acc.querySelectorAll('.accordion-item');
+                items.forEach((item, idx) => {
+                    const nameEl = item.querySelector('.accordion-button strong');
+                    const bodyPre = item.querySelector('.accordion-body pre');
+                    const bodyErr = item.querySelector('.accordion-body p.text-danger');
+                    const nameText = nameEl ? nameEl.textContent.trim() : ((uploadedFilenames && uploadedFilenames[idx]) ? uploadedFilenames[idx] : `视频_${idx+1}`);
+                    const contentText = bodyPre ? bodyPre.textContent : (bodyErr ? bodyErr.textContent : '');
+                    files.push({ filename: sanitizeFilename(nameText) + '.txt', content: contentText });
+                });
+                return files;
+            }
+            const singleContainer = document.getElementById('jsonMergeResultContainer');
+            if (singleContainer) {
+                const header = singleContainer.querySelector('.card .card-header h6');
+                const pre = singleContainer.querySelector('.card .card-body pre');
+                const err = singleContainer.querySelector('.card .card-body p.text-danger');
+                if (header && (pre || err)) {
+                    const nameText = header.textContent ? header.textContent.trim().replace(/^[^\w\u4e00-\u9fa5]+/, '') : ((uploadedFilenames && uploadedFilenames[0]) || '视频_1');
+                    const contentText = pre ? pre.textContent : (err ? err.textContent : '');
+                    files.push({ filename: sanitizeFilename(nameText) + '.txt', content: contentText });
+                }
+            }
+            return files;
+        }
         function startScriptExtraction() {
             const prompt = document.getElementById('scriptExtractPrompt').value.trim();
             if (!prompt) { showError('提取提示词不能为空'); return; }

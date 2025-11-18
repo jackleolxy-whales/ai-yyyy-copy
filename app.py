@@ -8,6 +8,8 @@ import time
 import base64
 from werkzeug.utils import secure_filename
 import requests
+import io
+import zipfile
 
 app = Flask(__name__)
 
@@ -864,6 +866,59 @@ def script_generate():
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy", "service": "Video Analyzer API"})
+
+# 新增：下载txt文件
+@app.route('/download/txt', methods=['POST'])
+def download_txt():
+    try:
+        data = request.json or {}
+        filename = (data.get('filename') or '').strip()
+        content = data.get('content') or ''
+        if not filename:
+            filename = 'result.txt'
+        filename = filename.split('/')[-1].split('\\')[-1]
+        if not filename.lower().endswith('.txt'):
+            filename = f"{filename}.txt"
+        return Response(
+            content,
+            mimetype='text/plain; charset=utf-8',
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"'
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": f"下载失败: {str(e)}"}), 500
+
+# 新增：打包批量结果为zip
+@app.route('/download/zip', methods=['POST'])
+def download_zip():
+    try:
+        data = request.json or {}
+        files = data.get('files') or []
+        if not isinstance(files, list) or not files:
+            return jsonify({"success": False, "error": "缺少文件列表"}), 400
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for item in files:
+                name = (item.get('filename') or 'result').strip()
+                text = item.get('content') or ''
+                name = name.split('/')[-1].split('\\')[-1]
+                if not name.lower().endswith('.txt'):
+                    name = f"{name}.txt"
+                zf.writestr(name, text)
+        zip_buf.seek(0)
+        zip_name = (data.get('zip_name') or 'results.zip').strip()
+        if not zip_name.lower().endswith('.zip'):
+            zip_name = f"{zip_name}.zip"
+        return Response(
+            zip_buf.read(),
+            mimetype='application/zip',
+            headers={
+                'Content-Disposition': f'attachment; filename="{zip_name}"'
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": f"压缩失败: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # 创建templates目录
