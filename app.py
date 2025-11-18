@@ -783,13 +783,7 @@ def script_generate():
                 if not result:
                     result = str(data_json)
                 print(f"[script_generate] task_id={task_id} glm result_len={len(result)}")
-            elif model_provider in {
-                'o3-pro-2025-06-10',
-                'claude-sonnet-4-5-20250929',
-                'gemini-2.5-pro-preview-06-05',
-                'gemini-2.5-flash',
-                'kimi-k2-250711'
-            }:
+            elif model_provider and model_provider != 'deepseek':
                 print(f"[script_generate] task_id={task_id} call laozhang model={model_provider}")
                 api_key = os.environ.get('LAOZHANG_API_KEY', '').strip()
                 if not api_key:
@@ -805,65 +799,28 @@ def script_generate():
                     'model': model_provider,
                     'messages': [
                         {'role': 'user', 'content': full_input}
-                    ],
-                    'stream': True
+                    ]
                 }
-
-                def stream_laozhang():
-                    final_text = ''
+                resp = requests.post(url, headers=headers, json=payload, timeout=120)
+                print(f"[script_generate] task_id={task_id} laozhang status_code={resp.status_code}")
+                if resp.status_code != 200:
+                    body_preview = ''
                     try:
-                        with requests.post(url, headers=headers, json=payload, timeout=300, stream=True) as resp:
-                            print(f"[script_generate] task_id={task_id} laozhang status_code={resp.status_code}")
-                            if resp.status_code != 200:
-                                body_preview = ''
-                                try:
-                                    body_preview = resp.text[:500]
-                                except:
-                                    pass
-                                raise Exception(f"LaoZhang调用失败: HTTP {resp.status_code} body={body_preview}")
-                            for raw_line in resp.iter_lines(decode_unicode=True):
-                                if not raw_line:
-                                    continue
-                                line = raw_line.strip()
-                                if line.startswith('data:'):
-                                    data_str = line[5:].strip()
-                                    if data_str == '[DONE]':
-                                        break
-                                    try:
-                                        import json as _json
-                                        obj = _json.loads(data_str)
-                                        chunk = ''
-                                        choices = obj.get('choices') or []
-                                        if choices:
-                                            delta = choices[0].get('delta') or {}
-                                            if 'content' in delta and delta['content'] is not None:
-                                                chunk = delta['content']
-                                            else:
-                                                msg = choices[0].get('message') or {}
-                                                if 'content' in msg and msg['content'] is not None:
-                                                    chunk = msg['content']
-                                        if chunk:
-                                            final_text += chunk
-                                            yield chunk
-                                    except Exception as _e:
-                                        # 非JSON数据，直接回传文本
-                                        final_text += data_str
-                                        yield data_str
-                                else:
-                                    # 非SSE格式，直接回传
-                                    final_text += line
-                                    yield line
-                    finally:
-                        deepseek_status[task_id] = {"status": "completed", "progress": 100}
-                        deepseek_results[task_id] = {
-                            "success": True,
-                            "result": final_text,
-                            "prompt": script_prompt,
-                            "type": ("script_generate" if source_type == 'json_merge' else "script_extract"),
-                            "batch_id": batch_id
-                        }
-
-                return Response(stream_with_context(stream_laozhang()), mimetype='text/plain; charset=utf-8')
+                        body_preview = resp.text[:500]
+                    except:
+                        pass
+                    raise Exception(f"LaoZhang调用失败: HTTP {resp.status_code} body={body_preview}")
+                data_json = resp.json()
+                result = ''
+                try:
+                    choices = data_json.get('choices') or []
+                    if choices:
+                        msg = choices[0].get('message') or {}
+                        result = msg.get('content') or ''
+                except:
+                    pass
+                if not result:
+                    result = str(data_json)
             else:
                 print(f"[script_generate] task_id={task_id} call deepseek")
                 result = deepseek_processor.process_video_analysis_result(
