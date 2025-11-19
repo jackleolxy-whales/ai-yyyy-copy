@@ -2992,23 +2992,18 @@ Now, I give you these two JSONs:</textarea>
                         if (!res.ok) {
                             throw new Error('HTTP状态异常: ' + res.status);
                         }
-                        const reader = res.body.getReader();
-                        const decoder = new TextDecoder();
-                        let acc = '';
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            const chunk = decoder.decode(value, { stream: true });
-                            if (chunk) {
-                                acc += chunk;
-                                renderScriptResult(acc);
-                            }
+                        const data = await res.json();
+                        if (data && data.success) {
+                            updateStepProgress(5, 90);
+                            renderScriptResult(String(data.result || ''));
+                            const next = document.getElementById('scriptExtractNextStepButtonContainer');
+                            if (next) { next.style.display = 'block'; }
+                            setStepStatus(5, 'completed', '已完成');
+                            updateStepProgress(5, 100);
+                        } else {
+                            setStepStatus(5, 'error', '生成失败');
+                            showError((data && data.error) ? data.error : '脚本生成失败');
                         }
-                        updateStepProgress(5, 90);
-                        const next = document.getElementById('scriptExtractNextStepButtonContainer');
-                        if (next) { next.style.display = 'block'; }
-                        setStepStatus(5, 'completed', '已完成');
-                        updateStepProgress(5, 100);
                     } catch (err) {
                         setStepStatus(5, 'error', '生成失败');
                         showError('脚本生成错误：' + err.message);
@@ -3061,34 +3056,43 @@ Now, I give you these two JSONs:</textarea>
                 for (let i = 0; i < total; i++) {
                     const body = JSON.stringify({ script_prompt: finalPrompt, batch_id: jsonMergeBatchId, source_type: 'json_merge', model_provider: modelProvider });
                     if (laozhangModels.has(modelProvider)) {
-                        try {
-                            const res = await fetch('/script/generate', { ...makeBody, body });
-                            if (!res.ok) {
-                                throw new Error('HTTP状态异常: ' + res.status);
+                        fetch('/script/generate', { ...makeBody, body })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                renderBatchScriptSetContent(i, String(data.result || ''));
+                                markBatchItemSuccess(i);
+                            } else {
+                                renderBatchScriptSetContent(i, data.error || '脚本生成失败');
+                                markBatchItemError(i);
                             }
-                            const reader = res.body.getReader();
-                            const decoder = new TextDecoder();
-                            let acc = '';
-                            while (true) {
-                                const { done, value } = await reader.read();
-                                if (done) break;
-                                const chunk = decoder.decode(value, { stream: true });
-                                if (chunk) {
-                                    acc += chunk;
-                                    renderBatchScriptSetContent(i, acc);
-                                }
-                            }
-                            markBatchItemSuccess(i);
                             completed++;
                             const p = Math.round((completed / total) * 100);
                             updateStepProgress(5, p);
-                        } catch (err) {
+                            if (completed === total) {
+                                const next = document.getElementById('scriptExtractNextStepButtonContainer');
+                                if (next) { next.style.display = 'block'; }
+                                setStepStatus(5, 'completed', '已完成');
+                                updateStepProgress(5, 100);
+                                if (btn) {
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                                }
+                            }
+                        })
+                        .catch(err => {
                             renderBatchScriptSetContent(i, '脚本生成错误：' + err.message);
                             markBatchItemError(i);
                             completed++;
                             const p = Math.round((completed / total) * 100);
                             updateStepProgress(5, p);
-                        }
+                            if (completed === total) {
+                                if (btn) {
+                                    btn.disabled = false;
+                                    btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
+                                }
+                            }
+                        });
                     } else {
                         fetch('/script/generate', { ...makeBody, body })
                         .then(r => r.json())
