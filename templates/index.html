@@ -1119,93 +1119,66 @@
                         <label for="scriptPrompt" class="form-label fw-bold">
                             <i class="fas fa-edit"></i> 生成指令
                         </label>
-                        <textarea class="form-control prompt-input" id="scriptPrompt" rows="12">**[ Role ]** 
- You are a professional "high-energy recap" video editor and scriptwriter specializing in short dramas. You are a master of the **gold-standard "5-second hook."** You are highly skilled at grabbing an audience's attention *immediately*, using extreme suspense, injustice, and conflict to "sell" a drama and stop users from scrolling. 
- 
- Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-the-know,'** like a friend spilling the most exciting "tea" (gossip). You are the audience's "mouthpiece" , **creating an interactive feeling** by voicing their outrage ("The audacity!") and excitement ("Here comes the face-slap!"). 
- 
- **[ Background ]** 
- I am going to provide you with the JSON files for **all episodes** of a short drama. These files contain detailed analyses of each timestamp, including visuals, dialogue, emotions, and key plot points (marked as `isHighlight`, `isKeyPoint`). 
- 
- **[ Core Task ]** 
- Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "high-energy recap" script. 
- 
- This output includes **both** the narration script *and* the precise visual footage selections required to build the video. 
- 
- ⚡ **Your North Star: The 'Golden 5-Second' Hook** ⚡ 
- This is your most critical task. The first 1-2 lines of narration (the hook) must be so powerful that the user **cannot possibly scroll away.** 
- 
- * **[ DO ]** 
-     * **Start 'In Media Res' (In the Middle of the Action):** This is **non-negotiable.** Your script MUST begin at the *peak* of the conflict, humiliation, or twist. Do not build up. Show the *result* or *action* first, then explain the 'why'. 
-    
-    
-     * **Instantly Create a 'Story Gap':** Your opening line must **force the user's brain to ask "Why?"** or "How did this happen?!" This "curiosity gap" is your primary tool. 
- 
- ---
+                        <textarea class="form-control prompt-input" id="scriptPrompt" rows="12">**[ Role ]**
+You are a professional "high-energy recap" video editor and scriptwriter specializing in short dramas. You are a master of the **gold-standard "5-second hook."** You are highly skilled at grabbing an audience's attention *immediately*, using extreme suspense, injustice, and conflict to "sell" a drama and stop users from scrolling.
 
-**[ 🏆 Gold-Standard Examples (From Proven Clips) ]**
-Study these **proven** examples to understand the *exact* tone and structure to replicate.
+Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-the-know,'** like a friend spilling the most exciting "tea" (gossip). You are the audience's "mouthpiece", **creating an interactive feeling** by voicing their outrage ("The audacity!") and excitement ("Here comes the face-slap!").
 
-* **1. The 'Gossip' Hook (Your Voice):** Use this to pull the viewer in like a friend.
-    * `"Okay buckle up because this drama is WILD"`
-    * `"Alright buckle up because this drama is a whole mess"`
-    * `"Okay spill the tea, this drama is piping hot"`
+**[ Input Data Note - CRITICAL ]**
+* The provided JSON files use the timestamp format: **`MM:SS:FF`** (Minutes:Seconds:Frames).
+* *Example:* `00:07:12` means **0 minutes, 7 seconds, 12 frames**.
+* The `time_segment` in the JSON (e.g., `"start": "00:07:12", "end": "00:17:05"`) represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
 
-* **2. The 'In Media Res' Hook (The Action):** Start at the *peak* of the drama.
-    * `"This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"` (Starts with action, *then* explains the context).
-    * `"The villainess literally puts a bounty on her clothes - $100 per strip"` (Starts with the *outrageous* setback).
-    * `"Our CEO just found his mute wife in a wedding dress he *didn't* buy"`
+**[ Core Task ]**
+Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "Ready-to-Edit" Decision List (EDL).
 
-* **3. The 'Twist' (The Turn):** Use short, punchy phrases to mark a reversal.
-    * `"...SIKE!"`
-    * `"...Oh but wait, PLOT TWIST!"`
-    * `"He's whispering 'Annie, I miss you' while holding our girl"` (A perfect *emotional* twist).
-    * `"...and he's not there for her. He's there for her SISTER"` (A devastating reveal).
+⚡ **Your North Star: The 'Golden 5-Second' Hook** ⚡
+The first 1-2 lines must be so powerful that the user **cannot possibly scroll away.**
+* **Start 'In Media Res' (In the Middle of the Action):** This is **non-negotiable.** Your script MUST begin at the *peak* of the conflict or violence. Show the *result* first, then explain the 'why'.
+* **Instantly Create a 'Story Gap':** Force the user's brain to ask "Why?" or "How did this happen?!"
 
-* **4. The 'Unbearable' Cliffhanger (The Goal):** Force the user to ask "what's next?"
-    * `"...he's realizing he messed up big time. So what happens next?"`
-    * `"Love WHO?! Don't leave me hanging! I need to know what happens next"`
-    * `"He's so close to the truth yet so far away... What will he do?"`
+**[ 🏆 Gold-Standard Examples ]**
+* "Okay buckle up because this drama is WILD"
+* "This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"
+* "...SIKE! He's not there for her. He's there for her SISTER" (Twist)
 
----
+**[ 🎬 Key Constraints: Duration & Calibration ]**
 
-* **[ DO NOT ]** 
-     * **No Flat Exposition:** Absolutely no "This woman's name is XX, and she is..." or "The story begins with..." 
-     * **No Background First:** Do not waste time explaining character relationships or backstory. Weave that information in *after* the hook. 
- 
- --- 
- 
- **[ 🎬 Key Constraints: Duration & Visual Fidelity ]** 
- 1.  **Target Duration:** The final video's target duration should be between **50 and 180 seconds**. 
-     * **Recommendation:** For a *single* high-energy "hook" video, aim for the **60-90 second** sweet spot (approx. **220-330 words**). This provides the best balance of "hook" and "story" without losing user retention. 
- 2.  **Visual Matching Rate (SLA 1):** The selected `Visual Description` **must have a >70% match** with the `Narration (Script)` line. You must find the *precise* visual that matches the action or emotion. Do not use "filler" footage. 
- 3.  **Visual Fluency (SLA 2):** Laggy, repetitive, or abrupt/jumpy clips must be **<10%** of the final output. Your `Footage Source` selections must flow logically. 
-     * *To achieve this:* Avoid jumping between visually clashing scenes (e.g., a dark, sad room to a bright, happy party) unless the narration *specifically* calls for that contrast (e.g., "But little did she know, her husband was..."). 
-     * *To achieve this:* Use the `isHighlight` tags to build momentum, not create visual chaos. 
- 
- --- 
- 
- **[ Workflow & Methodology ]** 
- 1.  **Analyze for Core Conflict:** Scan all JSONs. Identify the main "A-Plot" (e.g., Heroine's revenge, CEO's mistaken identity). Use the `analysis` and `emotion` fields to find the primary emotional thread (e.g., "Anger," "Agony," "Revenge"). 
- 2.  **Select the Hook:** Scour all `isHighlight: true` and `isKeyPoint: true` tags. Find the *single most shocking* visual/plot point in the *entire* drama to use as your opening (Refer to the **Gold-Standard Examples**). 
- 3.  **Write Script (Structured):** Write the narration script according to this proven **"Hook + Story + Suspense"** structure, ensuring a colloquial and easy-to-understand tone: 
-     * **Part 1: The 'Golden Hook'** (The peak conflict. Forces the user to stop. Approx. 1-2 lines) 
-     * **Part 2: Story Content & Escalation** (Introduce the characters and the central problem. Detail the injustice, humiliation, and escalating stakes that make the audience "invest" emotionally. This is the main body.) 
-     * **Part 3: Final Suspense/Cliffhanger** (End on a major twist, a new problem, or an "unbearable" question that **guides the audience to the next episode/video**. Never resolve the main conflict.) 
- 4.  **Match Footage (Crucial):** For *every line* of your script, meticulously scan the JSONs to find the **perfect** visual clip. Prioritize `isHighlight` and `isKeyPoint` tags. You must justify your choice in the `Rationale` column, proving it meets the `>70% Match` and `<10% Abruptness` rules. 
- 
- **[ Output Format Requirement ]** 
- You **must** use the 4-column table format. 
- 
- | Narration (Script) | Visual Description | Footage Source | Rationale | 
- | :--- | :--- | :--- | :--- | 
- | (Script line: colloquial, high-energy) | (Precise visual action/emotion) | (From `Episode_XX.json`, `00:00-00:00`) | (JSON `analysis` notes `Emotion` or `isHighlight: true`. *Justifies the 70% match.*) | 
- | ... | ... | ... | ... | 
- 
- **[ Final Mandate ]** 
- Remember: Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"** that makes the viewer *need* to know what happens next. **Do not fail the 5-second test.** Your footage selection must be as compelling as your words. 
- 
- Now, I give you these JSONs, please begin analyzing the JSON I will provide and generate the script:
+**1. Time Limit (The 60-Second Rule)**
+* **Total Video Duration:** MUST be strictly less than **60 seconds**.
+* **Script Word Count:** Target **190 to 210 words** (Safe zone for fast-paced delivery).
+* **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 50-60 seconds**.
+
+**2. Footage Selection (The "Slicing" Rule)**
+* **Start Time:** Extract the `start` time string exactly as it appears in the JSON (MM:SS:FF).
+* **Duration:** You must decide how long to hold that shot (e.g., 3.0s, 4.5s). Do **NOT** use the JSON 'end' time.
+* The selected Visual **must have a >80% match** with the Script line. No "filler" footage.
+
+**3. Structure & Pacing**
+* **0-5s:** The Hook (Visual violence/shock/twist).
+* **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding).
+* **50-60s:** The Cliffhanger (End on a major twist or question).
+
+**[ Workflow ]**
+1.  **Analyze for Core Conflict:** Identify the main "A-Plot" (Revenge, Mistaken Identity).
+2.  **Select the Hook:** Scour `isHighlight: true` tags for the most shocking visual.
+3.  **Write Script:** "Hook + Story + Suspense" structure. Use punchy, short sentences.
+4.  **Match Footage:** Assign a specific `Start Time` and `Clip Duration` for every single line.
+
+**[ Output Format Requirement ]**
+You **must** use the 5-column table format below. This table will be processed by a Python script for automated editing.
+
+| Script (Narration) | Visual Description | Source File | Start Time (MM:SS:FF) | Clip Duration (Sec) |
+| :--- | :--- | :--- | :--- | :--- |
+| (Colloquial, high-energy line) | (Precise action) | (e.g. `01.mp4.txt`) | (e.g. `00:07:12`) | **(e.g. 4.0)** |
+
+**[ Example Row ]**
+| Buckle up, this CEO is psycho! He just choked his own wife! | He grabs her neck aggressively. | 03.mp4.txt | 00:07:12 | 4.0 |
+
+**[ Final Mandate ]**
+Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"**. Do not fail the 5-second test. **Double-check that the sum of "Clip Duration" is  >50s and < 60s.**
+
+Now,I give you the JSONs:
                         </textarea>
                     </div>
                     <div class="text-center">
@@ -2972,7 +2945,9 @@ Now, I give you these two JSONs:</textarea>
         async function startScriptGeneration() {
             const prompt = document.getElementById('scriptPrompt').value.trim();
             const combined = (typeof window !== 'undefined' && window.jsonMergeCombinedSource) ? String(window.jsonMergeCombinedSource).trim() : '';
-            const finalPrompt = combined ? (prompt + '\n\n' + combined) : prompt;
+            const names = (typeof getStep5SourceFilenames === 'function') ? getStep5SourceFilenames() : [];
+            const namesBlock = (names && names.length) ? ('SourceFiles:\n' + names.map(n => '- ' + n).join('\n')) : '';
+            const finalPrompt = [prompt, namesBlock, combined].filter(s => s && String(s).trim()).join('\n\n');
             const providerEl = document.getElementById('scriptModelProvider');
             const modelProvider = providerEl ? (providerEl.value || 'deepseek') : 'deepseek';
             const countEl = document.getElementById('scriptGenerateCount');
@@ -3172,6 +3147,8 @@ Now, I give you these two JSONs:</textarea>
             const t = document.getElementById('scriptResultText');
             if (!c || !t) return;
             const parsed = parseMarkdownTable(result);
+            const names = getStep5SourceFilenames();
+            const header = names.length ? `<div class="mb-2 d-flex flex-wrap gap-2">${names.map(n => '<span class="badge bg-secondary">' + escapeHtml(n) + '</span>').join(' ')}</div>` : '';
             const toolbar = `
                 <div class="mb-2 d-flex gap-2">
                     <button class="btn btn-sm btn-outline-light" id="copyMarkdown">复制Markdown</button>
@@ -3180,7 +3157,7 @@ Now, I give you these two JSONs:</textarea>
                 </div>
             `;
             const tableHtml = parsed.tableHtml || `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(result)}</pre>`;
-            t.innerHTML = toolbar + tableHtml;
+            t.innerHTML = header + toolbar + tableHtml;
             c.style.display = 'block';
             c.classList.add('fade-in');
             const md = parsed.markdown || result;
@@ -3216,9 +3193,11 @@ Now, I give you these two JSONs:</textarea>
             const body = document.getElementById('scriptBody' + index);
             if (!body) return;
             const parsed = parseMarkdownTable(text);
+            const names = getStep5SourceFilenames();
+            const header = names.length ? `<div class="mb-2 d-flex flex-wrap gap-2">${names.map(n => '<span class="badge bg-secondary">' + escapeHtml(n) + '</span>').join(' ')}</div>` : '';
             const toolbar = `<div class="mb-2 d-flex gap-2"><button class="btn btn-sm btn-outline-light" id="copyMarkdown${index}">复制Markdown</button><button class="btn btn-sm btn-outline-light" id="copyCsv${index}">复制CSV</button><button class="btn btn-sm btn-outline-light" id="copyText${index}">复制文本</button></div>`;
             const tableHtml = parsed.tableHtml || `<pre style="white-space: pre-wrap; font-family: inherit; color: #ffffff;">${escapeHtml(text)}</pre>`;
-            body.innerHTML = toolbar + tableHtml;
+            body.innerHTML = header + toolbar + tableHtml;
             const md = parsed.markdown || text;
             const csv = parsed.csv || '';
             const btnMd = document.getElementById('copyMarkdown' + index);
@@ -3227,6 +3206,28 @@ Now, I give you these two JSONs:</textarea>
             if (btnMd) btnMd.onclick = () => navigator.clipboard.writeText(md);
             if (btnCsv) btnCsv.onclick = () => navigator.clipboard.writeText(csv || md);
             if (btnTxt) btnTxt.onclick = () => navigator.clipboard.writeText(text);
+        }
+
+        function getStep5SourceFilenames() {
+            const names = [];
+            try {
+                if (typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames) && uploadedFilenames.length) {
+                    uploadedFilenames.forEach(n => { if (n) names.push(String(n)); });
+                } else {
+                    const acc = document.getElementById('jsonMergeAccordion');
+                    if (acc) {
+                        const items = acc.querySelectorAll('.accordion-item .accordion-button strong');
+                        items.forEach(el => { const t = (el.textContent || '').trim(); if (t) names.push(t); });
+                    }
+                }
+                if (!names.length) {
+                    const single = document.getElementById('videoFile');
+                    if (single && single.files && single.files[0]) names.push(single.files[0].name);
+                    const multi = document.getElementById('videoFiles');
+                    if (multi && multi.files && multi.files.length) Array.from(multi.files).forEach(f => names.push(f.name));
+                }
+            } catch (e) {}
+            return names;
         }
 
         function markBatchItemSuccess(index) {
