@@ -1144,7 +1144,7 @@ Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-
 **[ Input Data Note - CRITICAL ]**
 * The provided JSON files use the timestamp format: **`MM:SS:FF`** (Minutes:Seconds:Frames).
 * *Example:* `00:07:12` means **0 minutes, 7 seconds, 12 frames**.
-* The `time_segment` in the JSON (e.g., `"start": "00:07:12", "end": "00:17:05"`) represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
+* The `time_segment` in the JSON (e.g., "start": "00:07:12", "end": "00:17:05") represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
 
 **[ Core Task ]**
 Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "Ready-to-Edit" Decision List (EDL).
@@ -1162,9 +1162,9 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 **[ 🎬 Key Constraints: Duration & Calibration ]**
 
 **1. Time Limit (The 60-Second Rule)**
-* **Total Video Duration:** MUST be strictly less than **70 seconds**.
-* **Script Word Count:** Target **180 to 200 words** (Safe zone for fast-paced delivery).
-* **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 60-70 seconds**.
+* **Total Video Duration:** MUST be strictly less than **65 seconds**.
+* **Script Word Count:** Target **180 to 190 words** (Safe zone for fast-paced delivery).
+* **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 55-65 seconds**.
 
 **2. Footage Selection (The "Slicing" Rule)**
 * **Start Time:** Extract the `start` time string exactly as it appears in the JSON (MM:SS:FF).
@@ -1193,7 +1193,7 @@ You **must** use the 5-column table format below. This table will be processed b
 | Buckle up, this CEO is psycho! He just choked his own wife! | He grabs her neck aggressively. | 03.mp4.txt | 00:07:12 | 4.0 |
 
 **[ Final Mandate ]**
-Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"**. Do not fail the 5-second test. **Double-check that the sum of "Clip Duration" is  >50s and < 60s.**
+Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"**. Do not fail the 5-second test. **Double-check that the sum of "Clip Duration" is  >55s and < 65s.**
 
 Now,I give you the JSONs:
                         </textarea>
@@ -1352,6 +1352,7 @@ Now,I give you the JSONs:
                     <div class="d-flex gap-2">
                         <button class="btn btn-sm btn-outline-light" onclick="addEdlRow()"><i class="fas fa-plus"></i> 添加行</button>
                         <button class="btn btn-sm btn-outline-light" onclick="clearEdlRows()"><i class="fas fa-trash"></i> 清空</button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="replaceInvalidEdlSources()"><i class="fas fa-wrench"></i> 一键替换不可用源文件</button>
                     </div>
                 </div>
             </div>
@@ -3380,22 +3381,63 @@ Now, I give you these two JSONs:</textarea>
                 const dur = parseFloat((inputs[3]?.value || '0'));
                 if (order > 0 && source && startTs && dur > 0) {
                     clips.push({ order, source_file: source, start_ts: startTs, duration_sec: dur });
+                    try { console.log('EDL clip parsed', { order, source_file: source, start_ts: startTs, duration_sec: dur }); } catch(e){}
                 }
             });
             clips.sort((a,b)=>a.order-b.order);
+            try { console.log('EDL clips collected', clips); } catch(e){}
             return clips;
         }
 
-        function startAutoVideoEdit() {
+        window.replaceInvalidEdlSources = async function replaceInvalidEdlSources() {
+            try {
+                const res = await fetch('/uploads/list');
+                const j = await res.json();
+                if (!j.success) { console.warn('list uploads failed', j.error); return false; }
+                const files = j.files || [];
+                const fallback = files.find(f=>f.endsWith('_11_compressed.mp4')) || files.find(f=>f.toLowerCase().endsWith('.mp4'));
+                if (!fallback) { console.warn('no fallback file'); return false; }
+                const tbody = document.querySelector('#edlTable tbody');
+                const rows = tbody ? tbody.querySelectorAll('tr') : [];
+                let replaced = 0;
+                for (const r of rows) {
+                    const inputs = r.querySelectorAll('input');
+                    const source = (inputs[1]?.value || '').trim();
+                    if (!source) continue;
+                    const check = await fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source }) }).then(r=>r.json()).catch(()=>({ success:false }));
+                    if (!check.success) { inputs[1].value = fallback; replaced++; }
+                }
+                console.log('EDL sources replaced', { replaced, fallback });
+                return replaced > 0;
+            } catch(e) { console.error('replaceInvalidEdlSources error', e); return false; }
+        }
+
+        async function startAutoVideoEdit() {
             const fpsEl = document.getElementById('edlFps');
             const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
             const clips = getEdlClipsFromTable();
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
+            try {
+                const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
+                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success, path: j.path, error: j.error }))).catch(err=>({ name: n, ok: false, error: err.message }))));
+                const failed = checks.filter(c => !c.ok);
+                console.log('EDL precheck results', checks);
+                if (failed.length) {
+                    console.warn('EDL precheck failed, trying auto replace');
+                    const ok = await window.replaceInvalidEdlSources();
+                    if (!ok) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
+                    const clips2 = getEdlClipsFromTable();
+                    const sources2 = Array.from(new Set(clips2.map(c => (c.source_file||'').trim()).filter(Boolean)));
+                    const rechecks = await Promise.all(sources2.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
+                    if (rechecks.some(x=>!x.ok)) { showError('自动替换后仍有源文件不可用'); return; }
+                }
+            } catch (e) { console.warn('EDL precheck error', e); }
             setStepStatus(7, 'processing', '自动拼接中');
             const pc = document.getElementById('videoEditProgressContainer');
             if (pc) pc.style.display = 'block';
             const btn = document.getElementById('startVideoEditBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
+            try { console.log('EDL start payload', { fps, clips }); } catch(e){}
             fetch('/video/edl/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3407,9 +3449,10 @@ Now, I give you these two JSONs:</textarea>
                 const taskId = data.task_id;
                 const lp = document.getElementById('videoEditLogsPre');
                 if (lp) lp.textContent = '';
+                try { console.log('EDL start response', data); } catch(e){}
                 pollVideoEditStatus(taskId, btn);
             })
-            .catch(err=>{ setStepStatus(7,'error','拼接失败'); showError('拼接错误：'+err.message); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} });
+            .catch(err=>{ try { console.error('EDL start error', err); } catch(e){} setStepStatus(7,'error','拼接失败'); showError('拼接错误：'+err.message); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} });
         }
 
         function pollVideoEditStatus(taskId, btn) {
@@ -3432,19 +3475,22 @@ Now, I give you these two JSONs:</textarea>
                     const lp = document.getElementById('videoEditLogsPre');
                     if (lp && s.logs && Array.isArray(s.logs)) {
                         lp.textContent = s.logs.join('\n');
+                        try { console.log('EDL logs', s.logs); } catch(e){}
                     }
+                    try { console.log('EDL status', s); } catch(e){}
                     if (s.done) {
                         setStepStatus(7, 'completed', '已完成');
                         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接'; }
                     } else if (s.error) {
                         setStepStatus(7, 'error', '拼接失败');
                         showError(s.error);
+                        try { console.warn('EDL status error', s.error); } catch(e){}
                         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接'; }
                     } else {
                         setTimeout(tick, 1000);
                     }
                 })
-                .catch(()=>{ setTimeout(tick, 1500); });
+                .catch(err=>{ try { console.error('EDL status fetch error', err); } catch(e){} setTimeout(tick, 1500); });
             };
             tick();
         }
@@ -5723,6 +5769,8 @@ Now, I give you these two JSONs:</textarea>
                     renderScriptExtractResult(data.result);
                     setStepStatus(6, 'completed', '已完成');
                     updateStepProgress(6, 100);
+                    const vbtn = document.getElementById('videoEditNextStepButtonContainer');
+                    if (vbtn) { vbtn.style.display = 'block'; }
                 } else {
                     setStepStatus(6, 'error', '提取失败');
                     showError(data.error || '台词提取失败');
@@ -5754,3 +5802,25 @@ Now, I give you these two JSONs:</textarea>
     </script>
 </body>
 </html>
+        async function replaceInvalidEdlSources() {
+            try {
+                const res = await fetch('/uploads/list');
+                const j = await res.json();
+                if (!j.success) { console.warn('list uploads failed', j.error); return false; }
+                const files = j.files || [];
+                const fallback = files.find(f=>f.endsWith('_11_compressed.mp4')) || files.find(f=>f.toLowerCase().endsWith('.mp4'));
+                if (!fallback) { console.warn('no fallback file'); return false; }
+                const tbody = document.querySelector('#edlTable tbody');
+                const rows = tbody ? tbody.querySelectorAll('tr') : [];
+                let replaced = 0;
+                for (const r of rows) {
+                    const inputs = r.querySelectorAll('input');
+                    const source = (inputs[1]?.value || '').trim();
+                    if (!source) continue;
+                    const check = await fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source }) }).then(r=>r.json()).catch(()=>({ success:false }));
+                    if (!check.success) { inputs[1].value = fallback; replaced++; }
+                }
+                console.log('EDL sources replaced', { replaced, fallback });
+                return replaced > 0;
+            } catch(e) { console.error('replaceInvalidEdlSources error', e); return false; }
+        }

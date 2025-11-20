@@ -37,6 +37,7 @@ analysis_status = {}
 deepseek_results = {}
 deepseek_status = {}
 edl_tasks = {}
+original_name_map = {}
 
 class VideoAnalyzerWeb:
     def __init__(self):
@@ -118,11 +119,6 @@ class VideoAnalyzerWeb:
                 "type": "upload"
             }
 
-            # 清理上传的文件
-            try:
-                os.unlink(video_path)
-            except:
-                pass
 
         except Exception as e:
             analysis_status[task_id] = {"status": "error", "progress": 0}
@@ -134,7 +130,7 @@ class VideoAnalyzerWeb:
                 "model": model,
                 "type": "upload"
             }
-
+            
     def analyze_direct(self, text_prompt, model="gemini-2.5-flash", max_tokens=None, stream=False):
         """
         直接分析文本内容，不处理视频
@@ -312,6 +308,9 @@ def upload_videos():
             video_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
 
             file.save(video_path)
+            original_name_map.setdefault(file.filename, []).append(saved_filename)
+            if secure_filename(file.filename) != file.filename:
+                original_name_map.setdefault(secure_filename(file.filename), []).append(saved_filename)
 
             # 生成任务ID
             task_id = f"{batch_id}_{len(tasks)}"
@@ -370,6 +369,9 @@ def upload_videos_single():
         video_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
 
         file.save(video_path)
+        original_name_map.setdefault(file.filename, []).append(saved_filename)
+        if secure_filename(file.filename) != file.filename:
+            original_name_map.setdefault(secure_filename(file.filename), []).append(saved_filename)
 
         # 检查文件大小（额外验证）
         file_size = os.path.getsize(video_path)
@@ -885,7 +887,7 @@ def mmssff_to_hhmmss_ms(ts, fps):
     return f"{hh:02d}:{m2:02d}:{s2:02d}.{ms:03d}"
 
 def resolve_source_file(name):
-    base = os.path.basename(name)
+    base = os.path.basename(name).strip()
     candidates = [base]
     if base.lower().endswith('.mp4.txt'):
         candidates.append(base[:-4])
@@ -896,6 +898,28 @@ def resolve_source_file(name):
         p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
         if os.path.exists(p):
             return p
+    sbase = secure_filename(base)
+    if sbase:
+        sp = os.path.join(app.config['UPLOAD_FOLDER'], sbase)
+        if os.path.exists(sp):
+            return sp
+        try:
+            for fname in os.listdir(app.config['UPLOAD_FOLDER']):
+                if fname.endswith(sbase):
+                    return os.path.join(app.config['UPLOAD_FOLDER'], fname)
+        except Exception:
+            pass
+    mapped = original_name_map.get(base) or original_name_map.get(sbase)
+    if mapped:
+        if isinstance(mapped, list):
+            for fn in mapped:
+                p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
+                if os.path.exists(p):
+                    return p
+        else:
+            p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
+            if os.path.exists(p):
+                return p
     return None
 
 def ensure_dir(path):
@@ -917,6 +941,10 @@ def run_ffmpeg_concat(list_path, out_path):
 def edit_video_task(task_id, clips, fps):
     edl_tasks[task_id] = {'progress': 0, 'status': '初始化', 'done': False, 'logs': []}
     edl_tasks[task_id]['logs'].append(f"task={task_id} start total_clips={len(clips)} fps={fps}")
+    try:
+        edl_tasks[task_id]['logs'].append(f"clips_payload={clips}")
+    except Exception:
+        pass
     if not ffmpeg_available():
         edl_tasks[task_id] = {'progress': 0, 'status': '错误', 'error': '缺少ffmpeg，请安装后重试', 'done': True, 'logs': edl_tasks[task_id]['logs']}
         edl_tasks[task_id]['logs'].append("ffmpeg not found")
@@ -928,10 +956,30 @@ def edit_video_task(task_id, clips, fps):
     for i, clip in enumerate(clips, start=1):
         edl_tasks[task_id]['status'] = f"处理片段 {i}/{total}"
         edl_tasks[task_id]['current_index'] = i
-        src = resolve_source_file(clip.get('source_file',''))
+        req_name = clip.get('source_file','')
+        src = resolve_source_file(req_name)
         if not src:
-            edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"找不到源文件: {clip.get('source_file','')}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
-            edl_tasks[task_id]['logs'].append(f"resolve_source failed name={clip.get('source_file','')}")
+            try:
+                base = os.path.basename((req_name or '').strip())
+                sbase = secure_filename(base)
+                edl_tasks[task_id]['logs'].append(f"resolve_source failed name={base} sbase={sbase}")
+                mapped_base = original_name_map.get(base)
+                mapped_sbase = original_name_map.get(sbase)
+                edl_tasks[task_id]['logs'].append(f"original_name_map[base]={mapped_base}")
+                edl_tasks[task_id]['logs'].append(f"original_name_map[sbase]={mapped_sbase}")
+                try:
+                    endswith_matches = [fn for fn in os.listdir(app.config['UPLOAD_FOLDER']) if sbase and fn.endswith(sbase)]
+                except Exception:
+                    endswith_matches = []
+                edl_tasks[task_id]['logs'].append(f"uploads_endswith_sbase={endswith_matches}")
+                try:
+                    dir_list = sorted(os.listdir(app.config['UPLOAD_FOLDER']))
+                    edl_tasks[task_id]['logs'].append(f"uploads_list_sample={dir_list[:20]}")
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"找不到源文件: {req_name}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
             return
         ts = clip.get('start_ts','')
         dur = float(clip.get('duration_sec',0))
@@ -952,7 +1000,7 @@ def edit_video_task(task_id, clips, fps):
     list_path = os.path.join(seg_dir, 'list.txt')
     with open(list_path, 'w') as f:
         for i in range(1, total+1):
-            f.write(f"file '{os.path.join(seg_dir, f'seg_{i:03d}.mp4')}'\n")
+            f.write(f"file 'seg_{i:03d}.mp4'\n")
     edl_tasks[task_id]['logs'].append(f"concat list {list_path}")
     out_path = os.path.join('outputs', 'edits', f"{task_id}.mp4")
     ok, log = run_ffmpeg_concat(list_path, out_path)
@@ -978,6 +1026,20 @@ def video_edl_start():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/video/edl/resolve', methods=['POST'])
+def video_edl_resolve():
+    try:
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': '缺少name'}), 400
+        p = resolve_source_file(name)
+        if p:
+            return jsonify({'success': True, 'path': p})
+        return jsonify({'success': False, 'error': '未找到'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/video/edl/status/<task_id>', methods=['GET'])
 def video_edl_status(task_id):
     s = edl_tasks.get(task_id)
@@ -989,6 +1051,19 @@ def video_edl_status(task_id):
     resp = dict(s)
     resp['logs'] = logs
     return jsonify(resp)
+
+@app.route('/uploads/list', methods=['GET'])
+def list_uploads():
+    try:
+        files = []
+        for fname in os.listdir(app.config['UPLOAD_FOLDER']):
+            p = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+            if os.path.isfile(p):
+                files.append(fname)
+        files.sort()
+        return jsonify({'success': True, 'files': files})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/health')
 def health():

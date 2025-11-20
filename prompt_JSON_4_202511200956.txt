@@ -1,0 +1,5 @@
+I'll give you two JSONs. The common feature of these two JSONs is that both have timestamps. One JSON has a timestamp in the form: "timestamp": "01:32:15-02:01:22". The other JSON has: "time_segment": { "start": "01:32:15", "end": "02:01:22" }. However, in fact, the timestamps involved in these two JSONs correspond one-to-one. I need you to combine these two JSONs into one JSON. # Output Constraints (!!! Must Be Strictly Followed !!!)
+-   Your final response **must** be *only* the JSON array itself.
+-   You **must not** include any explanatory text (e.g., "Here is the data you requested...").
+-   You **must not** include any Markdown formatting (e.g., ```json ... ```).
+Now, I give you these two JSONs:
