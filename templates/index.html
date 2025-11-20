@@ -1327,6 +1327,13 @@ Now,I give you the JSONs:
                             <label for="edlFps" class="form-label fw-bold"><i class="fas fa-tachometer-alt"></i> FPS</label>
                             <input type="number" class="form-control" id="edlFps" min="1" max="120" value="30">
                         </div>
+                        <div class="col-md-3">
+                            <label for="edlMode" class="form-label fw-bold"><i class="fas fa-sliders-h"></i> 模式</label>
+                            <select class="form-select" id="edlMode">
+                                <option value="time" selected>按时间</option>
+                                <option value="frames">按帧数</option>
+                            </select>
+                        </div>
                         <div class="col-md-9 d-flex align-items-end justify-content-end">
                             <button type="button" class="btn btn-outline-light me-2" id="fillEdlFromStep5Btn" onclick="fillEdlFromStep5()">
                                 <i class="fas fa-table"></i> 从第5步填充剪辑
@@ -3415,6 +3422,8 @@ Now, I give you these two JSONs:</textarea>
         async function startAutoVideoEdit() {
             const fpsEl = document.getElementById('edlFps');
             const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
+            const modeEl = document.getElementById('edlMode');
+            const mode = modeEl ? (modeEl.value || 'time') : 'time';
             const clips = getEdlClipsFromTable();
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
             try {
@@ -3437,11 +3446,11 @@ Now, I give you these two JSONs:</textarea>
             if (pc) pc.style.display = 'block';
             const btn = document.getElementById('startVideoEditBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
-            try { console.log('EDL start payload', { fps, clips }); } catch(e){}
+            try { console.log('EDL start payload', { fps, mode, clips }); } catch(e){}
             fetch('/video/edl/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fps, clips })
+                body: JSON.stringify({ fps, mode, clips })
             })
             .then(r=>r.json())
             .then(data=>{

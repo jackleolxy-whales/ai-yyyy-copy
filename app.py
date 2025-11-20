@@ -886,6 +886,15 @@ def mmssff_to_hhmmss_ms(ts, fps):
     ms = rem2 % 1000
     return f"{hh:02d}:{m2:02d}:{s2:02d}.{ms:03d}"
 
+def mmssff_to_frame_index(ts, fps):
+    m = re.match(r"^(\d{2}):(\d{2}):(\d{2})$", ts)
+    if not m:
+        return None
+    mm = int(m.group(1))
+    ss = int(m.group(2))
+    ff = int(m.group(3))
+    return mm * 60 * max(1, fps) + ss * max(1, fps) + ff
+
 def resolve_source_file(name):
     base = os.path.basename(name).strip()
     candidates = [base]
@@ -933,12 +942,20 @@ def run_ffmpeg_segment(src, start, duration, out_path):
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
 
+def run_ffmpeg_segment_frames(src, start_frame, end_frame, fps, out_path):
+    start_sec = start_frame / max(1, fps)
+    end_sec = end_frame / max(1, fps)
+    filter_complex = f"[0:v]trim=start_frame={start_frame}:end_frame={end_frame},setpts=PTS-STARTPTS[v];[0:a]atrim=start={start_sec}:end={end_sec},asetpts=PTS-STARTPTS[a]"
+    cmd = ['ffmpeg', '-hide_banner', '-y', '-i', src, '-filter_complex', filter_complex, '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', out_path]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
+
 def run_ffmpeg_concat(list_path, out_path):
     cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-c:a', 'aac', out_path]
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
 
-def edit_video_task(task_id, clips, fps):
+def edit_video_task(task_id, clips, fps, mode):
     edl_tasks[task_id] = {'progress': 0, 'status': '初始化', 'done': False, 'logs': []}
     edl_tasks[task_id]['logs'].append(f"task={task_id} start total_clips={len(clips)} fps={fps}")
     try:
@@ -983,14 +1000,24 @@ def edit_video_task(task_id, clips, fps):
             return
         ts = clip.get('start_ts','')
         dur = float(clip.get('duration_sec',0))
-        hhmmss = mmssff_to_hhmmss_ms(ts, fps)
-        if not hhmmss or dur <= 0:
-            edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"非法时间值: {ts}/{dur}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
-            edl_tasks[task_id]['logs'].append(f"invalid ts/dur ts={ts} dur={dur}")
-            return
         out_seg = os.path.join(seg_dir, f"seg_{i:03d}.mp4")
-        edl_tasks[task_id]['logs'].append(f"clip {i}/{total} src={src} start={hhmmss} dur={dur} out={out_seg}")
-        ok, log = run_ffmpeg_segment(src, hhmmss, dur, out_seg)
+        if (mode or 'time') == 'frames':
+            sf = mmssff_to_frame_index(ts, fps)
+            if sf is None or dur <= 0:
+                edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"非法帧值: {ts}/{dur}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+                edl_tasks[task_id]['logs'].append(f"invalid frames ts={ts} dur={dur}")
+                return
+            ef = sf + int(round(dur * max(1, fps)))
+            edl_tasks[task_id]['logs'].append(f"clip {i}/{total} src={src} start_frame={sf} end_frame={ef} fps={fps} out={out_seg}")
+            ok, log = run_ffmpeg_segment_frames(src, sf, ef, fps, out_seg)
+        else:
+            hhmmss = mmssff_to_hhmmss_ms(ts, fps)
+            if not hhmmss or dur <= 0:
+                edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"非法时间值: {ts}/{dur}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+                edl_tasks[task_id]['logs'].append(f"invalid ts/dur ts={ts} dur={dur}")
+                return
+            edl_tasks[task_id]['logs'].append(f"clip {i}/{total} src={src} start={hhmmss} dur={dur} out={out_seg}")
+            ok, log = run_ffmpeg_segment(src, hhmmss, dur, out_seg)
         if not ok:
             edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"片段生成失败: {log[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
             edl_tasks[task_id]['logs'].append(f"ffmpeg segment error: {log[:200]}")
@@ -1016,11 +1043,14 @@ def video_edl_start():
     try:
         data = request.get_json(silent=True) or {}
         fps = int(data.get('fps', 30))
+        mode = (data.get('mode') or 'time').strip()
+        if mode not in ('time','frames'):
+            mode = 'time'
         clips = data.get('clips') or []
         if not clips:
             return jsonify({'success': False, 'error': '剪辑清单为空'}), 400
         tid = str(uuid.uuid4()).replace('-', '')
-        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps), daemon=True)
+        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps, mode), daemon=True)
         t.start()
         return jsonify({'success': True, 'task_id': tid})
     except Exception as e:
