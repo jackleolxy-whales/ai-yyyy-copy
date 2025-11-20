@@ -2928,8 +2928,26 @@ Now,I give you the JSONs:
                 if (currentWidth > 0 && progress === 0 && currentWidth !== 100) {
                     console.log(`⚠️ [Step ${stepNumber}] Blocking progress reset from ${currentWidth}% to ${progress}%`);
                     return;
+        }
+        }
+
+        function extractEpisodeNumber(name) {
+            const m = String(name||'').match(/_(\d+)_compressed\.mp4$/);
+            return m ? m[1] : '';
+        }
+
+        function buildEpisodeMap(files) {
+            const map = {};
+            const sorted = [...files].sort((a,b)=>String(b).localeCompare(String(a)));
+            sorted.forEach(f => {
+                const ep = extractEpisodeNumber(f);
+                if (ep) {
+                    if (!map[ep]) map[ep] = [];
+                    map[ep].push(f);
                 }
-            }
+            });
+            return map;
+        }
 
             const stepProgress = document.getElementById('stepProgress');
             const stepProgressFill = stepProgress.querySelector('.step-progress-fill');
@@ -3642,9 +3660,10 @@ Now,I give you the JSONs:
                 const res = await fetch('/uploads/list');
                 const j = await res.json();
                 if (!j.success) { return false; }
-                const files = j.files || [];
-                const fallback = files.find(f=>f.endsWith('_11_compressed.mp4')) || files.find(f=>f.toLowerCase().endsWith('.mp4'));
-                if (!fallback) { return false; }
+                let files = j.files || [];
+                if (Array.isArray(window.edlLastUploadedFiles) && window.edlLastUploadedFiles.length) {
+                    files = window.edlLastUploadedFiles.concat(files);
+                }
                 const tbody = document.querySelector('#edlToolTable tbody');
                 const rows = tbody ? tbody.querySelectorAll('tr') : [];
                 let replaced = 0;
@@ -3653,10 +3672,34 @@ Now,I give you the JSONs:
                     const source = (inputs[1]?.value || '').trim();
                     if (!source) continue;
                     const check = await fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source }) }).then(r=>r.json()).catch(()=>({ success:false }));
-                    if (!check.success) { inputs[1].value = fallback; replaced++; }
+                    if (check && check.success) { continue; }
+                    const base = String(source).split(/[/\\]/).pop();
+                    let candidate = '';
+                    if (files.includes(base)) {
+                        candidate = base;
+                    } else if (base.toLowerCase().endsWith('.mp4.txt')) {
+                        const alt = base.slice(0, -4);
+                        if (files.includes(alt)) candidate = alt;
+                    }
+                    if (candidate) { inputs[1].value = candidate; replaced++; }
                 }
                 return replaced > 0;
             } catch(e) { return false; }
+        }
+
+        function computeEdlToolSbase(name) {
+            const n = String(name || '').trim();
+            if (!n) return '';
+            if (n.endsWith('_compressed.mp4')) {
+                const idx = n.lastIndexOf('_');
+                if (idx > -1) { return n.slice(idx+1); }
+            }
+            const m = n.match(/[^/\\]+$/);
+            const base = m ? m[0] : n;
+            const s = base.toLowerCase();
+            if (s.endsWith('.mp4')) return base;
+            return base;
+
         }
 
         async function startEdlToolEdit() {
@@ -3671,12 +3714,7 @@ Now,I give you the JSONs:
                 const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
                 const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
                 const failed = checks.filter(c => !c.ok);
-                if (failed.length) {
-                    const ok = await window.replaceInvalidEdlToolSources();
-                    if (!ok) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
-                    const rechecks = await Promise.all(Array.from(new Set(getEdlToolClipsFromTable().map(c => (c.source_file||'').trim()).filter(Boolean))).map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
-                    if (rechecks.some(x=>!x.ok)) { showError('自动替换后仍有源文件不可用'); return; }
-                }
+                try { console.log('EDL tool precheck failed sources', failed.map(f=>f.name)); } catch(e){}
             } catch (e) {}
             const pc = document.getElementById('edlToolProgressContainer');
             if (pc) pc.style.display = 'block';
@@ -3742,6 +3780,7 @@ Now,I give you the JSONs:
                     const items = (data.files || []).map(it => `${it.original} → ${it.saved}`).join('\n');
                     list.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${items}</pre>`;
                 }
+                try { window.edlLastUploadedFiles = (data.files || []).map(it => it.saved).filter(Boolean); } catch(e) {}
             } catch (e) {
                 showError('上传错误：' + e.message);
             } finally {
