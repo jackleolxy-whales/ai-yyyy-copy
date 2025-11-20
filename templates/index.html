@@ -931,6 +931,23 @@
             font-weight: 500;
         }
 
+        .step-indicator .steps-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            gap: 12px;
+            padding-bottom: 8px;
+        }
+        .step-indicator .steps-scroll::-webkit-scrollbar { height: 6px; }
+        .step-indicator .steps-scroll::-webkit-scrollbar-thumb { background: rgba(138,43,226,0.4); border-radius: 3px; }
+        .step-indicator .steps-scroll .step-item { flex: 0 0 auto; }
+        .step-indicator .steps-scroll .step-connector { flex: 0 0 auto; }
+        @media (max-width: 992px) {
+            .step-indicator .steps-scroll .step-circle { width: 48px; height: 48px; font-size: 16px; }
+            .step-indicator .steps-scroll .step-title { font-size: 12px; }
+            .step-indicator .steps-scroll .step-status { font-size: 11px; }
+            .step-indicator .steps-scroll .step-connector { flex-basis: 60px; margin: 0 12px; }
+        }
+
         /* 步骤区域样式 */
         .step-section {
             margin-top: 24px;
@@ -1145,9 +1162,9 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 **[ 🎬 Key Constraints: Duration & Calibration ]**
 
 **1. Time Limit (The 60-Second Rule)**
-* **Total Video Duration:** MUST be strictly less than **60 seconds**.
-* **Script Word Count:** Target **190 to 210 words** (Safe zone for fast-paced delivery).
-* **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 50-60 seconds**.
+* **Total Video Duration:** MUST be strictly less than **70 seconds**.
+* **Script Word Count:** Target **180 to 200 words** (Safe zone for fast-paced delivery).
+* **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 60-70 seconds**.
 
 **2. Footage Selection (The "Slicing" Rule)**
 * **Start Time:** Extract the `start` time string exactly as it appears in the JSON (MM:SS:FF).
@@ -1221,6 +1238,15 @@ Now,I give you the JSONs:
             </div>
         </div>
 
+        <div class="text-center mt-4" id="videoEditNextStepButtonContainer" style="display: none;">
+            <button type="button" class="btn btn-primary btn-lg" id="videoEditNextStepBtn" onclick="proceedToStep7()">
+                <i class="fas fa-film"></i> 下一步：自动拼接视频
+            </button>
+            <div class="mt-2 text-muted">
+                <small>根据第5步结果与输入的剪辑清单自动生成成片</small>
+            </div>
+        </div>
+
         <div class="mt-4" id="scriptExtractSection" style="display: none;">
             <h5 class="mb-3">
                 <i class="fas fa-comment-dots text-warning"></i> 第六步：解说台词提取
@@ -1290,12 +1316,70 @@ Now,I give you the JSONs:
             </div>
         </div>
 
+        <div class="mt-4" id="videoEditSection" style="display: none;">
+            <h5 class="mb-3">
+                <i class="fas fa-film text-info"></i> 第七步：自动拼接视频
+            </h5>
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label for="edlFps" class="form-label fw-bold"><i class="fas fa-tachometer-alt"></i> FPS</label>
+                            <input type="number" class="form-control" id="edlFps" min="1" max="120" value="30">
+                        </div>
+                        <div class="col-md-9 d-flex align-items-end justify-content-end">
+                            <button type="button" class="btn btn-outline-light me-2" id="fillEdlFromStep5Btn" onclick="fillEdlFromStep5()">
+                                <i class="fas fa-table"></i> 从第5步填充剪辑
+                            </button>
+                            <button type="button" class="btn btn-info" id="startVideoEditBtn" onclick="startAutoVideoEdit()">
+                                <i class="fas fa-play"></i> 开始自动拼接
+                            </button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped table-bordered align-middle" id="edlTable">
+                            <thead>
+                                <tr>
+                                    <th>顺序号</th>
+                                    <th>原素材文件名称</th>
+                                    <th>开始时间戳 (MM:SS:FF)</th>
+                                    <th>截取时长 (秒)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-light" onclick="addEdlRow()"><i class="fas fa-plus"></i> 添加行</button>
+                        <button class="btn btn-sm btn-outline-light" onclick="clearEdlRows()"><i class="fas fa-trash"></i> 清空</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3" id="videoEditProgressContainer" style="display:none;">
+                <div class="card result-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="status-text" id="videoEditStatusText">等待中...</span>
+                            <span class="status-text" id="videoEditProgressText">0%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="videoEditProgressBar" role="progressbar" style="width:0%"></div>
+                        </div>
+                        <div class="mt-2" id="videoEditOutput"></div>
+                        <div class="mt-2" id="videoEditLogs" style="max-height:240px; overflow:auto; background: rgba(30,30,45,0.5); border: 1px solid rgba(138,43,226,0.2); border-radius: 8px; padding: 12px;">
+                            <pre id="videoEditLogsPre" style="white-space: pre-wrap; font-family: inherit; color: #e8e8e8;"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
                 <!-- 主要分析界面 -->
                 <div class="card">
                     <div class="card-body p-4">
                         <!-- 步骤指示器 -->
                         <div class="step-indicator mb-4">
-                            <div class="d-flex align-items-center justify-content-center">
+                            <div class="d-flex align-items-center justify-content-center steps-scroll">
                                 <div class="step-item active" id="step1">
                                     <div class="step-circle">
                                         <span class="step-number">1</span>
@@ -1363,6 +1447,19 @@ Now,I give you the JSONs:
                                     </div>
                                     <div class="step-title">解说台词提取</div>
                                     <div class="step-status" id="step6Status">等待中</div>
+                                </div>
+                                <div class="step-connector">
+                                    <div class="step-progress" id="stepProgress5">
+                                        <div class="step-progress-fill"></div>
+                                    </div>
+                                </div>
+                                <div class="step-item" id="step7">
+                                    <div class="step-circle">
+                                        <span class="step-number">7</span>
+                                        <i class="fas fa-film step-icon" style="display: none;"></i>
+                                    </div>
+                                    <div class="step-title">自动拼接视频</div>
+                                    <div class="step-status" id="step7Status">等待中</div>
                                 </div>
                             </div>
                         </div>
@@ -2346,7 +2443,7 @@ Now, I give you the json:</textarea>
                                                 <label for="jsonMergePrompt" class="form-label">
                                                     <i class="fas fa-edit"></i> JSON拼接要求
                                                 </label>
-                                                <textarea class="form-control" id="jsonMergePrompt" rows="6" placeholder="请输入JSON拼接的具体要求...">I'll give you two JSONs. The common feature of these two JSONs is that both have timestamps. One JSON has a timestamp in the form: "timestamp": "00:45-00:47". The other JSON has: "time_segment": { "start": "01:01", "end": "01:02" }. However, in fact, the timestamps involved in these two JSONs correspond one-to-one. I need you to combine these two JSONs into one JSON. # Output Constraints (!!! Must Be Strictly Followed !!!)
+                                                <textarea class="form-control" id="jsonMergePrompt" rows="6" placeholder="请输入JSON拼接的具体要求...">I'll give you two JSONs. The common feature of these two JSONs is that both have timestamps. One JSON has a timestamp in the form: "timestamp": "01:32:15-02:01:22". The other JSON has: "time_segment": { "start": "01:32:15", "end": "02:01:22" }. However, in fact, the timestamps involved in these two JSONs correspond one-to-one. I need you to combine these two JSONs into one JSON. # Output Constraints (!!! Must Be Strictly Followed !!!)
 -   Your final response **must** be *only* the JSON array itself.
 -   You **must not** include any explanatory text (e.g., "Here is the data you requested...").
 -   You **must not** include any Markdown formatting (e.g., ```json ... ```).
@@ -2734,6 +2831,16 @@ Now, I give you these two JSONs:</textarea>
             if (container) { container.style.display = 'none'; }
             moveToNextStep();
             const section = document.getElementById('scriptExtractSection');
+            if (section) { section.style.display = 'block'; }
+            const vbtn = document.getElementById('videoEditNextStepButtonContainer');
+            if (vbtn) { vbtn.style.display = 'block'; }
+        }
+
+        function proceedToStep7() {
+            const container = document.getElementById('videoEditNextStepButtonContainer');
+            if (container) { container.style.display = 'none'; }
+            moveToNextStep();
+            const section = document.getElementById('videoEditSection');
             if (section) { section.style.display = 'block'; }
         }
 
@@ -3210,6 +3317,136 @@ Now, I give you these two JSONs:</textarea>
             if (btnMd) btnMd.onclick = () => navigator.clipboard.writeText(md);
             if (btnCsv) btnCsv.onclick = () => navigator.clipboard.writeText(csv || md);
             if (btnTxt) btnTxt.onclick = () => navigator.clipboard.writeText(text);
+        }
+
+        function addEdlRow(order, source, startTs, durSec) {
+            const tbody = document.querySelector('#edlTable tbody');
+            if (!tbody) return;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><input type="number" class="form-control" value="${order || ''}" min="1"></td><td><input type="text" class="form-control" value="${source || ''}"></td><td><input type="text" class="form-control" value="${startTs || ''}" placeholder="MM:SS:FF"></td><td><input type="number" step="0.1" class="form-control" value="${durSec || ''}" min="0.1"></td>`;
+            tbody.appendChild(tr);
+        }
+
+        function clearEdlRows() {
+            const tbody = document.querySelector('#edlTable tbody');
+            if (tbody) tbody.innerHTML = '';
+        }
+
+        function fillEdlFromStep5() {
+            const table = document.querySelector('#scriptResultText table');
+            const rows = table ? table.querySelectorAll('tbody tr') : [];
+            const batchBodies = document.querySelectorAll('#scriptBatchAccordion .accordion-body');
+            clearEdlRows();
+            let count = 0;
+            if (rows && rows.length) {
+                rows.forEach((r, idx) => {
+                    const cells = r.querySelectorAll('td');
+                    if (cells.length >= 5) {
+                        const source = cells[2].textContent.trim();
+                        const start = cells[3].textContent.trim();
+                        const dur = cells[4].textContent.trim();
+                        addEdlRow(idx + 1, source, start, dur);
+                        count++;
+                    }
+                });
+            } else if (batchBodies && batchBodies.length) {
+                batchBodies.forEach(body => {
+                    const t = body.querySelector('table');
+                    const rs = t ? t.querySelectorAll('tbody tr') : [];
+                    rs.forEach((r) => {
+                        const cells = r.querySelectorAll('td');
+                        if (cells.length >= 5) {
+                            const source = cells[2].textContent.trim();
+                            const start = cells[3].textContent.trim();
+                            const dur = cells[4].textContent.trim();
+                            addEdlRow(count + 1, source, start, dur);
+                            count++;
+                        }
+                    });
+                });
+            }
+            if (!count) addEdlRow(1, '', '', '');
+        }
+
+        function getEdlClipsFromTable() {
+            const tbody = document.querySelector('#edlTable tbody');
+            const rows = tbody ? tbody.querySelectorAll('tr') : [];
+            const clips = [];
+            rows.forEach(r => {
+                const inputs = r.querySelectorAll('input');
+                const order = parseInt((inputs[0]?.value || '0'), 10);
+                const source = (inputs[1]?.value || '').trim();
+                const startTs = (inputs[2]?.value || '').trim();
+                const dur = parseFloat((inputs[3]?.value || '0'));
+                if (order > 0 && source && startTs && dur > 0) {
+                    clips.push({ order, source_file: source, start_ts: startTs, duration_sec: dur });
+                }
+            });
+            clips.sort((a,b)=>a.order-b.order);
+            return clips;
+        }
+
+        function startAutoVideoEdit() {
+            const fpsEl = document.getElementById('edlFps');
+            const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
+            const clips = getEdlClipsFromTable();
+            if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
+            setStepStatus(7, 'processing', '自动拼接中');
+            const pc = document.getElementById('videoEditProgressContainer');
+            if (pc) pc.style.display = 'block';
+            const btn = document.getElementById('startVideoEditBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
+            fetch('/video/edl/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fps, clips })
+            })
+            .then(r=>r.json())
+            .then(data=>{
+                if (!data.success) { setStepStatus(7,'error','拼接失败'); showError(data.error||'拼接失败'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} return; }
+                const taskId = data.task_id;
+                const lp = document.getElementById('videoEditLogsPre');
+                if (lp) lp.textContent = '';
+                pollVideoEditStatus(taskId, btn);
+            })
+            .catch(err=>{ setStepStatus(7,'error','拼接失败'); showError('拼接错误：'+err.message); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} });
+        }
+
+        function pollVideoEditStatus(taskId, btn) {
+            const st = document.getElementById('videoEditStatusText');
+            const pt = document.getElementById('videoEditProgressText');
+            const pb = document.getElementById('videoEditProgressBar');
+            const out = document.getElementById('videoEditOutput');
+            if (!st || !pt || !pb || !out) return;
+            const tick = () => {
+                fetch('/video/edl/status/' + taskId)
+                .then(r=>r.json())
+                .then(s=>{
+                    const p = s.progress || 0;
+                    st.textContent = s.status || '处理中';
+                    pt.textContent = p + '%';
+                    pb.style.width = p + '%';
+                    if (s.output_path) {
+                        out.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle"></i> 输出：${escapeHtml(s.output_path)}</div>`;
+                    }
+                    const lp = document.getElementById('videoEditLogsPre');
+                    if (lp && s.logs && Array.isArray(s.logs)) {
+                        lp.textContent = s.logs.join('\n');
+                    }
+                    if (s.done) {
+                        setStepStatus(7, 'completed', '已完成');
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接'; }
+                    } else if (s.error) {
+                        setStepStatus(7, 'error', '拼接失败');
+                        showError(s.error);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接'; }
+                    } else {
+                        setTimeout(tick, 1000);
+                    }
+                })
+                .catch(()=>{ setTimeout(tick, 1500); });
+            };
+            tick();
         }
 
         function getStep5SourceFilenames() {

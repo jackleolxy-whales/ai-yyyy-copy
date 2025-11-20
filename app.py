@@ -1,6 +1,10 @@
 from flask import Flask, render_template, request, jsonify, Response
 from flask import stream_with_context
 import os
+import re
+import uuid
+import shutil
+import subprocess
 from video_analyzer import VideoAnalyzer
 from deepseek_processor import DeepSeekProcessor
 import threading
@@ -32,6 +36,7 @@ analysis_results = {}
 analysis_status = {}
 deepseek_results = {}
 deepseek_status = {}
+edl_tasks = {}
 
 class VideoAnalyzerWeb:
     def __init__(self):
@@ -862,6 +867,128 @@ def script_generate():
 
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
+
+def mmssff_to_hhmmss_ms(ts, fps):
+    m = re.match(r"^(\d{2}):(\d{2}):(\d{2})$", ts)
+    if not m:
+        return None
+    mm = int(m.group(1))
+    ss = int(m.group(2))
+    ff = int(m.group(3))
+    total_ms = int(((mm * 60) + ss) * 1000 + (ff * 1000) / max(1, fps))
+    hh = total_ms // 3600000
+    rem = total_ms % 3600000
+    m2 = rem // 60000
+    rem2 = rem % 60000
+    s2 = rem2 // 1000
+    ms = rem2 % 1000
+    return f"{hh:02d}:{m2:02d}:{s2:02d}.{ms:03d}"
+
+def resolve_source_file(name):
+    base = os.path.basename(name)
+    candidates = [base]
+    if base.lower().endswith('.mp4.txt'):
+        candidates.append(base[:-4])
+    if '.' not in base:
+        for ext in ['.mp4', '.MP4', '.mov', '.MOV', '.mkv', '.MKV']:
+            candidates.append(base + ext)
+    for cand in candidates:
+        p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
+        if os.path.exists(p):
+            return p
+    return None
+
+def ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
+
+def ffmpeg_available():
+    return shutil.which('ffmpeg') is not None
+
+def run_ffmpeg_segment(src, start, duration, out_path):
+    cmd = ['ffmpeg', '-hide_banner', '-y', '-ss', start, '-t', str(duration), '-i', src, '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', out_path]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
+
+def run_ffmpeg_concat(list_path, out_path):
+    cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-c:a', 'aac', out_path]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
+
+def edit_video_task(task_id, clips, fps):
+    edl_tasks[task_id] = {'progress': 0, 'status': '初始化', 'done': False, 'logs': []}
+    edl_tasks[task_id]['logs'].append(f"task={task_id} start total_clips={len(clips)} fps={fps}")
+    if not ffmpeg_available():
+        edl_tasks[task_id] = {'progress': 0, 'status': '错误', 'error': '缺少ffmpeg，请安装后重试', 'done': True, 'logs': edl_tasks[task_id]['logs']}
+        edl_tasks[task_id]['logs'].append("ffmpeg not found")
+        return
+    seg_dir = os.path.join('temp', 'segments', task_id)
+    ensure_dir(seg_dir)
+    ensure_dir(os.path.join('outputs', 'edits'))
+    total = len(clips)
+    for i, clip in enumerate(clips, start=1):
+        edl_tasks[task_id]['status'] = f"处理片段 {i}/{total}"
+        edl_tasks[task_id]['current_index'] = i
+        src = resolve_source_file(clip.get('source_file',''))
+        if not src:
+            edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"找不到源文件: {clip.get('source_file','')}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+            edl_tasks[task_id]['logs'].append(f"resolve_source failed name={clip.get('source_file','')}")
+            return
+        ts = clip.get('start_ts','')
+        dur = float(clip.get('duration_sec',0))
+        hhmmss = mmssff_to_hhmmss_ms(ts, fps)
+        if not hhmmss or dur <= 0:
+            edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"非法时间值: {ts}/{dur}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+            edl_tasks[task_id]['logs'].append(f"invalid ts/dur ts={ts} dur={dur}")
+            return
+        out_seg = os.path.join(seg_dir, f"seg_{i:03d}.mp4")
+        edl_tasks[task_id]['logs'].append(f"clip {i}/{total} src={src} start={hhmmss} dur={dur} out={out_seg}")
+        ok, log = run_ffmpeg_segment(src, hhmmss, dur, out_seg)
+        if not ok:
+            edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"片段生成失败: {log[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+            edl_tasks[task_id]['logs'].append(f"ffmpeg segment error: {log[:200]}")
+            return
+        edl_tasks[task_id]['logs'].append(f"segment ok {out_seg}")
+        edl_tasks[task_id]['progress'] = int((i/total)*100)
+    list_path = os.path.join(seg_dir, 'list.txt')
+    with open(list_path, 'w') as f:
+        for i in range(1, total+1):
+            f.write(f"file '{os.path.join(seg_dir, f'seg_{i:03d}.mp4')}'\n")
+    edl_tasks[task_id]['logs'].append(f"concat list {list_path}")
+    out_path = os.path.join('outputs', 'edits', f"{task_id}.mp4")
+    ok, log = run_ffmpeg_concat(list_path, out_path)
+    if not ok:
+        edl_tasks[task_id] = {'progress': 100, 'status': '错误', 'error': f"拼接失败: {log[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+        edl_tasks[task_id]['logs'].append(f"ffmpeg concat error: {log[:200]}")
+        return
+    edl_tasks[task_id] = {'progress': 100, 'status': '完成', 'output_path': out_path, 'done': True, 'logs': edl_tasks[task_id]['logs']}
+    edl_tasks[task_id]['logs'].append(f"output {out_path}")
+
+@app.route('/video/edl/start', methods=['POST'])
+def video_edl_start():
+    try:
+        data = request.get_json(silent=True) or {}
+        fps = int(data.get('fps', 30))
+        clips = data.get('clips') or []
+        if not clips:
+            return jsonify({'success': False, 'error': '剪辑清单为空'}), 400
+        tid = str(uuid.uuid4()).replace('-', '')
+        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps), daemon=True)
+        t.start()
+        return jsonify({'success': True, 'task_id': tid})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/video/edl/status/<task_id>', methods=['GET'])
+def video_edl_status(task_id):
+    s = edl_tasks.get(task_id)
+    if not s:
+        return jsonify({'success': False, 'error': '任务不存在'})
+    logs = s.get('logs') or []
+    if len(logs) > 200:
+        logs = logs[-200:]
+    resp = dict(s)
+    resp['logs'] = logs
+    return jsonify(resp)
 
 @app.route('/health')
 def health():
