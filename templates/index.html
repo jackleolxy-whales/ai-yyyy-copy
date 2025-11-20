@@ -1043,6 +1043,13 @@
     </style>
 </head>
 <body>
+    <div class="text-center mb-3">
+        <div class="btn-group" role="group" aria-label="工具切换">
+            <button type="button" class="btn btn-outline-info" onclick="switchTool('workflow')"><i class="fas fa-stream"></i> 爆款短剧剪辑工作流</button>
+            <button type="button" class="btn btn-outline-warning" onclick="switchTool('script_tool')"><i class="fas fa-file-alt"></i> 脚本生成工具</button>
+            <button type="button" class="btn btn-outline-success" onclick="switchTool('edl_tool')"><i class="fas fa-film"></i> 自动拼接工具</button>
+        </div>
+    </div>
     <div class="container main-container">
         <div class="row justify-content-center">
             <div class="col-lg-10">
@@ -2529,6 +2536,187 @@ Now, I give you these two JSONs:</textarea>
         </div>
     </div>
 
+    <div class="container" id="scriptToolSection" style="display: none;">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="text-center mb-4">
+                    <h2 class="header-title"><i class="fas fa-file-alt"></i> 脚本生成工具</h2>
+                    <p class="lead text-white">使用页面输入的提示词与JSON文本直接生成脚本</p>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="toolScriptModelProvider" class="form-label fw-bold"><i class="fas fa-robot"></i> 模型选择</label>
+                            <select class="form-select" id="toolScriptModelProvider">
+                                <option value="deepseek" selected>DeepSeek</option>
+                                <option value="glm-4-long">GLM-4-Long</option>
+                                <option value="o3-pro-2025-06-10">o3-pro-2025-06-10</option>
+                                <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5-20250929</option>
+                                <option value="gemini-2.5-pro-preview-06-05">gemini-2.5-pro-preview-06-05</option>
+                                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                                <option value="kimi-k2-250711">kimi-k2-250711</option>
+                                <option value="gemini-3-pro-preview">gemini-3-pro-preview</option>
+                                <option value="gemini-3-pro-preview-thinking">gemini-3-pro-preview-thinking</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolScriptPrompt" class="form-label fw-bold"><i class="fas fa-edit"></i> 生成指令</label>
+                            <textarea class="form-control prompt-input" id="toolScriptPrompt" rows="10">**[ Role ]**
+You are a professional "high-energy recap" video editor and scriptwriter specializing in short dramas. You are a master of the **gold-standard "5-second hook."** You are highly skilled at grabbing an audience's attention *immediately*, using extreme suspense, injustice, and conflict to "sell" a drama and stop users from scrolling.
+
+Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-the-know,'** like a friend spilling the most exciting "tea" (gossip). You are the audience's "mouthpiece", **creating an interactive feeling** by voicing their outrage ("The audacity!") and excitement ("Here comes the face-slap!").
+
+**[ Input Data Note - CRITICAL ]**
+* The provided JSON files use the timestamp format: **`MM:SS:FF`** (Minutes:Seconds:Frames).
+* *Example:* `00:07:12` means **0 minutes, 7 seconds, 12 frames**.
+* The `time_segment` in the JSON (e.g., "start": "00:07:12", "end": "00:17:05") represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
+
+**[ Core Task ]**
+Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "Ready-to-Edit" Decision List (EDL).
+
+⚡ **Your North Star: The 'Golden 5-Second' Hook** ⚡
+The first 1-2 lines must be so powerful that the user **cannot possibly scroll away.**
+* **Start 'In Media Res' (In the Middle of the Action):** This is **non-negotiable.** Your script MUST begin at the *peak* of the conflict or violence. Show the *result* first, then explain the 'why'.
+* **Instantly Create a 'Story Gap':** Force the user's brain to ask "Why?" or "How did this happen?!"
+
+**[ 🏆 Gold-Standard Examples ]**
+* "Okay buckle up because this drama is WILD"
+* "This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"
+* "...SIKE! He's not there for her. He's there for her SISTER" (Twist)
+
+**[ 🎬 Key Constraints: Duration & Calibration ]**
+
+**1. Time Limit (The 60-Second Rule)**
+* **Total Video Duration:** MUST be strictly less than **65 seconds**.
+* **Script Word Count:** Target **180 to 190 words** (Safe zone for fast-paced delivery).
+* **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 55-65 seconds**.
+
+**2. Footage Selection (The "Slicing" Rule)**
+* **Start Time:** Extract the `start` time string exactly as it appears in the JSON (MM:SS:FF).
+* **Duration:** You must decide how long to hold that shot (e.g., 3.0s, 4.5s). Do **NOT** use the JSON 'end' time.
+* The selected Visual **must have a >80% match** with the Script line. No "filler" footage.
+
+**3. Structure & Pacing**
+* **0-5s:** The Hook (Visual violence/shock/twist).
+* **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding).
+* **50-60s:** The Cliffhanger (End on a major twist or question).
+
+**[ Workflow ]**
+1.  **Analyze for Core Conflict:** Identify the main "A-Plot" (Revenge, Mistaken Identity).
+2.  **Select the Hook:** Scour `isHighlight: true` tags for the most shocking visual.
+3.  **Write Script:** "Hook + Story + Suspense" structure. Use punchy, short sentences.
+4.  **Match Footage:** Assign a specific `Start Time` and `Clip Duration` for every single line.
+
+**[ Output Format Requirement ]**
+You **must** use the 5-column table format below. This table will be processed by a Python script for automated editing.
+
+| Script (Narration) | Visual Description | Source File | Start Time (MM:SS:FF) | Clip Duration (Sec) |
+| :--- | :--- | :--- | :--- | :--- |
+| (Colloquial, high-energy line) | (Precise action) | (e.g. `01.mp4.txt`) | (e.g. `00:07:12`) | **(e.g. 4.0)** |
+
+**[ Example Row ]**
+| Buckle up, this CEO is psycho! He just choked his own wife! | He grabs her neck aggressively. | 03.mp4.txt | 00:07:12 | 4.0 |
+
+**[ Final Mandate ]**
+Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"**. Do not fail the 5-second test. **Double-check that the sum of "Clip Duration" is  >55s and < 65s.**
+
+Now,I give you the JSONs:
+                            </textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolTxtFiles" class="form-label fw-bold"><i class="fas fa-file-upload"></i> 上传本地 TXT 文件</label>
+                            <input type="file" class="form-control" id="toolTxtFiles" multiple accept=".txt">
+                            <div class="form-text" id="toolTxtFilesList">已选择 0 个文件</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="toolJsonInputs" class="form-label fw-bold"><i class="fas fa-code"></i> JSON文本（可粘贴多个）</label>
+                            <textarea class="form-control" id="toolJsonInputs" rows="12" placeholder="在此粘贴用于生成脚本的JSON文本，多个可直接连续粘贴"></textarea>
+                        </div>
+                        <div class="text-center">
+                            <button type="button" class="btn btn-warning btn-lg" id="toolScriptGenerateBtn" onclick="startScriptTool()"><i class="fas fa-play"></i> 开始脚本生成</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3" id="toolScriptResultContainer" style="display: none;">
+                    <h6 class="mb-2"><i class="fas fa-check-circle text-warning"></i> 结果</h6>
+                    <div class="card result-card"><div class="card-body"><div id="toolScriptResultText"></div></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="edlToolSection" style="display: none;">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="text-center mb-4">
+                    <h2 class="header-title"><i class="fas fa-film"></i> 自动拼接工具</h2>
+                    <p class="lead text-white">使用页面输入的剪辑清单直接生成成片</p>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold"><i class="fas fa-upload"></i> 批量上传本地视频</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="file" class="form-control" id="edlToolFiles" multiple accept="video/*" style="max-width: 60%">
+                                <button type="button" class="btn btn-outline-primary" onclick="startEdlToolUpload()"><i class="fas fa-cloud-upload-alt"></i> 上传到素材库</button>
+                            </div>
+                            <div class="form-text text-muted">上传后素材保存在 `uploads` 目录，源文件名与改名映射可用于中文文件名解析</div>
+                            <div class="mt-2" id="edlToolUploadedList"></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-3">
+                                <label for="edlToolFps" class="form-label fw-bold"><i class="fas fa-tachometer-alt"></i> FPS</label>
+                                <input type="number" class="form-control" id="edlToolFps" min="1" max="120" value="30">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="edlToolMode" class="form-label fw-bold"><i class="fas fa-sliders-h"></i> 模式</label>
+                                <select class="form-select" id="edlToolMode">
+                                    <option value="time" selected>按时间</option>
+                                    <option value="frames">按帧数</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end justify-content-end">
+                                <button type="button" class="btn btn-info" id="startEdlToolBtn" onclick="startEdlToolEdit()"><i class="fas fa-play"></i> 开始自动拼接</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped table-bordered align-middle" id="edlToolTable">
+                                <thead>
+                                    <tr>
+                                        <th>顺序号</th>
+                                        <th>原素材文件名称</th>
+                                        <th>开始时间戳 (MM:SS:FF)</th>
+                                        <th>截取时长 (秒)</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-light" onclick="addEdlToolRow()"><i class="fas fa-plus"></i> 添加行</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="clearEdlToolRows()"><i class="fas fa-trash"></i> 清空</button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="replaceInvalidEdlToolSources()"><i class="fas fa-wrench"></i> 一键替换不可用源文件</button>
+                            <button class="btn btn-sm btn-outline-info" onclick="pasteMarkdownToEdlTool()"><i class="fas fa-paste"></i> 一键粘贴Markdown填充</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3" id="edlToolProgressContainer" style="display:none;">
+                    <div class="card result-card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="status-text" id="edlToolStatusText">等待中...</span>
+                                <span class="status-text" id="edlToolProgressText">0%</span>
+                            </div>
+                            <div class="progress"><div class="progress-bar progress-bar-striped progress-bar-animated" id="edlToolProgressBar" role="progressbar" style="width:0%"></div></div>
+                            <div class="mt-2" id="edlToolOutput"></div>
+                            <div class="mt-2" id="edlToolLogs" style="max-height:240px; overflow:auto; background: rgba(30,30,45,0.5); border: 1px solid rgba(138,43,226,0.2); border-radius: 8px; padding: 12px;"><pre id="edlToolLogsPre" style="white-space: pre-wrap; font-family: inherit; color: #e8e8e8;"></pre></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentTaskId = null;
@@ -2831,6 +3019,26 @@ Now, I give you these two JSONs:</textarea>
             const section = document.getElementById('scriptSection');
             if (section) {
                 section.style.display = 'block';
+            }
+        }
+
+        function switchTool(tool) {
+            const workflow = document.querySelector('.main-container');
+            const scriptTool = document.getElementById('scriptToolSection');
+            const edlTool = document.getElementById('edlToolSection');
+            if (!workflow || !scriptTool || !edlTool) return;
+            if (tool === 'script_tool') {
+                workflow.style.display = 'none';
+                scriptTool.style.display = 'block';
+                edlTool.style.display = 'none';
+            } else if (tool === 'edl_tool') {
+                workflow.style.display = 'none';
+                scriptTool.style.display = 'none';
+                edlTool.style.display = 'block';
+            } else {
+                workflow.style.display = 'block';
+                scriptTool.style.display = 'none';
+                edlTool.style.display = 'none';
             }
         }
 
@@ -3258,6 +3466,286 @@ Now, I give you these two JSONs:</textarea>
                         btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成';
                     }
                 }
+            }
+        }
+
+        async function startScriptTool() {
+            const prompt = (document.getElementById('toolScriptPrompt')?.value || '').trim();
+            const jsonText = (document.getElementById('toolJsonInputs')?.value || '').trim();
+            const providerEl = document.getElementById('toolScriptModelProvider');
+            const modelProvider = providerEl ? (providerEl.value || 'deepseek') : 'deepseek';
+            if (!prompt) { showError('脚本提示词不能为空'); return; }
+            const btn = document.getElementById('toolScriptGenerateBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>脚本生成中...'; }
+            const texts = [];
+            if (jsonText) { texts.push(jsonText); }
+            try {
+                const fileEntries = await readToolTxtFiles();
+                fileEntries.forEach(e => {
+                    const combo = (e.name ? (e.name + '\n') : '') + (e.content || '');
+                    if (combo.trim()) { texts.push(combo); }
+                });
+            } catch (_) {}
+            if (!texts.length) { showError('请粘贴JSON文本或上传TXT文件'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始脚本生成';} return; }
+            try {
+                const res = await fetch('/script/generate_direct', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script_prompt: prompt, json_texts: texts, model_provider: modelProvider })
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    renderToolScriptResult(String(data.result || ''));
+                } else {
+                    showError((data && data.error) ? data.error : '脚本生成失败');
+                }
+            } catch (e) {
+                showError('脚本生成错误：' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始脚本生成'; }
+            }
+        }
+
+        async function readToolTxtFiles() {
+            const input = document.getElementById('toolTxtFiles');
+            const files = Array.from(input?.files || []);
+            const tasks = files.map(f => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({ name: f.name, content: String(reader.result || '') });
+                reader.onerror = () => reject(reader.error || new Error('读取失败'));
+                try { reader.readAsText(f); } catch(e) { reject(e); }
+            }));
+            const list = await Promise.all(tasks);
+            return list;
+        }
+
+        (function bindToolTxtChange(){
+            const el = document.getElementById('toolTxtFiles');
+            const listEl = document.getElementById('toolTxtFilesList');
+            if (!el) return;
+            el.addEventListener('change', async () => {
+                const files = Array.from(el.files || []);
+                const names = files.map(f => f.name);
+                if (listEl) { listEl.textContent = `已选择 ${files.length} 个文件` + (names.length ? `：${names.join(', ')}` : ''); }
+                try {
+                    const entries = await readToolTxtFiles();
+                    const combined = entries.map(e => ((e.name ? (e.name + '\n') : '') + (e.content || ''))).filter(s => s && s.trim()).join('\n\n');
+                    const target = document.getElementById('toolJsonInputs');
+                    if (target) { target.value = combined; }
+                } catch(_){ }
+            });
+        })();
+
+        function renderToolScriptResult(result) {
+            const c = document.getElementById('toolScriptResultContainer');
+            const t = document.getElementById('toolScriptResultText');
+            if (!c || !t) return;
+            const parsed = parseMarkdownTable(result);
+            const toolbar = '<div class="mb-2 d-flex gap-2"><button class="btn btn-sm btn-outline-light" id="toolCopyMarkdown">复制Markdown</button><button class="btn btn-sm btn-outline-light" id="toolCopyCsv">复制CSV</button><button class="btn btn-sm btn-outline-light" id="toolCopyText">复制文本</button></div>';
+            const tableHtml = parsed.tableHtml || '<pre style="white-space: pre-wrap; font-family: inherit;">' + escapeHtml(result) + '</pre>';
+            t.innerHTML = toolbar + tableHtml;
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            const md = parsed.markdown || result;
+            const csv = parsed.csv || '';
+            const btnMd = document.getElementById('toolCopyMarkdown');
+            const btnCsv = document.getElementById('toolCopyCsv');
+            const btnTxt = document.getElementById('toolCopyText');
+            if (btnMd) btnMd.onclick = () => navigator.clipboard.writeText(md);
+            if (btnCsv) btnCsv.onclick = () => navigator.clipboard.writeText(csv || md);
+            if (btnTxt) btnTxt.onclick = () => navigator.clipboard.writeText(result);
+        }
+
+        function addEdlToolRow() {
+            const tbody = document.querySelector('#edlToolTable tbody');
+            if (!tbody) return;
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td><input type="number" class="form-control" value="1"></td>'+
+                           '<td><input type="text" class="form-control" placeholder="例如 许你真心岁岁欢_50_compressed.mp4"></td>'+
+                           '<td><input type="text" class="form-control" placeholder="MM:SS:FF"></td>'+
+                           '<td><input type="number" step="0.1" class="form-control" value="4"></td>';
+            tbody.appendChild(tr);
+        }
+
+        function clearEdlToolRows() {
+            const tbody = document.querySelector('#edlToolTable tbody');
+            if (tbody) { tbody.innerHTML = ''; }
+        }
+
+        function getEdlToolClipsFromTable() {
+            const tbody = document.querySelector('#edlToolTable tbody');
+            const rows = tbody ? tbody.querySelectorAll('tr') : [];
+            const clips = [];
+            rows.forEach(r => {
+                const inputs = r.querySelectorAll('input');
+                const order = parseInt((inputs[0]?.value || '0'), 10);
+                const source = (inputs[1]?.value || '').trim();
+                const startTs = (inputs[2]?.value || '').trim();
+                const dur = parseFloat((inputs[3]?.value || '0'));
+                if (order > 0 && source && startTs && dur > 0) {
+                    clips.push({ order, source_file: source, start_ts: startTs, duration_sec: dur });
+                }
+            });
+            clips.sort((a,b)=>a.order-b.order);
+            return clips;
+        }
+
+        async function pasteMarkdownToEdlTool() {
+            try {
+                const text = await navigator.clipboard.readText();
+                fillEdlToolFromMarkdown(text);
+            } catch (e) {
+                showError('读取剪贴板失败：' + e.message);
+            }
+        }
+
+        function addEdlToolRowWithValues(order, source, startTs, durSec) {
+            const tbody = document.querySelector('#edlToolTable tbody');
+            if (!tbody) return;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><input type="number" class="form-control" value="${order || ''}" min="1"></td>`+
+                           `<td><input type="text" class="form-control" value="${source || ''}"></td>`+
+                           `<td><input type="text" class="form-control" value="${startTs || ''}" placeholder="MM:SS:FF"></td>`+
+                           `<td><input type="number" step="0.1" class="form-control" value="${durSec || ''}" min="0.1"></td>`;
+            tbody.appendChild(tr);
+        }
+
+        function fillEdlToolFromMarkdown(text) {
+            try {
+                if (!text || !String(text).trim()) { showError('剪贴板为空或不是有效Markdown'); return; }
+                const lines = String(text).split(/\r?\n/);
+                let start = -1, end = -1;
+                for (let i = 0; i < lines.length; i++) {
+                    const l = lines[i].trim();
+                    if (l.startsWith('|')) { if (start === -1) start = i; end = i; } else if (start !== -1) break;
+                }
+                if (start === -1) { showError('未检测到Markdown表格'); return; }
+                const tableLines = lines.slice(start, end + 1).filter(l => l.trim().startsWith('|'));
+                if (tableLines.length < 3) { showError('Markdown表格格式不完整'); return; }
+                const rows = tableLines.slice(2).map(splitRow);
+                clearEdlToolRows();
+                let idx = 0;
+                rows.forEach(r => {
+                    if (Array.isArray(r) && r.length >= 5) {
+                        const source = (r[2] || '').trim();
+                        const startTs = (r[3] || '').trim();
+                        const dur = (r[4] || '').trim();
+                        idx += 1;
+                        addEdlToolRowWithValues(idx, source, startTs, dur);
+                    }
+                });
+                if (idx === 0) { showError('未从Markdown中解析出剪辑行'); }
+            } catch (e) { showError('解析Markdown失败：' + e.message); }
+        }
+
+        window.replaceInvalidEdlToolSources = async function replaceInvalidEdlToolSources() {
+            try {
+                const res = await fetch('/uploads/list');
+                const j = await res.json();
+                if (!j.success) { return false; }
+                const files = j.files || [];
+                const fallback = files.find(f=>f.endsWith('_11_compressed.mp4')) || files.find(f=>f.toLowerCase().endsWith('.mp4'));
+                if (!fallback) { return false; }
+                const tbody = document.querySelector('#edlToolTable tbody');
+                const rows = tbody ? tbody.querySelectorAll('tr') : [];
+                let replaced = 0;
+                for (const r of rows) {
+                    const inputs = r.querySelectorAll('input');
+                    const source = (inputs[1]?.value || '').trim();
+                    if (!source) continue;
+                    const check = await fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source }) }).then(r=>r.json()).catch(()=>({ success:false }));
+                    if (!check.success) { inputs[1].value = fallback; replaced++; }
+                }
+                return replaced > 0;
+            } catch(e) { return false; }
+        }
+
+        async function startEdlToolEdit() {
+            const fpsEl = document.getElementById('edlToolFps');
+            const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
+            const modeEl = document.getElementById('edlToolMode');
+            const mode = modeEl ? (modeEl.value || 'time') : 'time';
+            const clips = getEdlToolClipsFromTable();
+            if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
+            try {
+                try { console.log('EDL tool start payload', { fps, mode, clips }); } catch(e){}
+                const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
+                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
+                const failed = checks.filter(c => !c.ok);
+                if (failed.length) {
+                    const ok = await window.replaceInvalidEdlToolSources();
+                    if (!ok) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
+                    const rechecks = await Promise.all(Array.from(new Set(getEdlToolClipsFromTable().map(c => (c.source_file||'').trim()).filter(Boolean))).map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
+                    if (rechecks.some(x=>!x.ok)) { showError('自动替换后仍有源文件不可用'); return; }
+                }
+            } catch (e) {}
+            const pc = document.getElementById('edlToolProgressContainer');
+            if (pc) pc.style.display = 'block';
+            const btn = document.getElementById('startEdlToolBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
+            fetch('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, clips }) })
+            .then(r=>r.json())
+            .then(data=>{
+                try { console.log('EDL tool start response', data); } catch(e){}
+                if (!data.success) { showError(data.error||'拼接失败'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} return; }
+                const taskId = data.task_id;
+                const lp = document.getElementById('edlToolLogsPre');
+                if (lp) lp.textContent = '';
+                pollEdlToolStatus(taskId, btn);
+            })
+            .catch(err=>{ showError('拼接错误：'+err.message); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} });
+        }
+
+        function pollEdlToolStatus(taskId, btn) {
+            const st = document.getElementById('edlToolStatusText');
+            const pt = document.getElementById('edlToolProgressText');
+            const pb = document.getElementById('edlToolProgressBar');
+            const out = document.getElementById('edlToolOutput');
+            if (!st || !pt || !pb || !out) return;
+            const tick = () => {
+                fetch('/video/edl/status/' + taskId)
+                .then(r=>r.json())
+                .then(s=>{
+                    const p = s.progress || 0;
+                    st.textContent = s.status || '处理中';
+                    pt.textContent = p + '%';
+                    pb.style.width = p + '%';
+                    if (s.output_path) { out.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> 输出：' + s.output_path + '</div>'; }
+                    const lp = document.getElementById('edlToolLogsPre');
+                    if (lp && s.logs && Array.isArray(s.logs)) { lp.textContent = s.logs.join('\n'); }
+                    if (s.done) {
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接'; }
+                    } else if (s.error) {
+                        showError(s.error);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接'; }
+                    } else {
+                        setTimeout(tick, 1000);
+                    }
+                })
+                .catch(()=>{ setTimeout(tick, 1500); });
+            };
+            tick();
+        }
+
+        async function startEdlToolUpload() {
+            const input = document.getElementById('edlToolFiles');
+            if (!input || !input.files || !input.files.length) { showError('请选择要上传的视频文件'); return; }
+            const fd = new FormData();
+            Array.from(input.files).forEach(f => fd.append('edl_files', f, f.name));
+            const btns = document.querySelectorAll('button[onclick="startEdlToolUpload()"]');
+            btns.forEach(b=>{ b.disabled = true; b.innerHTML = '<span class="loading-spinner"></span>上传中...'; });
+            try {
+                const res = await fetch('/edl/upload/batch', { method: 'POST', body: fd });
+                const data = await res.json();
+                if (!data.success) { showError(data.error || '上传失败'); return; }
+                const list = document.getElementById('edlToolUploadedList');
+                if (list) {
+                    const items = (data.files || []).map(it => `${it.original} → ${it.saved}`).join('\n');
+                    list.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit;">${items}</pre>`;
+                }
+            } catch (e) {
+                showError('上传错误：' + e.message);
+            } finally {
+                btns.forEach(b=>{ b.disabled = false; b.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> 上传到素材库'; });
             }
         }
 

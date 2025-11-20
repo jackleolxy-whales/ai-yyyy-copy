@@ -870,6 +870,172 @@ def script_generate():
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
 
+@app.route('/script/generate_direct', methods=['POST'])
+def script_generate_direct():
+    try:
+        data = request.json or {}
+        script_prompt = (data.get('script_prompt') or '').strip()
+        model_provider = (data.get('model_provider') or 'deepseek').strip()
+        json_texts = data.get('json_texts') or []
+        if not script_prompt:
+            return jsonify({"success": False, "error": "脚本提示词不能为空"})
+        if not isinstance(json_texts, list) or not json_texts:
+            return jsonify({"success": False, "error": "未提供JSON内容"})
+        combined_input = "\n\n".join([str(t) for t in json_texts if t])
+        def _preview_text(label, text):
+            try:
+                sample = text[:300]
+                is_ascii = all(ord(ch) < 128 for ch in sample)
+                print(f"[script_generate_direct] {label}_preview(len={len(text)} ascii={is_ascii}) -> {sample}")
+            except Exception as _e:
+                print(f"[script_generate_direct] {label}_preview error={str(_e)}")
+        print(f"[script_generate_direct] provider={model_provider} prompt_len={len(script_prompt)} combined_len={len(combined_input)}")
+        _preview_text('script_prompt', script_prompt)
+        _preview_text('combined_input', combined_input)
+        task_id = str(int(time.time() * 1000))
+        deepseek_status[task_id] = {"status": "processing", "progress": 50}
+        try:
+            if model_provider == 'glm-4-long':
+                api_key = os.environ.get('BIGMODEL_API_KEY', '').strip()
+                if not api_key:
+                    raise Exception('缺少GLM-4-Long API密钥')
+                full_input = f"{script_prompt}\n\n{combined_input}"
+                url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+                headers = {
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Accept-Charset': 'utf-8'
+                }
+                payload = {
+                    'model': 'glm-4-long',
+                    'messages': [
+                        {'role': 'user', 'content': full_input}
+                    ]
+                }
+                resp = requests.post(url, headers=headers, json=payload, timeout=60)
+                if resp.status_code != 200:
+                    body_preview = resp.text[:500]
+                    raise Exception(f"GLM-4-Long调用失败: HTTP {resp.status_code} body={body_preview}")
+                data_json = resp.json()
+                result = ''
+                try:
+                    choices = data_json.get('choices') or []
+                    if choices:
+                        msg = choices[0].get('message') or {}
+                        result = msg.get('content') or ''
+                except:
+                    pass
+                if not result:
+                    result = str(data_json)
+            elif model_provider and model_provider != 'deepseek':
+                api_key = os.environ.get('LAOZHANG_API_KEY', '').strip()
+                if not api_key:
+                    raise Exception('缺少LaoZhang API密钥')
+                full_input = f"{script_prompt}\n\n{combined_input}"
+                url = 'https://api.laozhang.ai/v1/chat/completions'
+                headers = {
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Accept-Charset': 'utf-8'
+                }
+                payload = {
+                    'model': model_provider,
+                    'messages': [
+                        {'role': 'user', 'content': full_input}
+                    ]
+                }
+                resp = requests.post(url, headers=headers, json=payload, timeout=120)
+                if resp.status_code != 200:
+                    body_preview = ''
+                    try:
+                        body_preview = resp.text[:500]
+                    except:
+                        pass
+                    raise Exception(f"LaoZhang调用失败: HTTP {resp.status_code} body={body_preview}")
+                data_json = resp.json()
+                result = ''
+                try:
+                    choices = data_json.get('choices') or []
+                    if choices:
+                        msg = choices[0].get('message') or {}
+                        result = msg.get('content') or ''
+                except:
+                    pass
+                if not result:
+                    result = str(data_json)
+            else:
+                result = deepseek_processor.process_video_analysis_result(
+                    video_analysis_text=combined_input,
+                    user_prompt=script_prompt,
+                    model="deepseek-chat",
+                    stream=False
+                )
+            deepseek_status[task_id] = {"status": "completed", "progress": 100}
+            deepseek_results[task_id] = {
+                "success": True,
+                "result": result,
+                "prompt": script_prompt,
+                "type": "script_direct",
+                "batch_id": ""
+            }
+            return jsonify({"success": True, "task_id": task_id, "result": result})
+        except Exception as e:
+            deepseek_status[task_id] = {"status": "error", "progress": 0}
+            deepseek_results[task_id] = {
+                "success": False,
+                "error": str(e),
+                "prompt": script_prompt,
+                "type": "script_direct",
+                "batch_id": ""
+            }
+            return jsonify({"success": False, "error": f"脚本生成失败: {str(e)}"})
+    except Exception as e:
+        return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
+
+@app.route('/edl/upload/batch', methods=['POST'])
+def edl_upload_batch():
+    try:
+        if 'edl_files' not in request.files:
+            return jsonify({'success': False, 'error': '没有选择文件'})
+        files = request.files.getlist('edl_files')
+        if not files or files[0].filename == '':
+            return jsonify({'success': False, 'error': '没有选择文件'})
+        if len(files) > 300:
+            return jsonify({'success': False, 'error': '最多同时上传300个文件'})
+        saved = []
+        total_size = 0
+        for f in files:
+            if f.filename == '':
+                continue
+            if not allowed_file(f.filename):
+                return jsonify({'success': False, 'error': f"文件 '{f.filename}' 格式不支持"})
+            if hasattr(f, 'content_length'):
+                sz = f.content_length
+            else:
+                f.seek(0, 2)
+                sz = f.tell()
+                f.seek(0)
+            if sz > 100 * 1024 * 1024:
+                return jsonify({'success': False, 'error': f"文件 '{f.filename}' 大小超过100MB限制"})
+            total_size += sz
+        if total_size > 10 * 1024 * 1024 * 1024:
+            return jsonify({'success': False, 'error': '所有文件总大小超过10GB限制'})
+        for f in files:
+            if f.filename == '':
+                continue
+            fn = secure_filename(f.filename)
+            ts = str(int(time.time() * 1000))
+            saved_fn = f"{ts}_{fn}"
+            p = os.path.join(app.config['UPLOAD_FOLDER'], saved_fn)
+            f.save(p)
+            original_name_map.setdefault(f.filename, []).append(saved_fn)
+            if secure_filename(f.filename) != f.filename:
+                original_name_map.setdefault(secure_filename(f.filename), []).append(saved_fn)
+            saved.append({'original': f.filename, 'saved': saved_fn})
+        return jsonify({'success': True, 'files': saved})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 def mmssff_to_hhmmss_ms(ts, fps):
     m = re.match(r"^(\d{2}):(\d{2}):(\d{2})$", ts)
     if not m:
@@ -940,7 +1106,12 @@ def ffmpeg_available():
 def run_ffmpeg_segment(src, start, duration, out_path):
     cmd = ['ffmpeg', '-hide_banner', '-y', '-ss', start, '-t', str(duration), '-i', src, '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', out_path]
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
+    if p.returncode == 0:
+        return True, p.stderr.decode('utf-8', errors='ignore')
+    cmd_vo = ['ffmpeg', '-hide_banner', '-y', '-ss', start, '-t', str(duration), '-i', src, '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-an', out_path]
+    p2 = subprocess.run(cmd_vo, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
+    return p2.returncode == 0, log
 
 def run_ffmpeg_segment_frames(src, start_frame, end_frame, fps, out_path):
     start_sec = start_frame / max(1, fps)
@@ -948,10 +1119,54 @@ def run_ffmpeg_segment_frames(src, start_frame, end_frame, fps, out_path):
     filter_complex = f"[0:v]trim=start_frame={start_frame}:end_frame={end_frame},setpts=PTS-STARTPTS[v];[0:a]atrim=start={start_sec}:end={end_sec},asetpts=PTS-STARTPTS[a]"
     cmd = ['ffmpeg', '-hide_banner', '-y', '-i', src, '-filter_complex', filter_complex, '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', '-c:a', 'aac', out_path]
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
+    if p.returncode == 0:
+        return True, p.stderr.decode('utf-8', errors='ignore')
+    filter_complex_vo = f"[0:v]trim=start_frame={start_frame}:end_frame={end_frame},setpts=PTS-STARTPTS[v]"
+    cmd_vo = ['ffmpeg', '-hide_banner', '-y', '-i', src, '-filter_complex', filter_complex_vo, '-map', '[v]', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', out_path]
+    p2 = subprocess.run(cmd_vo, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
+    return p2.returncode == 0, log
 
 def run_ffmpeg_concat(list_path, out_path):
     cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-c:a', 'aac', out_path]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode == 0:
+        return True, p.stderr.decode('utf-8', errors='ignore')
+    cmd_vo = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-an', out_path]
+    p2 = subprocess.run(cmd_vo, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
+    return p2.returncode == 0, log
+
+def ffprobe_resolution(path):
+    try:
+        cmd = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'csv=s=x:p=0', path]
+        p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out = p.stdout.decode('utf-8', errors='ignore').strip()
+        if 'x' in out:
+            parts = out.split('x')
+            w = int(parts[0])
+            h = int(parts[1])
+            if w > 0 and h > 0:
+                return w, h
+    except Exception:
+        pass
+    return None, None
+
+def run_ffmpeg_concat_filter(seg_dir, total, out_path):
+    inputs = [os.path.join(seg_dir, f"seg_{i:03d}.mp4") for i in range(1, total+1)]
+    w, h = ffprobe_resolution(inputs[0]) if inputs else (None, None)
+    if not w or not h:
+        w, h = 1280, 720
+    filter_parts = []
+    for i in range(total):
+        filter_parts.append(f"[{i}:v]scale={w}:{h}[v{i}]")
+    concat_inputs = ''.join([f"[v{i}]" for i in range(total)])
+    filter_parts.append(f"{concat_inputs}concat=n={total}:v=1:a=0[outv]")
+    filter = ';'.join(filter_parts)
+    cmd = ['ffmpeg', '-hide_banner', '-y']
+    for inp in inputs:
+        cmd += ['-i', inp]
+    cmd += ['-filter_complex', filter, '-map', '[outv]', '-c:v', 'libx264', '-preset', 'fast', '-crf', '23', out_path]
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
 
@@ -1032,9 +1247,13 @@ def edit_video_task(task_id, clips, fps, mode):
     out_path = os.path.join('outputs', 'edits', f"{task_id}.mp4")
     ok, log = run_ffmpeg_concat(list_path, out_path)
     if not ok:
-        edl_tasks[task_id] = {'progress': 100, 'status': '错误', 'error': f"拼接失败: {log[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
         edl_tasks[task_id]['logs'].append(f"ffmpeg concat error: {log[:200]}")
-        return
+        ok2, log2 = run_ffmpeg_concat_filter(seg_dir, total, out_path)
+        if not ok2:
+            combined = (log or '') + '\n' + (log2 or '')
+            edl_tasks[task_id] = {'progress': 100, 'status': '错误', 'error': f"拼接失败: {combined[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
+            edl_tasks[task_id]['logs'].append(f"ffmpeg concat filter error: {log2[:200]}")
+            return
     edl_tasks[task_id] = {'progress': 100, 'status': '完成', 'output_path': out_path, 'done': True, 'logs': edl_tasks[task_id]['logs']}
     edl_tasks[task_id]['logs'].append(f"output {out_path}")
 
