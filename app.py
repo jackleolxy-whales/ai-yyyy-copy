@@ -1061,7 +1061,7 @@ def mmssff_to_frame_index(ts, fps):
     ff = int(m.group(3))
     return mm * 60 * max(1, fps) + ss * max(1, fps) + ff
 
-def resolve_source_file(name):
+def resolve_source_file(name, allowed=None):
     base = os.path.basename(name).strip()
     candidates = [base]
     if base.lower().endswith('.mp4.txt'):
@@ -1069,32 +1069,76 @@ def resolve_source_file(name):
     if '.' not in base:
         for ext in ['.mp4', '.MP4', '.mov', '.MOV', '.mkv', '.MKV']:
             candidates.append(base + ext)
-    for cand in candidates:
-        p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
-        if os.path.exists(p):
-            return p
-    sbase = secure_filename(base)
-    if sbase:
-        sp = os.path.join(app.config['UPLOAD_FOLDER'], sbase)
-        if os.path.exists(sp):
-            return sp
+    allowed_saved = None
+    if isinstance(allowed, list) and allowed:
         try:
-            for fname in os.listdir(app.config['UPLOAD_FOLDER']):
-                if fname.endswith(sbase):
-                    return os.path.join(app.config['UPLOAD_FOLDER'], fname)
+            allowed_bases = set([os.path.basename(str(a)).strip() for a in allowed if a])
         except Exception:
-            pass
-    mapped = original_name_map.get(base) or original_name_map.get(sbase)
-    if mapped:
-        if isinstance(mapped, list):
-            for fn in mapped:
-                p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
-                if os.path.exists(p):
-                    return p
-        else:
-            p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
+            allowed_bases = set()
+        allowed_sec = set([secure_filename(a) for a in allowed_bases])
+        saved = set()
+        for a in list(allowed_bases | allowed_sec):
+            mm = original_name_map.get(a)
+            if isinstance(mm, list):
+                for fn in mm:
+                    saved.add(fn)
+            elif isinstance(mm, str):
+                saved.add(mm)
+        allowed_saved = saved
+        for cand in candidates:
+            if allowed_saved and cand not in allowed_saved:
+                continue
+            p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
             if os.path.exists(p):
                 return p
+    else:
+        for cand in candidates:
+            p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
+            if os.path.exists(p):
+                return p
+    sbase = secure_filename(base)
+    if sbase:
+        if allowed_saved is not None:
+            for fname in list(allowed_saved):
+                if fname.endswith(sbase):
+                    sp = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                    if os.path.exists(sp):
+                        return sp
+        else:
+            sp = os.path.join(app.config['UPLOAD_FOLDER'], sbase)
+            if os.path.exists(sp):
+                return sp
+            try:
+                for fname in os.listdir(app.config['UPLOAD_FOLDER']):
+                    if fname.endswith(sbase):
+                        return os.path.join(app.config['UPLOAD_FOLDER'], fname)
+            except Exception:
+                pass
+    mapped = original_name_map.get(base) or original_name_map.get(sbase)
+    if mapped:
+        if allowed_saved is not None:
+            if isinstance(mapped, list):
+                for fn in mapped:
+                    if fn not in allowed_saved:
+                        continue
+                    p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
+                    if os.path.exists(p):
+                        return p
+            else:
+                if mapped in allowed_saved:
+                    p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
+                    if os.path.exists(p):
+                        return p
+        else:
+            if isinstance(mapped, list):
+                for fn in mapped:
+                    p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
+                    if os.path.exists(p):
+                        return p
+            else:
+                p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
+                if os.path.exists(p):
+                    return p
     return None
 
 def ensure_dir(path):
@@ -1170,7 +1214,7 @@ def run_ffmpeg_concat_filter(seg_dir, total, out_path):
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
 
-def edit_video_task(task_id, clips, fps, mode):
+def edit_video_task(task_id, clips, fps, mode, allowed=None):
     edl_tasks[task_id] = {'progress': 0, 'status': '初始化', 'done': False, 'logs': []}
     edl_tasks[task_id]['logs'].append(f"task={task_id} start total_clips={len(clips)} fps={fps}")
     try:
@@ -1189,7 +1233,7 @@ def edit_video_task(task_id, clips, fps, mode):
         edl_tasks[task_id]['status'] = f"处理片段 {i}/{total}"
         edl_tasks[task_id]['current_index'] = i
         req_name = clip.get('source_file','')
-        src = resolve_source_file(req_name)
+        src = resolve_source_file(req_name, allowed)
         if not src:
             try:
                 base = os.path.basename((req_name or '').strip())
@@ -1266,10 +1310,11 @@ def video_edl_start():
         if mode not in ('time','frames'):
             mode = 'time'
         clips = data.get('clips') or []
+        allowed = data.get('allowed_files') or None
         if not clips:
             return jsonify({'success': False, 'error': '剪辑清单为空'}), 400
         tid = str(uuid.uuid4()).replace('-', '')
-        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps, mode), daemon=True)
+        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps, mode, allowed), daemon=True)
         t.start()
         return jsonify({'success': True, 'task_id': tid})
     except Exception as e:
@@ -1280,9 +1325,10 @@ def video_edl_resolve():
     try:
         data = request.get_json(silent=True) or {}
         name = (data.get('name') or '').strip()
+        allowed = data.get('allowed') or None
         if not name:
             return jsonify({'success': False, 'error': '缺少name'}), 400
-        p = resolve_source_file(name)
+        p = resolve_source_file(name, allowed)
         if p:
             return jsonify({'success': True, 'path': p})
         return jsonify({'success': False, 'error': '未找到'}), 404

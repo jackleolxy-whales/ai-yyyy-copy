@@ -1352,6 +1352,7 @@ Now,I give you the JSONs:
                             </button>
                         </div>
                     </div>
+                    <div id="edlAllowedList" class="mb-2"></div>
                     <div class="table-responsive">
                         <table class="table table-dark table-striped table-bordered align-middle" id="edlTable">
                             <thead>
@@ -3082,6 +3083,7 @@ Now,I give you the JSONs:
             moveToNextStep();
             const section = document.getElementById('videoEditSection');
             if (section) { section.style.display = 'block'; }
+            try { updateEdlAllowedList(); } catch (e) {}
         }
 
         function fillVideoAnalysisResults() {
@@ -3715,18 +3717,21 @@ Now,I give you the JSONs:
             const mode = modeEl ? (modeEl.value || 'time') : 'time';
             const clips = getEdlToolClipsFromTable();
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
+            const allowed = (Array.isArray(window.edlLastUploadedFiles) && window.edlLastUploadedFiles.length) ? window.edlLastUploadedFiles : [];
+            if (!allowed.length) { showError('请先在独立拼接工具中上传素材'); return; }
             try {
                 try { console.log('EDL tool start payload', { fps, mode, clips }); } catch(e){}
                 const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
-                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
+                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, allowed }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
                 const failed = checks.filter(c => !c.ok);
                 try { console.log('EDL tool precheck failed sources', failed.map(f=>f.name)); } catch(e){}
+                if (failed.length) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
             } catch (e) {}
             const pc = document.getElementById('edlToolProgressContainer');
             if (pc) pc.style.display = 'block';
             const btn = document.getElementById('startEdlToolBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
-            fetch('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, clips }) })
+            fetch('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, clips, allowed_files: allowed }) })
             .then(r=>r.json())
             .then(data=>{
                 try { console.log('EDL tool start response', data); } catch(e){}
@@ -4032,17 +4037,13 @@ Now,I give you the JSONs:
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
             try {
                 const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
-                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success, path: j.path, error: j.error }))).catch(err=>({ name: n, ok: false, error: err.message }))));
+                const allowed = (typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : [];
+                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, allowed }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success, path: j.path, error: j.error }))).catch(err=>({ name: n, ok: false, error: err.message }))));
                 const failed = checks.filter(c => !c.ok);
                 console.log('EDL precheck results', checks);
                 if (failed.length) {
-                    console.warn('EDL precheck failed, trying auto replace');
-                    const ok = await window.replaceInvalidEdlSources();
-                    if (!ok) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
-                    const clips2 = getEdlClipsFromTable();
-                    const sources2 = Array.from(new Set(clips2.map(c => (c.source_file||'').trim()).filter(Boolean)));
-                    const rechecks = await Promise.all(sources2.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
-                    if (rechecks.some(x=>!x.ok)) { showError('自动替换后仍有源文件不可用'); return; }
+                    showError('未找到源文件：' + failed.map(f => f.name).join(', '));
+                    return;
                 }
             } catch (e) { console.warn('EDL precheck error', e); }
             setStepStatus(7, 'processing', '自动拼接中');
@@ -4054,7 +4055,7 @@ Now,I give you the JSONs:
             fetch('/video/edl/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fps, mode, clips })
+                body: JSON.stringify({ fps, mode, clips, allowed_files: ((typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : []) })
             })
             .then(r=>r.json())
             .then(data=>{
@@ -4117,7 +4118,8 @@ Now,I give you the JSONs:
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
             try {
                 const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
-                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success, path: j.path, error: j.error }))).catch(err=>({ name: n, ok: false, error: err.message }))));
+                const allowed = (typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : [];
+                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, allowed }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success, path: j.path, error: j.error }))).catch(err=>({ name: n, ok: false, error: err.message }))));
                 const failed = checks.filter(c => !c.ok);
                 if (failed.length) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
             } catch (e) {}
@@ -4129,7 +4131,7 @@ Now,I give you the JSONs:
             fetch('/video/edl/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fps, mode, clips })
+                body: JSON.stringify({ fps, mode, clips, allowed_files: ((typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : []) })
             })
             .then(r=>r.json())
             .then(data=>{
@@ -4199,6 +4201,13 @@ Now,I give you the JSONs:
                 }
             } catch (e) {}
             return names;
+        }
+
+        function updateEdlAllowedList() {
+            const c = document.getElementById('edlAllowedList');
+            if (!c) return;
+            const names = getStep5SourceFilenames();
+            c.innerHTML = names.length ? `<div class="d-flex flex-wrap gap-2">${names.map(n => '<span class="badge bg-secondary">' + escapeHtml(n) + '</span>').join(' ')}</div>` : '';
         }
 
         function markBatchItemSuccess(index) {
