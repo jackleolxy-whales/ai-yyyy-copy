@@ -1151,7 +1151,7 @@ Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-
 **[ Input Data Note - CRITICAL ]**
 * The provided JSON files use the timestamp format: **`MM:SS:FF`** (Minutes:Seconds:Frames).
 * *Example:* `00:07:12` means **0 minutes, 7 seconds, 12 frames**.
-* The `time_segment` in the JSON (e.g., "start": "00:07:12", "end": "00:17:05") represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
+* The `time_segment` in the JSON (e.g., `"start": "00:07:12", "end": "00:17:05"`) represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
 
 **[ Core Task ]**
 Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "Ready-to-Edit" Decision List (EDL).
@@ -1162,9 +1162,10 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 * **Instantly Create a 'Story Gap':** Force the user's brain to ask "Why?" or "How did this happen?!"
 
 **[ 🏆 Gold-Standard Examples ]**
-* "Okay buckle up because this drama is WILD"
-* "This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"
-* "...SIKE! He's not there for her. He's there for her SISTER" (Twist)
+* `"Okay buckle up because this drama is WILD.You won't believe this kid just K.O.'d a grown man to save his mom!"`
+* `"This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"`
+* `"SIKE! They treat him like trash, but we know he's actually the Billionaire CEO. Let the games begin"`
+* `"...SIKE! He's not there for her. He's there for her SISTER"` (Twist)
 
 **[ 🎬 Key Constraints: Duration & Calibration ]**
 
@@ -1181,7 +1182,8 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 **3. Structure & Pacing**
 * **0-5s:** The Hook (Visual violence/shock/twist).
 * **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding).
-* **50-60s:** The Cliffhanger (End on a major twist or question).
+* **45-55s:** The Setup (Lighting the Fuse. Do not explain anymore. Focus purely on the immediate threat or discovery.)
+* **50-60s:** The Cliffhanger (End on a major twist or question. Cut exactly when the tension is highest. The audience must be desperate to know the outcome.)
 
 **[ Workflow ]**
 1.  **Analyze for Core Conflict:** Identify the main "A-Plot" (Revenge, Mistaken Identity).
@@ -1358,6 +1360,7 @@ Now,I give you the JSONs:
                                     <th>原素材文件名称</th>
                                     <th>开始时间戳 (MM:SS:FF)</th>
                                     <th>截取时长 (秒)</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -1367,6 +1370,9 @@ Now,I give you the JSONs:
                         <button class="btn btn-sm btn-outline-light" onclick="addEdlRow()"><i class="fas fa-plus"></i> 添加行</button>
                         <button class="btn btn-sm btn-outline-light" onclick="clearEdlRows()"><i class="fas fa-trash"></i> 清空</button>
                         <button class="btn btn-sm btn-outline-warning" onclick="replaceInvalidEdlSources()"><i class="fas fa-wrench"></i> 一键替换不可用源文件</button>
+                    </div>
+                    <div id="edlBatchContainer" class="mt-3" style="display:none;">
+                        <div class="accordion" id="edlBatchAccordion"></div>
                     </div>
                 </div>
             </div>
@@ -3858,7 +3864,7 @@ Now,I give you the JSONs:
             const tbody = document.querySelector('#edlTable tbody');
             if (!tbody) return;
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><input type="number" class="form-control" value="${order || ''}" min="1"></td><td><input type="text" class="form-control" value="${source || ''}"></td><td><input type="text" class="form-control" value="${startTs || ''}" placeholder="MM:SS:FF"></td><td><input type="number" step="0.1" class="form-control" value="${durSec || ''}" min="0.1"></td>`;
+            tr.innerHTML = `<td><input type="number" class="form-control" value="${order || ''}" min="1"></td><td><input type="text" class="form-control" value="${source || ''}"></td><td><input type="text" class="form-control" value="${startTs || ''}" placeholder="MM:SS:FF"></td><td><input type="number" step="0.1" class="form-control" value="${durSec || ''}" min="0.1"></td><td><button class="btn btn-sm btn-outline-danger" onclick="deleteEdlRow(this)">删除</button></td>`;
             tbody.appendChild(tr);
         }
 
@@ -3867,13 +3873,21 @@ Now,I give you the JSONs:
             if (tbody) tbody.innerHTML = '';
         }
 
+        function deleteEdlRow(btn) {
+            const tr = btn.closest('tr');
+            if (tr) tr.remove();
+        }
+
         function fillEdlFromStep5() {
-            const table = document.querySelector('#scriptResultText table');
-            const rows = table ? table.querySelectorAll('tbody tr') : [];
+            const singleTable = document.querySelector('#scriptResultText table');
             const batchBodies = document.querySelectorAll('#scriptBatchAccordion .accordion-body');
-            clearEdlRows();
-            let count = 0;
-            if (rows && rows.length) {
+            const batchContainer = document.getElementById('edlBatchContainer');
+            const batchAccordion = document.getElementById('edlBatchAccordion');
+            if (singleTable) {
+                if (batchContainer) batchContainer.style.display = 'none';
+                clearEdlRows();
+                const rows = singleTable.querySelectorAll('tbody tr');
+                let count = 0;
                 rows.forEach((r, idx) => {
                     const cells = r.querySelectorAll('td');
                     if (cells.length >= 5) {
@@ -3884,23 +3898,86 @@ Now,I give you the JSONs:
                         count++;
                     }
                 });
-            } else if (batchBodies && batchBodies.length) {
-                batchBodies.forEach(body => {
+                if (!count) addEdlRow(1, '', '', '');
+                return;
+            }
+            if (batchBodies && batchBodies.length) {
+                clearEdlRows();
+                if (batchContainer && batchAccordion) {
+                    batchContainer.style.display = 'block';
+                    batchAccordion.innerHTML = '';
+                }
+                window.edlBatchClips = [];
+                batchBodies.forEach((body, idx) => {
                     const t = body.querySelector('table');
                     const rs = t ? t.querySelectorAll('tbody tr') : [];
-                    rs.forEach((r) => {
+                    const clips = [];
+                    rs.forEach((r, i) => {
                         const cells = r.querySelectorAll('td');
                         if (cells.length >= 5) {
                             const source = cells[2].textContent.trim();
                             const start = cells[3].textContent.trim();
-                            const dur = cells[4].textContent.trim();
-                            addEdlRow(count + 1, source, start, dur);
-                            count++;
+                            const dur = parseFloat(cells[4].textContent.trim());
+                            if (source && start && dur > 0) {
+                                clips.push({ order: i + 1, source_file: source, start_ts: start, duration_sec: dur });
+                            }
                         }
                     });
+                    window.edlBatchClips[idx] = clips;
+                    if (batchAccordion) {
+                        const collapseId = `edlBatchCollapse_${idx}`;
+                        const headingId = `edlBatchHeading_${idx}`;
+                        const rowsHtml = clips.map(c => `<tr><td>${c.order}</td><td>${c.source_file}</td><td>${c.start_ts}</td><td>${c.duration_sec}</td></tr>`).join('');
+                        const itemHtml = `
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="${headingId}">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                                        第${idx + 1}个拼接任务（${clips.length}条剪辑）
+                                    </button>
+                                </h2>
+                                <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#edlBatchAccordion">
+                                    <div class="accordion-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-dark table-striped table-bordered align-middle">
+                                                <thead>
+                                                    <tr>
+                                                        <th>顺序号</th>
+                                                        <th>原素材文件名称</th>
+                                                        <th>开始时间戳 (MM:SS:FF)</th>
+                                                        <th>截取时长 (秒)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="edlBatchTbody_${idx}">${rowsHtml}</tbody>
+                                            </table>
+                                        </div>
+                                        <div class="d-flex gap-2 mb-2">
+                                            <button class="btn btn-sm btn-info" id="startBatchItemBtn_${idx}" onclick="startEdlBatchItemEdit(${idx})"><i class="fas fa-play"></i> 开始自动拼接此任务</button>
+                                        </div>
+                                        <div class="mt-2" id="videoEditProgressContainer_${idx}" style="display:none;">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="status-text" id="videoEditStatusText_${idx}">等待中...</span>
+                                                <span class="status-text" id="videoEditProgressText_${idx}">0%</span>
+                                            </div>
+                                            <div class="progress">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" id="videoEditProgressBar_${idx}" role="progressbar" style="width:0%"></div>
+                                            </div>
+                                            <div class="mt-2" id="videoEditOutput_${idx}"></div>
+                                            <div class="mt-2" style="max-height:240px; overflow:auto; background: rgba(30,30,45,0.5); border: 1px solid rgba(138,43,226,0.2); border-radius: 8px; padding: 12px;">
+                                                <pre id="videoEditLogsPre_${idx}" style="white-space: pre-wrap; font-family: inherit; color: #e8e8e8;"></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        batchAccordion.insertAdjacentHTML('beforeend', itemHtml);
+                    }
                 });
+                return;
             }
-            if (!count) addEdlRow(1, '', '', '');
+            clearEdlRows();
+            addEdlRow(1, '', '', '');
+            if (batchContainer) batchContainer.style.display = 'none';
         }
 
         function getEdlClipsFromTable() {
@@ -4027,6 +4104,77 @@ Now,I give you the JSONs:
                     }
                 })
                 .catch(err=>{ try { console.error('EDL status fetch error', err); } catch(e){} setTimeout(tick, 1500); });
+            };
+            tick();
+        }
+
+        async function startEdlBatchItemEdit(index) {
+            const fpsEl = document.getElementById('edlFps');
+            const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
+            const modeEl = document.getElementById('edlMode');
+            const mode = modeEl ? (modeEl.value || 'time') : 'time';
+            const clips = (window.edlBatchClips && window.edlBatchClips[index]) ? window.edlBatchClips[index] : [];
+            if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
+            try {
+                const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
+                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success, path: j.path, error: j.error }))).catch(err=>({ name: n, ok: false, error: err.message }))));
+                const failed = checks.filter(c => !c.ok);
+                if (failed.length) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
+            } catch (e) {}
+            setStepStatus(7, 'processing', '自动拼接中');
+            const pc = document.getElementById('videoEditProgressContainer_' + index);
+            if (pc) pc.style.display = 'block';
+            const btn = document.getElementById('startBatchItemBtn_' + index);
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
+            fetch('/video/edl/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fps, mode, clips })
+            })
+            .then(r=>r.json())
+            .then(data=>{
+                if (!data.success) { setStepStatus(7,'error','拼接失败'); showError(data.error||'拼接失败'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接此任务';} return; }
+                const taskId = data.task_id;
+                const lp = document.getElementById('videoEditLogsPre_' + index);
+                if (lp) lp.textContent = '';
+                pollVideoEditStatusFor(taskId, index, btn);
+            })
+            .catch(err=>{ setStepStatus(7,'error','拼接失败'); showError('拼接错误：'+err.message); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接此任务';} });
+        }
+
+        function pollVideoEditStatusFor(taskId, index, btn) {
+            const st = document.getElementById('videoEditStatusText_' + index);
+            const pt = document.getElementById('videoEditProgressText_' + index);
+            const pb = document.getElementById('videoEditProgressBar_' + index);
+            const out = document.getElementById('videoEditOutput_' + index);
+            if (!st || !pt || !pb || !out) return;
+            const tick = () => {
+                fetch('/video/edl/status/' + taskId)
+                .then(r=>r.json())
+                .then(s=>{
+                    const p = s.progress || 0;
+                    st.textContent = s.status || '处理中';
+                    pt.textContent = p + '%';
+                    pb.style.width = p + '%';
+                    if (s.output_path) {
+                        out.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle"></i> 输出：${escapeHtml(s.output_path)}</div>`;
+                    }
+                    const lp = document.getElementById('videoEditLogsPre_' + index);
+                    if (lp && s.logs && Array.isArray(s.logs)) {
+                        lp.textContent = s.logs.join('\n');
+                    }
+                    if (s.done) {
+                        setStepStatus(7, 'completed', '已完成');
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接此任务'; }
+                    } else if (s.error) {
+                        setStepStatus(7, 'error', '拼接失败');
+                        showError(s.error);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始自动拼接此任务'; }
+                    } else {
+                        setTimeout(tick, 1000);
+                    }
+                })
+                .catch(()=>{ setTimeout(tick, 1500); });
             };
             tick();
         }
@@ -6292,6 +6440,40 @@ Now,I give you the JSONs:
             const btn = document.getElementById('scriptExtractBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>提取中...'; }
             updateStepProgress(6, 60);
+
+            const singleTable = document.querySelector('#scriptResultText table');
+            const batchTables = document.querySelectorAll('#scriptBatchAccordion .accordion-body table');
+            if (batchTables && batchTables.length) {
+                const results = [];
+                const labels = [];
+                batchTables.forEach(t => {
+                    const s = extractNarrationFromTable(t);
+                    const item = t.closest('.accordion-item');
+                    const strong = item ? item.querySelector('.accordion-header strong') : null;
+                    const label = (strong && strong.textContent) ? strong.textContent.trim() : ('脚本 ' + (labels.length + 1));
+                    results.push(s);
+                    labels.push(label);
+                });
+                renderBatchScriptExtractResults(results, labels);
+                setStepStatus(6, 'completed', '已完成');
+                updateStepProgress(6, 100);
+                const vbtn = document.getElementById('videoEditNextStepButtonContainer');
+                if (vbtn) { vbtn.style.display = 'block'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始提取'; }
+                return;
+            }
+
+            if (singleTable) {
+                const s = extractNarrationFromTable(singleTable);
+                renderScriptExtractResult(s);
+                setStepStatus(6, 'completed', '已完成');
+                updateStepProgress(6, 100);
+                const vbtn = document.getElementById('videoEditNextStepButtonContainer');
+                if (vbtn) { vbtn.style.display = 'block'; }
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始提取'; }
+                return;
+            }
+
             const modelProvider = (document.getElementById('modelSelectStep6')?.value || 'gemini-2.5-flash').trim();
             fetch('/script/generate', {
                 method: 'POST',
@@ -6334,6 +6516,54 @@ Now,I give you the JSONs:
             c.classList.add('fade-in');
             const btnCopy = document.getElementById('copyExtract');
             if (btnCopy) btnCopy.onclick = () => navigator.clipboard.writeText(result);
+        }
+
+        function extractNarrationFromTable(tableEl) {
+            try {
+                const ths = tableEl.querySelectorAll('thead th');
+                let colIdx = 0;
+                ths.forEach((th, i) => {
+                    const txt = (th.textContent || '').toLowerCase();
+                    if (txt.includes('script') || txt.includes('narration')) { colIdx = i; }
+                });
+                const rows = tableEl.querySelectorAll('tbody tr');
+                const parts = [];
+                rows.forEach(r => {
+                    const cells = r.querySelectorAll('td');
+                    const v = (cells[colIdx] && cells[colIdx].textContent) ? cells[colIdx].textContent.trim() : '';
+                    if (v) parts.push(v);
+                });
+                return parts.join(' ');
+            } catch (e) { return ''; }
+        }
+
+        function renderBatchScriptExtractResults(results) {
+            const c = document.getElementById('scriptExtractResultContainer');
+            const t = document.getElementById('scriptExtractResultText');
+            if (!c || !t) return;
+            const labels = arguments[1];
+            const items = results.map((s, i) => {
+                const headingId = 'scriptExtractHeading' + i;
+                const collapseId = 'scriptExtractCollapse' + i;
+                const btnId = 'copyExtract' + i;
+                return `
+                    <div class=\"accordion-item mb-3\">
+                        <h2 class=\"accordion-header\" id=\"${headingId}\">
+                            <button class=\"accordion-button ${i > 0 ? 'collapsed' : ''}\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#${collapseId}\">
+                                <div class=\"d-flex w-100 justify-content-between align-items-center\">\n                                    <div><i class=\"fas fa-comment-dots me-2\"></i><strong>${(labels && labels[i]) ? labels[i] : ('提取结果 ' + (i + 1))}</strong></div>\n                                </div>
+                            </button>
+                        </h2>
+                        <div id=\"${collapseId}\" class=\"accordion-collapse collapse ${i === 0 ? 'show' : ''}\" data-bs-parent=\"#scriptExtractBatchAccordion\">\n                            <div class=\"accordion-body\">\n                                <div class=\"mb-2 d-flex gap-2\"><button class=\"btn btn-sm btn-outline-light\" id=\"${btnId}\">复制台词文本</button></div>\n                                <pre style=\"white-space: pre-wrap; font-family: inherit;\">${escapeHtml(s)}</pre>\n                            </div>\n                        </div>
+                    </div>
+                `;
+            }).join('');
+            t.innerHTML = `<div class=\"accordion\" id=\"scriptExtractBatchAccordion\">${items}</div>`;
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            results.forEach((s, i) => {
+                const btn = document.getElementById('copyExtract' + i);
+                if (btn) btn.onclick = () => navigator.clipboard.writeText(s);
+            });
         }
     </script>
 </body>
