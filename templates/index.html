@@ -1048,6 +1048,7 @@
             <button type="button" class="btn btn-outline-info" onclick="switchTool('workflow')"><i class="fas fa-stream"></i> 爆款短剧剪辑工作流</button>
             <button type="button" class="btn btn-outline-warning" onclick="switchTool('script_tool')"><i class="fas fa-file-alt"></i> 脚本生成工具</button>
             <button type="button" class="btn btn-outline-success" onclick="switchTool('edl_tool')"><i class="fas fa-film"></i> 自动拼接工具</button>
+            <button type="button" class="btn btn-outline-primary" onclick="switchTool('voice_tool')"><i class="fas fa-microphone"></i> 台词配音工具</button>
         </div>
     </div>
     <div class="container main-container">
@@ -1240,10 +1241,10 @@ Now,I give you the JSONs:
 
         <div class="text-center mt-4" id="scriptExtractNextStepButtonContainer" style="display: none;">
             <button type="button" class="btn btn-primary btn-lg" id="scriptExtractNextStepBtn" onclick="proceedToStep6()">
-                <i class="fas fa-arrow-right"></i> 下一步：解说台词提取
+                <i class="fas fa-arrow-right"></i> 下一步：台词配音生成
             </button>
             <div class="mt-2 text-muted">
-                <small>从第5步表格中提取 Narration 文本并拼接</small>
+                <small>使用第5步的每个片段台词生成配音音频</small>
             </div>
         </div>
 
@@ -1258,56 +1259,22 @@ Now,I give you the JSONs:
 
         <div class="mt-4" id="scriptExtractSection" style="display: none;">
             <h5 class="mb-3">
-                <i class="fas fa-comment-dots text-warning"></i> 第六步：解说台词提取
+                <i class="fas fa-comment-dots text-warning"></i> 第六步：台词配音生成
             </h5>
             <div class="card">
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label for="scriptExtractPrompt" class="form-label fw-bold">
-                            <i class="fas fa-edit"></i> 提取指令
-                        </label>
-                        <textarea class="form-control prompt-input" id="scriptExtractPrompt" rows="10">### 
- Task: Text Extraction and Concatenation 
- 
- You are an automated data processing routine. Your **sole** task is to parse the table 
-  data provided below and return a result according to the following strict rules. 
- 
- ### Processing Rules: 
- 1.  **Target:** Focus exclusively on the column named `Narration (Script)`. 
- 2.  **Extract:** Extract the complete text from **every** cell in that column, 
- maintaining the original top-to-bottom order. 
- 3.  **Format:** Concatenate all extracted text into a **single** string (one 
- paragraph). 
- 4.  **Delimiter:** Use a **single space** (" ") to separate the text from each cell. 
- **Do not** use newlines or line breaks. 
- 
- ### Absolute Output Constraints: 
- * Your response **must** contain 100% **only** the final concatenated text string. 
- * **Strictly prohibit** any form of greeting, confirmation, explanation, title, 
- prefix, or wrapper text (e.g., "Here is the result:"). 
- * **Strictly prohibit** modifying, summarizing, or rephrasing any of the original 
- extracted text. 
- 
-### Begin processing data below:
-                        </textarea>
-                        <div class="mb-3 mt-2">
-                            <label for="modelSelectStep6" class="form-label fw-bold">
-                                <i class="fas fa-microchip"></i> 选择模型（LaoZhang）
-                            </label>
-                            <select class="form-select" id="modelSelectStep6">
-                                <option value="gemini-2.5-flash" selected>gemini-2.5-flash</option>
-                                <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                                <option value="gemini-2.5-pro-preview-06-05">gemini-2.5-pro-preview-06-05</option>
-                                <option value="o3-pro-2025-06-10">o3-pro-2025-06-10</option>
-                                <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5-20250929</option>
-                                <option value="kimi-k2-250711">kimi-k2-250711</option>
-                                <option value="deepseek">deepseek（备用）</option>
-                            </select>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-text text-muted">voice_id 固定为 JNyLRc3LFmQDImliF0sT</div>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <div class="form-text text-muted">model_id 固定为 eleven_multilingual_v2</div>
                         </div>
                     </div>
+                    </div>
                     <div class="text-center">
-                        <button type="button" class="btn btn-warning btn-lg" id="scriptExtractBtn" onclick="startScriptExtraction()">
-                            <i class="fas fa-play"></i> 开始提取
+                        <button type="button" class="btn btn-warning btn-lg" id="voiceoverGenerateBtn" onclick="startVoiceoverGeneration()">
+                            <i class="fas fa-play"></i> 开始配音生成
                         </button>
                     </div>
                 </div>
@@ -1315,7 +1282,7 @@ Now,I give you the JSONs:
 
             <div class="mt-3" id="scriptExtractResultContainer" style="display: none;">
                 <h6 class="mb-2">
-                    <i class="fas fa-check-circle text-warning"></i> 提取结果
+                    <i class="fas fa-check-circle text-warning"></i> 配音生成结果
                 </h6>
                 <div class="card result-card">
                     <div class="card-body">
@@ -1467,7 +1434,7 @@ Now,I give you the JSONs:
                                         <span class="step-number">6</span>
                                         <i class="fas fa-comment-dots step-icon" style="display: none;"></i>
                                     </div>
-                                    <div class="step-title">解说台词提取</div>
+                                    <div class="step-title">台词配音生成</div>
                                     <div class="step-status" id="step6Status">等待中</div>
                                 </div>
                                 <div class="step-connector">
@@ -2724,6 +2691,32 @@ Now,I give you the JSONs:
         </div>
     </div>
 
+    <div class="container" id="voiceToolSection" style="display: none;">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="text-center mb-4">
+                    <h2 class="header-title"><i class="fas fa-microphone"></i> 台词配音工具</h2>
+                    <p class="lead text-white">粘贴第5步的表格，仅用“Script (Narration)”生成配音</p>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="voiceToolMarkdown" class="form-label fw-bold"><i class="fas fa-table"></i> 粘贴脚本表格（Markdown）</label>
+                            <textarea class="form-control" id="voiceToolMarkdown" rows="12" placeholder="在此粘贴第5步生成的表格Markdown文本"></textarea>
+                        </div>
+                        <div class="text-center">
+                            <button type="button" class="btn btn-primary btn-lg" id="voiceToolStartBtn" onclick="startVoiceTool()"><i class="fas fa-play"></i> 开始生成配音</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3" id="voiceToolResultContainer" style="display: none;">
+                    <h6 class="mb-2"><i class="fas fa-check-circle text-primary"></i> 结果</h6>
+                    <div class="card result-card"><div class="card-body"><div id="voiceToolResultText"></div></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentTaskId = null;
@@ -3048,24 +3041,55 @@ Now,I give you the JSONs:
         }
 
         function switchTool(tool) {
-            const workflow = document.querySelector('.main-container');
-            const scriptTool = document.getElementById('scriptToolSection');
-            const edlTool = document.getElementById('edlToolSection');
-            if (!workflow || !scriptTool || !edlTool) return;
-            if (tool === 'script_tool') {
-                workflow.style.display = 'none';
-                scriptTool.style.display = 'block';
-                edlTool.style.display = 'none';
-            } else if (tool === 'edl_tool') {
-                workflow.style.display = 'none';
-                scriptTool.style.display = 'none';
-                edlTool.style.display = 'block';
-            } else {
-                workflow.style.display = 'block';
-                scriptTool.style.display = 'none';
-                edlTool.style.display = 'none';
-            }
+            try {
+                const workflow = document.querySelector('.main-container');
+                const scriptTool = document.getElementById('scriptToolSection');
+                const edlTool = document.getElementById('edlToolSection');
+                const voiceTool = document.getElementById('voiceToolSection');
+                if (tool === 'script_tool') {
+                    if (workflow) workflow.style.display = 'none';
+                    if (scriptTool) scriptTool.style.display = 'block';
+                    if (edlTool) edlTool.style.display = 'none';
+                    if (voiceTool) voiceTool.style.display = 'none';
+                } else if (tool === 'edl_tool') {
+                    if (workflow) workflow.style.display = 'none';
+                    if (scriptTool) scriptTool.style.display = 'none';
+                    if (edlTool) edlTool.style.display = 'block';
+                    if (voiceTool) voiceTool.style.display = 'none';
+                } else if (tool === 'voice_tool') {
+                    if (workflow) workflow.style.display = 'none';
+                    if (scriptTool) scriptTool.style.display = 'none';
+                    if (edlTool) edlTool.style.display = 'none';
+                    if (voiceTool) voiceTool.style.display = 'block';
+                } else {
+                    if (workflow) workflow.style.display = 'block';
+                    if (scriptTool) scriptTool.style.display = 'none';
+                    if (edlTool) edlTool.style.display = 'none';
+                    if (voiceTool) voiceTool.style.display = 'none';
+                }
+                const group = document.querySelector('[aria-label="工具切换"]');
+                if (group) {
+                    const btns = group.querySelectorAll('button');
+                    btns.forEach(b => b.classList.remove('active'));
+                    const map = { workflow: 0, script_tool: 1, edl_tool: 2, voice_tool: 3 };
+                    const idx = map[tool];
+                    if (typeof idx === 'number' && btns[idx]) btns[idx].classList.add('active');
+                }
+            } catch (e) { /* no-op */ }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const workflow = document.querySelector('.main-container');
+                const scriptTool = document.getElementById('scriptToolSection');
+                const edlTool = document.getElementById('edlToolSection');
+                const voiceTool = document.getElementById('voiceToolSection');
+                if (workflow) workflow.style.display = 'block';
+                if (scriptTool) scriptTool.style.display = 'none';
+                if (edlTool) edlTool.style.display = 'none';
+                if (voiceTool) voiceTool.style.display = 'none';
+            } catch (e) { /* no-op */ }
+        });
 
         function proceedToStep6() {
             const container = document.getElementById('scriptExtractNextStepButtonContainer');
@@ -3722,17 +3746,26 @@ Now,I give you the JSONs:
             try {
                 try { console.log('EDL tool start payload', { fps, mode, clips }); } catch(e){}
                 const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
-                const checks = await Promise.all(sources.map(n => fetch('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, allowed }) }).then(r=>r.json().then(j=>({ name: n, ok: j.success }))).catch(()=>({ name: n, ok: false }))));
+                const checks = await Promise.all(sources.map(async (n) => {
+                    try {
+                        const j = await fetchJsonWithFallback('/video/edl/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: n, allowed }) });
+                        return { name: n, ok: !!j.success };
+                    } catch { return { name: n, ok: false }; }
+                }));
                 const failed = checks.filter(c => !c.ok);
                 try { console.log('EDL tool precheck failed sources', failed.map(f=>f.name)); } catch(e){}
-                if (failed.length) { showError('未找到源文件：' + failed.map(f => f.name).join(', ')); return; }
+                if (failed.length) {
+                    const out = document.getElementById('edlToolOutput');
+                    if (out) out.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> 未找到源文件：' + failed.map(f => f.name).join(', ') + '</div>';
+                    showError('未找到源文件：' + failed.map(f => f.name).join(', '));
+                    return;
+                }
             } catch (e) {}
             const pc = document.getElementById('edlToolProgressContainer');
             if (pc) pc.style.display = 'block';
             const btn = document.getElementById('startEdlToolBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
-            fetch('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, clips, allowed_files: allowed }) })
-            .then(r=>r.json())
+            fetchJsonWithFallback('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, clips, allowed_files: allowed }) })
             .then(data=>{
                 try { console.log('EDL tool start response', data); } catch(e){}
                 if (!data.success) { showError(data.error||'拼接失败'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} return; }
@@ -3751,8 +3784,7 @@ Now,I give you the JSONs:
             const out = document.getElementById('edlToolOutput');
             if (!st || !pt || !pb || !out) return;
             const tick = () => {
-                fetch('/video/edl/status/' + taskId)
-                .then(r=>r.json())
+                fetchJsonWithFallback('/video/edl/status/' + taskId, { method: 'GET' })
                 .then(s=>{
                     const p = s.progress || 0;
                     st.textContent = s.status || '处理中';
@@ -3773,6 +3805,22 @@ Now,I give you the JSONs:
                 .catch(()=>{ setTimeout(tick, 1500); });
             };
             tick();
+        }
+
+        async function fetchJsonWithFallback(path, options) {
+            const resp = await fetch(path, options).catch(() => null);
+            if (resp) {
+                try { return await resp.json(); } catch(e) { /* fall through */ }
+            }
+            const bases = ['http://localhost:5000', 'http://127.0.0.1:5000'];
+            for (const b of bases) {
+                const url = b + path;
+                const r = await fetch(url, options).catch(() => null);
+                if (r) {
+                    try { return await r.json(); } catch(e) { /* continue */ }
+                }
+            }
+            throw new Error('请求失败');
         }
 
         async function startEdlToolUpload() {
@@ -6509,6 +6557,468 @@ Now,I give you the JSONs:
                 showError('台词提取错误：' + err.message);
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始提取'; }
             });
+        }
+
+        function collectNarrationSegments() {
+            const segments = [];
+            const singleTable = document.querySelector('#scriptResultText table');
+            const batchBodies = document.querySelectorAll('#scriptBatchAccordion .accordion-body');
+            const getColIndex = (tableEl) => {
+                const ths = tableEl.querySelectorAll('thead th');
+                let colIdx = 0;
+                ths.forEach((th, i) => {
+                    const txt = (th.textContent || '').toLowerCase();
+                    if (txt.includes('script') || txt.includes('narration')) { colIdx = i; }
+                });
+                return colIdx;
+            };
+            if (singleTable) {
+                const colIdx = getColIndex(singleTable);
+                const rows = singleTable.querySelectorAll('tbody tr');
+                rows.forEach((r, i) => {
+                    const cells = r.querySelectorAll('td');
+                    const v = (cells[colIdx] && cells[colIdx].textContent) ? cells[colIdx].textContent.trim() : '';
+                    if (v) segments.push({ text: v, batch: null, index: i });
+                });
+            } else if (batchBodies && batchBodies.length) {
+                batchBodies.forEach((body, bIdx) => {
+                    const t = body.querySelector('table');
+                    if (!t) return;
+                    const colIdx = getColIndex(t);
+                    const rows = t.querySelectorAll('tbody tr');
+                    rows.forEach((r, i) => {
+                        const cells = r.querySelectorAll('td');
+                        const v = (cells[colIdx] && cells[colIdx].textContent) ? cells[colIdx].textContent.trim() : '';
+                        if (v) segments.push({ text: v, batch: bIdx, index: i });
+                    });
+                });
+            }
+            return segments;
+        }
+
+        function renderVoiceoverList(segments) {
+            const c = document.getElementById('scriptExtractResultContainer');
+            const t = document.getElementById('scriptExtractResultText');
+            if (!c || !t) return;
+            const items = segments.map((seg, i) => {
+                const aid = `voiceAudio_${i}`;
+                const did = `voiceDownload_${i}`;
+                const rid = `voiceRetry_${i}`;
+                const hid = `voiceHeading_${i}`;
+                const cid = `voiceCollapse_${i}`;
+                const label = `片段 ${seg.batch !== null ? (seg.batch + 1) + '-' : ''}${seg.index + 1}`;
+                return `
+                    <div class="accordion-item mb-3">
+                        <h2 class="accordion-header" id="${hid}">
+                            <button class="accordion-button ${i>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#${cid}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div><i class="fas fa-volume-up me-2"></i><strong>${label}</strong></div>
+                                    <small class="text-muted">${escapeHtml(seg.text).slice(0,60)}${seg.text.length>60?'...':''}</small>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="${cid}" class="accordion-collapse collapse ${i===0?'show':''}" data-bs-parent="#voiceoverAccordion">
+                            <div class="accordion-body">
+                                <div class="mb-2">${escapeHtml(seg.text)}</div>
+                                <div class="d-flex gap-2 mb-2">
+                                    <button class="btn btn-sm btn-outline-warning" id="${rid}"><i class="fas fa-sync"></i> 重试</button>
+                                    <a class="btn btn-sm btn-outline-light" id="${did}" href="#" download>下载音频</a>
+                                </div>
+                                <audio id="${aid}" controls style="width:100%"></audio>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            t.innerHTML = `<div class="accordion" id="voiceoverAccordion">${items}</div>`;
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            segments.forEach((seg, i) => {
+                const btn = document.getElementById(`voiceRetry_${i}`);
+                if (btn) btn.onclick = () => generateVoiceoverForSegment(seg, i);
+            });
+        }
+
+        function collectNarrationGroups() {
+            const groups = [];
+            const singleTable = document.querySelector('#scriptResultText table');
+            const batchItems = document.querySelectorAll('#scriptBatchAccordion .accordion-item');
+            const findNarrationColIndex = (tableEl) => {
+                const ths = tableEl.querySelectorAll('thead th');
+                let exactIdx = -1;
+                let fallbackIdx = -1;
+                ths.forEach((th, i) => {
+                    const raw = (th.textContent || '').trim();
+                    const txt = raw.toLowerCase();
+                    const norm = txt.replace(/\s+/g, ' ');
+                    if (norm === 'script (narration)') {
+                        exactIdx = i;
+                    } else if (txt.includes('script') && txt.includes('narration')) {
+                        exactIdx = (exactIdx === -1 ? i : exactIdx);
+                    } else if (txt.includes('narration') || txt.includes('台词') || txt.includes('解说') || txt.includes('旁白')) {
+                        fallbackIdx = (fallbackIdx === -1 ? i : fallbackIdx);
+                    }
+                });
+                if (exactIdx !== -1) return exactIdx;
+                if (fallbackIdx !== -1) return fallbackIdx;
+                return 0;
+            };
+            const getHeaderIndices = (tableEl) => {
+                const ths = tableEl.querySelectorAll('thead th');
+                let srcIdx = 2, startIdx = 3, durIdx = 4;
+                ths.forEach((th, i) => {
+                    const txt = (th.textContent || '').toLowerCase();
+                    if (txt.includes('source') || txt.includes('file') || txt.includes('原素材') || txt.includes('源文件')) srcIdx = i;
+                    if (txt.includes('start') || txt.includes('时间戳') || txt.includes('开始时间')) startIdx = i;
+                    if (txt.includes('duration') || txt.includes('时长')) durIdx = i;
+                });
+                return { srcIdx, startIdx, durIdx };
+            };
+            const collectRows = (tableEl) => {
+                const rows = tableEl.querySelectorAll('tbody tr');
+                const colIdx = findNarrationColIndex(tableEl);
+                const { srcIdx, startIdx, durIdx } = getHeaderIndices(tableEl);
+                const items = [];
+                rows.forEach((r, i) => {
+                    const cells = r.querySelectorAll('td');
+                    const text = (cells[colIdx] && cells[colIdx].textContent) ? cells[colIdx].textContent.trim() : '';
+                    const source = (cells[srcIdx] && cells[srcIdx].textContent) ? cells[srcIdx].textContent.trim() : '';
+                    const start = (cells[startIdx] && cells[startIdx].textContent) ? cells[startIdx].textContent.trim() : '';
+                    const dur = (cells[durIdx] && cells[durIdx].textContent) ? cells[durIdx].textContent.trim() : '';
+                    if (text) items.push({ text, source, start, dur, rowIndex: i });
+                });
+                return items;
+            };
+            if (singleTable) {
+                groups.push({ label: '脚本 1', scriptIndex: 0, segments: collectRows(singleTable) });
+            } else if (batchItems && batchItems.length) {
+                batchItems.forEach((item, idx) => {
+                    const labelEl = item.querySelector('.accordion-button strong');
+                    const label = labelEl ? (labelEl.textContent || '').trim() : ('脚本 ' + (idx+1));
+                    const tableEl = item.querySelector('.accordion-body table');
+                    if (tableEl) {
+                        groups.push({ label, scriptIndex: idx, segments: collectRows(tableEl) });
+                    }
+                });
+            }
+            return groups;
+        }
+
+        function renderVoiceoverGroups(groups) {
+            const c = document.getElementById('scriptExtractResultContainer');
+            const t = document.getElementById('scriptExtractResultText');
+            if (!c || !t) return;
+            const groupHtml = groups.map((g, gi) => {
+                const headingId = `voiceGroupHeading_${gi}`;
+                const collapseId = `voiceGroupCollapse_${gi}`;
+                const items = g.segments.map((seg, i) => {
+                    const aid = `voiceAudio_${gi}_${i}`;
+                    const did = `voiceDownload_${gi}_${i}`;
+                    const rid = `voiceRetry_${gi}_${i}`;
+                    const hid = `voiceHeading_${gi}_${i}`;
+                    const cid = `voiceCollapse_${gi}_${i}`;
+                    const label = `片段 ${i + 1}`;
+                    const meta = [seg.source, seg.start, seg.dur].filter(Boolean).join(' / ');
+                    return `
+                        <div class="accordion-item mb-2">
+                            <h2 class="accordion-header" id="${hid}">
+                                <button class="accordion-button ${i>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#${cid}">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div><i class="fas fa-volume-up me-2"></i><strong>${label}</strong></div>
+                                        <small class="text-muted">${escapeHtml(meta)}</small>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="${cid}" class="accordion-collapse collapse ${i===0?'show':''}" data-bs-parent="#voiceoverInnerAccordion_${gi}">
+                                <div class="accordion-body">
+                                    <div class="mb-2">${escapeHtml(seg.text)}</div>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button class="btn btn-sm btn-outline-warning" id="${rid}"><i class="fas fa-sync"></i> 重试</button>
+                                        <a class="btn btn-sm btn-outline-light" id="${did}" href="#" download>下载音频</a>
+                                    </div>
+                                    <audio id="${aid}" controls style="width:100%"></audio>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                return `
+                    <div class="accordion-item mb-3">
+                        <h2 class="accordion-header" id="${headingId}">
+                            <button class="accordion-button ${gi>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div><i class="fas fa-file-alt me-2"></i><strong>${escapeHtml(g.label)}</strong></div>
+                                    <span class="badge bg-info">${g.segments.length} 条台词</span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="${collapseId}" class="accordion-collapse collapse ${gi===0?'show':''}" data-bs-parent="#voiceoverGroupAccordion">
+                            <div class="accordion-body">
+                                <div class="accordion" id="voiceoverInnerAccordion_${gi}">${items}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            t.innerHTML = `<div class="accordion" id="voiceoverGroupAccordion">${groupHtml}</div>`;
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            groups.forEach((g, gi) => {
+                g.segments.forEach((seg, i) => {
+                    const btn = document.getElementById(`voiceRetry_${gi}_${i}`);
+                    if (btn) btn.onclick = () => generateVoiceoverForSegmentGrouped(seg, gi, i);
+                });
+            });
+        }
+
+        function renderVoiceoverGroupsInto(containerId, textId, groups) {
+            const c = document.getElementById(containerId);
+            const t = document.getElementById(textId);
+            if (!c || !t) return;
+            const groupHtml = groups.map((g, gi) => {
+                const headingId = `voiceGroupHeading_${gi}`;
+                const collapseId = `voiceGroupCollapse_${gi}`;
+                const items = g.segments.map((seg, i) => {
+                    const aid = `voiceAudio_${gi}_${i}`;
+                    const did = `voiceDownload_${gi}_${i}`;
+                    const rid = `voiceRetry_${gi}_${i}`;
+                    const sid = `voiceSimplify_${gi}_${i}`;
+                    const hid = `voiceHeading_${gi}_${i}`;
+                    const cid = `voiceCollapse_${gi}_${i}`;
+                    const label = `片段 ${i + 1}`;
+                    const meta = [seg.source, seg.start, seg.dur].filter(Boolean).join(' / ');
+                    return `
+                        <div class="accordion-item mb-2">
+                            <h2 class="accordion-header" id="${hid}">
+                                <button class="accordion-button ${i>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#${cid}">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div><i class="fas fa-volume-up me-2"></i><strong>${label}</strong></div>
+                                        <small class="text-muted">${escapeHtml(meta)}</small>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="${cid}" class="accordion-collapse collapse ${i===0?'show':''}">
+                                <div class="accordion-body">
+                                    <div class="mb-2" id="voiceText_${gi}_${i}">${escapeHtml(seg.text)}</div>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button class="btn btn-sm btn-outline-primary" id="${sid}"><i class="fas fa-magic"></i> 简化文案</button>
+                                        <button class="btn btn-sm btn-outline-warning" id="${rid}"><i class="fas fa-sync"></i> 重试</button>
+                                        <a class="btn btn-sm btn-outline-light" id="${did}" href="#" download>下载音频</a>
+                                    </div>
+                                    <audio id="${aid}" controls style="width:100%"></audio>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                return `
+                    <div class="accordion-item mb-3">
+                        <h2 class="accordion-header" id="${headingId}">
+                            <button class="accordion-button ${gi>0?'collapsed':''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div><i class="fas fa-file-alt me-2"></i><strong>${escapeHtml(g.label)}</strong></div>
+                                    <span class="badge bg-info">${g.segments.length} 条台词</span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="${collapseId}" class="accordion-collapse collapse ${gi===0?'show':''}">
+                            <div class="accordion-body">
+                                <div class="accordion" id="voiceoverInnerAccordion_${gi}">${items}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            t.insertAdjacentHTML('beforeend', `<div class="accordion mt-3" id="voiceoverGroupAccordion">${groupHtml}</div>`);
+            c.style.display = 'block';
+            c.classList.add('fade-in');
+            groups.forEach((g, gi) => {
+                g.segments.forEach((seg, i) => {
+                    const btn = document.getElementById(`voiceRetry_${gi}_${i}`);
+                    if (btn) btn.onclick = () => generateVoiceoverForSegmentGrouped(seg, gi, i);
+                    const sbtn = document.getElementById(`voiceSimplify_${gi}_${i}`);
+                    if (sbtn) sbtn.onclick = () => simplifySegmentText(seg, gi, i);
+                });
+            });
+        }
+
+        function findNarrationColIndexFromHeader(headerCells) {
+            let exactIdx = -1;
+            let fallbackIdx = -1;
+            headerCells.forEach((raw, i) => {
+                const txt = String(raw || '').trim().toLowerCase().replace(/\s+/g, ' ');
+                if (txt === 'script (narration)') {
+                    exactIdx = i;
+                } else if (txt.includes('script') && txt.includes('narration')) {
+                    if (exactIdx === -1) exactIdx = i;
+                } else if (txt.includes('narration') || txt.includes('台词') || txt.includes('解说') || txt.includes('旁白')) {
+                    if (fallbackIdx === -1) fallbackIdx = i;
+                }
+            });
+            if (exactIdx !== -1) return exactIdx;
+            if (fallbackIdx !== -1) return fallbackIdx;
+            return 0;
+        }
+
+        function getHeaderIndicesFromHeader(headerCells) {
+            let srcIdx = 2, startIdx = 3, durIdx = 4;
+            headerCells.forEach((raw, i) => {
+                const txt = String(raw || '').trim().toLowerCase();
+                if (txt.includes('source') || txt.includes('file') || txt.includes('原素材') || txt.includes('源文件')) srcIdx = i;
+                if (txt.includes('start') || txt.includes('时间戳') || txt.includes('开始时间')) startIdx = i;
+                if (txt.includes('duration') || txt.includes('时长')) durIdx = i;
+            });
+            return { srcIdx, startIdx, durIdx };
+        }
+
+        function extractNarrationSegmentsFromMarkdown(text) {
+            const lines = text.split(/\r?\n/);
+            let start = -1, end = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().startsWith('|')) { if (start === -1) start = i; end = i; } else if (start !== -1) break;
+            }
+            if (start === -1) return [];
+            const tableLines = lines.slice(start, end + 1).filter(l => l.trim().startsWith('|'));
+            if (tableLines.length < 2) return [];
+            const header = splitRow(tableLines[0]);
+            const rows = tableLines.slice(2).map(splitRow);
+            const narrIdx = findNarrationColIndexFromHeader(header);
+            const { srcIdx, startIdx, durIdx } = getHeaderIndicesFromHeader(header);
+            const segs = [];
+            rows.forEach((r, i) => {
+                const text = (r[narrIdx] || '').trim();
+                const source = (r[srcIdx] || '').trim();
+                const start = (r[startIdx] || '').trim();
+                const dur = (r[durIdx] || '').trim();
+                if (text) segs.push({ text, source, start, dur, rowIndex: i });
+            });
+            return segs;
+        }
+
+        async function startVoiceTool() {
+            const md = (document.getElementById('voiceToolMarkdown')?.value || '').trim();
+            if (!md) { showError('请粘贴第5步的表格Markdown'); return; }
+            const segments = extractNarrationSegmentsFromMarkdown(md);
+            if (!segments.length) { showError('未解析到任何台词行'); return; }
+            const resultContainer = document.getElementById('voiceToolResultContainer');
+            const resultText = document.getElementById('voiceToolResultText');
+            if (resultContainer && resultText) {
+                const parsed = parseMarkdownTable(md);
+                const header = '<h6 class="mb-2"><i class="fas fa-table text-primary"></i> 脚本表格</h6>';
+                resultText.innerHTML = header + (parsed.tableHtml || '<div class="alert alert-warning">未能解析为表格</div>');
+            }
+            const groups = [{ label: '脚本 1', segments }];
+            renderVoiceoverGroupsInto('voiceToolResultContainer','voiceToolResultText',groups);
+            for (let i = 0; i < segments.length; i++) {
+                await generateVoiceoverForSegmentGrouped(segments[i], 0, i);
+            }
+        }
+
+        async function simplifySegmentText(seg, gi, i) {
+            try {
+                const btn = document.getElementById(`voiceSimplify_${gi}_${i}`);
+                if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>简化中...'; }
+                const prompt = "You are an expert script editor. Your task is to shorten the provided English line.\n\nPlease follow these strict rules:\n1. Reduce the character count by approximately 10% while preserving the original meaning and tone.\n2. Output EXACTLY ONE simplified version.\n3. Output ONLY the result text. Do not include any introductory words, explanations, notes, or quotation marks.\n\nInput text:\n" + (seg.text || '');
+                const resp = await fetch('/deepseek/process', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_result: prompt, user_prompt: '' })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '简化失败');
+                } else {
+                    const simplified = String(data.result || '').trim();
+                    seg.text = simplified;
+                    const el = document.getElementById(`voiceText_${gi}_${i}`);
+                    if (el) el.textContent = simplified;
+                }
+            } catch (e) {
+                showError('简化错误：' + e.message);
+            } finally {
+                const btn = document.getElementById(`voiceSimplify_${gi}_${i}`);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> 简化文案'; }
+            }
+        }
+
+        async function generateVoiceoverForSegmentGrouped(seg, gi, i) {
+            try {
+                const btn = document.getElementById(`voiceRetry_${gi}_${i}`);
+                if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
+                const batchId = jsonMergeBatchId || ('voiceover_' + Date.now());
+                const groupBatchId = batchId + (typeof gi === 'number' ? (`_script_${gi}`) : '');
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: seg.text, voice_id: 'JNyLRc3LFmQDImliF0sT', model_id: 'eleven_multilingual_v2', batch_id: groupBatchId, index: i, output_format: 'mp3_44100_128' })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '配音生成失败');
+                } else {
+                    const audio = document.getElementById(`voiceAudio_${gi}_${i}`);
+                    const dl = document.getElementById(`voiceDownload_${gi}_${i}`);
+                    if (audio) audio.src = data.url;
+                    if (dl) dl.href = data.url;
+                }
+            } catch (e) {
+                showError('配音生成错误：' + e.message);
+            } finally {
+                const btn = document.getElementById(`voiceRetry_${gi}_${i}`);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync"></i> 重试'; }
+            }
+        }
+
+        async function generateVoiceoverForSegment(seg, i) {
+            try {
+                const btn = document.getElementById(`voiceRetry_${i}`);
+                if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
+                const batchId = jsonMergeBatchId || ('voiceover_' + Date.now());
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: seg.text, voice_id: 'JNyLRc3LFmQDImliF0sT', model_id: 'eleven_multilingual_v2', batch_id: batchId, index: i, output_format: 'mp3_44100_128' })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '配音生成失败');
+                } else {
+                    const audio = document.getElementById(`voiceAudio_${i}`);
+                    const dl = document.getElementById(`voiceDownload_${i}`);
+                    if (audio) audio.src = data.url;
+                    if (dl) dl.href = data.url;
+                }
+            } catch (e) {
+                showError('配音生成错误：' + e.message);
+            } finally {
+                const btn = document.getElementById(`voiceRetry_${i}`);
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync"></i> 重试'; }
+            }
+        }
+
+        async function startVoiceoverGeneration() {
+            if (!jsonMergeBatchId) { showError('缺少批次ID，请先完成第5步'); return; }
+            const groups = collectNarrationGroups();
+            const totalSegs = groups.reduce((a,g)=>a+g.segments.length,0);
+            if (!totalSegs) { showError('未找到可生成配音的台词片段'); return; }
+            setStepStatus(6, 'processing', '配音生成中');
+            updateStepProgress(6, 20);
+            const btn = document.getElementById('voiceoverGenerateBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
+            renderVoiceoverGroups(groups);
+            let done = 0;
+            for (let gi = 0; gi < groups.length; gi++) {
+                for (let i = 0; i < groups[gi].segments.length; i++) {
+                    await generateVoiceoverForSegmentGrouped(groups[gi].segments[i], gi, i);
+                    done++;
+                    const pct = Math.round((done / totalSegs) * 100);
+                    updateStepProgress(6, Math.min(95, pct));
+                }
+            }
+            setStepStatus(6, 'completed', '已完成');
+            updateStepProgress(6, 100);
+            const vbtn = document.getElementById('videoEditNextStepButtonContainer');
+            if (vbtn) { vbtn.style.display = 'block'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始配音生成'; }
         }
 
         function renderScriptExtractResult(result) {

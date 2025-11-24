@@ -38,6 +38,16 @@ deepseek_results = {}
 deepseek_status = {}
 edl_tasks = {}
 original_name_map = {}
+ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
+
+@app.after_request
+def add_cors_headers(resp):
+    origin = request.headers.get('Origin') or '*'
+    resp.headers['Access-Control-Allow-Origin'] = origin
+    resp.headers['Access-Control-Allow-Credentials'] = 'true'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    return resp
 
 class VideoAnalyzerWeb:
     def __init__(self):
@@ -992,9 +1002,11 @@ def script_generate_direct():
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
 
-@app.route('/edl/upload/batch', methods=['POST'])
+@app.route('/edl/upload/batch', methods=['POST', 'OPTIONS'])
 def edl_upload_batch():
     try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
         if 'edl_files' not in request.files:
             return jsonify({'success': False, 'error': '没有选择文件'})
         files = request.files.getlist('edl_files')
@@ -1063,79 +1075,44 @@ def mmssff_to_frame_index(ts, fps):
 
 def resolve_source_file(name, allowed=None):
     base = os.path.basename(name).strip()
-    candidates = [base]
+    sbase = secure_filename(base)
+    patterns = {base, sbase}
     if base.lower().endswith('.mp4.txt'):
-        candidates.append(base[:-4])
+        patterns.add(base[:-4])
+        patterns.add(sbase[:-4])
     if '.' not in base:
         for ext in ['.mp4', '.MP4', '.mov', '.MOV', '.mkv', '.MKV']:
-            candidates.append(base + ext)
-    allowed_saved = None
+            patterns.add(base + ext)
+            patterns.add(sbase + ext)
+    allowed_set = None
     if isinstance(allowed, list) and allowed:
         try:
-            allowed_bases = set([os.path.basename(str(a)).strip() for a in allowed if a])
+            allowed_set = set([os.path.basename(str(a)).strip() for a in allowed if a])
         except Exception:
-            allowed_bases = set()
-        allowed_sec = set([secure_filename(a) for a in allowed_bases])
-        saved = set()
-        for a in list(allowed_bases | allowed_sec):
-            mm = original_name_map.get(a)
-            if isinstance(mm, list):
-                for fn in mm:
-                    saved.add(fn)
-            elif isinstance(mm, str):
-                saved.add(mm)
-        allowed_saved = saved
-        for cand in candidates:
-            if allowed_saved and cand not in allowed_saved:
-                continue
-            p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
-            if os.path.exists(p):
-                return p
-    else:
-        for cand in candidates:
-            p = os.path.join(app.config['UPLOAD_FOLDER'], cand)
-            if os.path.exists(p):
-                return p
-    sbase = secure_filename(base)
-    if sbase:
-        if allowed_saved is not None:
-            for fname in list(allowed_saved):
-                if fname.endswith(sbase):
-                    sp = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-                    if os.path.exists(sp):
-                        return sp
-        else:
-            sp = os.path.join(app.config['UPLOAD_FOLDER'], sbase)
-            if os.path.exists(sp):
-                return sp
-            try:
-                for fname in os.listdir(app.config['UPLOAD_FOLDER']):
-                    if fname.endswith(sbase):
-                        return os.path.join(app.config['UPLOAD_FOLDER'], fname)
-            except Exception:
-                pass
+            allowed_set = None
+    try:
+        for fname in os.listdir(app.config['UPLOAD_FOLDER']):
+            if (fname in patterns) or any(fname.endswith(p) for p in patterns):
+                if allowed_set and fname not in allowed_set:
+                    continue
+                p = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+                if os.path.exists(p):
+                    return p
+    except Exception:
+        pass
     mapped = original_name_map.get(base) or original_name_map.get(sbase)
     if mapped:
-        if allowed_saved is not None:
-            if isinstance(mapped, list):
-                for fn in mapped:
-                    if fn not in allowed_saved:
-                        continue
-                    p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
-                    if os.path.exists(p):
-                        return p
-            else:
-                if mapped in allowed_saved:
-                    p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
-                    if os.path.exists(p):
-                        return p
+        if isinstance(mapped, list):
+            for fn in mapped:
+                bfn = os.path.basename(fn)
+                if allowed_set and bfn not in allowed_set:
+                    continue
+                p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
+                if os.path.exists(p):
+                    return p
         else:
-            if isinstance(mapped, list):
-                for fn in mapped:
-                    p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
-                    if os.path.exists(p):
-                        return p
-            else:
+            bfn = os.path.basename(mapped)
+            if not allowed_set or bfn in allowed_set:
                 p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
                 if os.path.exists(p):
                     return p
@@ -1301,9 +1278,11 @@ def edit_video_task(task_id, clips, fps, mode, allowed=None):
     edl_tasks[task_id] = {'progress': 100, 'status': '完成', 'output_path': out_path, 'done': True, 'logs': edl_tasks[task_id]['logs']}
     edl_tasks[task_id]['logs'].append(f"output {out_path}")
 
-@app.route('/video/edl/start', methods=['POST'])
+@app.route('/video/edl/start', methods=['POST', 'OPTIONS'])
 def video_edl_start():
     try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
         data = request.get_json(silent=True) or {}
         fps = int(data.get('fps', 30))
         mode = (data.get('mode') or 'time').strip()
@@ -1320,9 +1299,11 @@ def video_edl_start():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/video/edl/resolve', methods=['POST'])
+@app.route('/video/edl/resolve', methods=['POST', 'OPTIONS'])
 def video_edl_resolve():
     try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
         data = request.get_json(silent=True) or {}
         name = (data.get('name') or '').strip()
         allowed = data.get('allowed') or None
@@ -1335,8 +1316,10 @@ def video_edl_resolve():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/video/edl/status/<task_id>', methods=['GET'])
+@app.route('/video/edl/status/<task_id>', methods=['GET', 'OPTIONS'])
 def video_edl_status(task_id):
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     s = edl_tasks.get(task_id)
     if not s:
         return jsonify({'success': False, 'error': '任务不存在'})
@@ -1416,6 +1399,60 @@ def download_zip():
         )
     except Exception as e:
         return jsonify({"success": False, "error": f"压缩失败: {str(e)}"}), 500
+
+@app.route('/voiceover/generate', methods=['POST'])
+def voiceover_generate():
+    try:
+        data = request.get_json(silent=True) or {}
+        text = (data.get('text') or '').strip()
+        voice_id = (data.get('voice_id') or 'JNyLRc3LFmQDImliF0sT').strip()
+        model_id = (data.get('model_id') or 'eleven_multilingual_v2').strip()
+        output_format = (data.get('output_format') or 'mp3_44100_128').strip()
+        batch_id = (data.get('batch_id') or f"voiceover_{int(time.time()*1000)}").strip()
+        index = int(data.get('index') or 0)
+        if not text:
+            return jsonify({"success": False, "error": "台词文本不能为空"}), 400
+
+        api_key = ELEVENLABS_API_KEY or (os.getenv('XI_API_KEY') or os.getenv('ELEVEN_LABS_API_KEY') or os.getenv('XI_API_KEY') or '')
+        explicit_key = (data.get('api_key') or '').strip()
+        if explicit_key:
+            api_key = explicit_key
+        if not api_key:
+            api_key = 'sk_a987b9d1c1b709ef8c5bb1fbb0dfa8b35eeea98b89c35775'
+
+        base_url = 'https://api.elevenlabs.io/v1'
+        url = f"{base_url}/text-to-speech/{voice_id}/stream?output_format={output_format}"
+        headers = {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': api_key
+        }
+        payload = {
+            'text': text,
+            'model_id': model_id
+        }
+
+        out_dir = os.path.join('static', 'voiceover', batch_id)
+        ensure_dir(out_dir)
+        out_path = os.path.join(out_dir, f"seg_{index:03d}.mp3")
+
+        r = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+        if r.status_code != 200:
+            try:
+                err_json = r.json()
+                return jsonify({"success": False, "error": err_json.get('detail') or err_json.get('error') or f"TTS接口错误: {r.status_code}"}), 500
+            except Exception:
+                return jsonify({"success": False, "error": f"TTS接口错误: {r.status_code}"}), 500
+
+        with open(out_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        rel_url = f"/static/voiceover/{batch_id}/seg_{index:03d}.mp3"
+        return jsonify({"success": True, "url": rel_url, "file_path": out_path})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     # 创建templates目录
