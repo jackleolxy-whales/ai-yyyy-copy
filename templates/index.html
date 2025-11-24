@@ -2713,6 +2713,21 @@ Now,I give you the JSONs:
                             <select class="form-select" id="voiceToolVoiceSelect"></select>
                         </div>
                         <div class="mb-3">
+                            <label for="voiceToolModelSelect" class="form-label fw-bold"><i class="fas fa-cogs"></i> 选择模型</label>
+                            <select class="form-select" id="voiceToolModelSelect"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="voiceToolModeSelect" class="form-label fw-bold"><i class="fas fa-sliders-h"></i> 生成模式</label>
+                            <select class="form-select" id="voiceToolModeSelect">
+                                <option value="segmented">逐段生成（每段分别生成）</option>
+                                <option value="combined">合并一次生成（所有台词拼接）</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="voiceToolModelSelect" class="form-label fw-bold"><i class="fas fa-cogs"></i> 选择模型</label>
+                            <select class="form-select" id="voiceToolModelSelect"></select>
+                        </div>
+                        <div class="mb-3">
                             <label for="voiceToolMarkdown" class="form-label fw-bold"><i class="fas fa-table"></i> 粘贴脚本表格（Markdown）</label>
                             <textarea class="form-control" id="voiceToolMarkdown" rows="12" placeholder="在此粘贴第5步生成的表格Markdown文本"></textarea>
                         </div>
@@ -3074,6 +3089,7 @@ Now,I give you the JSONs:
                     if (edlTool) edlTool.style.display = 'none';
                     if (voiceTool) voiceTool.style.display = 'block';
                     try { loadElevenVoices(); } catch (e) {}
+                    try { loadElevenModels(); } catch (e) {}
                 } else {
                     if (workflow) workflow.style.display = 'block';
                     if (scriptTool) scriptTool.style.display = 'none';
@@ -3101,6 +3117,8 @@ Now,I give you the JSONs:
                 if (scriptTool) scriptTool.style.display = 'none';
                 if (edlTool) edlTool.style.display = 'none';
                 if (voiceTool) voiceTool.style.display = 'none';
+                try { loadElevenVoices(); } catch (e) {}
+                try { loadElevenModels(); } catch (e) {}
             } catch (e) { /* no-op */ }
         });
 
@@ -7010,6 +7028,7 @@ Now,I give you the JSONs:
             const segments = extractNarrationSegmentsFromMarkdown(md);
             if (!segments.length) { showError('未解析到任何台词行'); return; }
             try { await loadElevenVoices(); } catch (e) {}
+            try { await loadElevenModels(); } catch (e) {}
             const resultContainer = document.getElementById('voiceToolResultContainer');
             const resultText = document.getElementById('voiceToolResultText');
             if (resultContainer && resultText) {
@@ -7017,10 +7036,16 @@ Now,I give you the JSONs:
                 const header = '<h6 class="mb-2"><i class="fas fa-table text-primary"></i> 脚本表格</h6>';
                 resultText.innerHTML = header + (parsed.tableHtml || '<div class="alert alert-warning">未能解析为表格</div>');
             }
-            const groups = [{ label: '脚本 1', segments }];
-            renderVoiceoverGroupsInto('voiceToolResultContainer','voiceToolResultText',groups);
-            for (let i = 0; i < segments.length; i++) {
-                await generateVoiceoverForSegmentGrouped(segments[i], 0, i);
+            const modeSel = document.getElementById('voiceToolModeSelect');
+            const mode = (modeSel && modeSel.value) ? modeSel.value : 'segmented';
+            if (mode === 'combined') {
+                await generateVoiceoverCombined(segments);
+            } else {
+                const groups = [{ label: '脚本 1', segments }];
+                renderVoiceoverGroupsInto('voiceToolResultContainer','voiceToolResultText',groups);
+                for (let i = 0; i < segments.length; i++) {
+                    await generateVoiceoverForSegmentGrouped(segments[i], 0, i);
+                }
             }
         }
 
@@ -7068,6 +7093,29 @@ Now,I give you the JSONs:
             }
         }
 
+        async function loadElevenModels() {
+            try {
+                const sel = document.getElementById('voiceToolModelSelect');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">加载中...</option>';
+                const resp = await fetch('/elevenlabs/models');
+                let data = null;
+                try { data = await resp.json(); } catch (e) { sel.innerHTML = '<option value="">加载失败</option>'; return; }
+                if (!data.success) { sel.innerHTML = '<option value="">加载失败</option>'; return; }
+                const models = data.models || [];
+                if (!models.length) { sel.innerHTML = '<option value="">无可用模型</option>'; return; }
+                const priority = new Set(['eleven_multilingual_v2']);
+                const top = [], rest = [];
+                for (const m of models) { if (priority.has(String(m.id))) top.push(m); else rest.push(m); }
+                const ordered = top.concat(rest);
+                sel.innerHTML = ordered.map(m => `<option value="${m.id}">${escapeHtml(m.name || m.id)}</option>`).join('');
+                if (top.length) sel.value = top[0].id;
+            } catch (_) {
+                const sel = document.getElementById('voiceToolModelSelect');
+                if (sel) sel.innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
         async function simplifySegmentText(seg, gi, i) {
             try {
                 const btn = document.getElementById(`voiceSimplify_${gi}_${i}`);
@@ -7103,10 +7151,13 @@ Now,I give you the JSONs:
                 let voiceId = 'JNyLRc3LFmQDImliF0sT';
                 const sel = document.getElementById('voiceToolVoiceSelect');
                 if (sel && sel.value) voiceId = sel.value;
+                const modelSel = document.getElementById('voiceToolModelSelect');
+                let modelId = 'eleven_multilingual_v2';
+                if (modelSel && modelSel.value) modelId = modelSel.value;
                 const resp = await fetch('/voiceover/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: seg.text, voice_id: voiceId, model_id: 'eleven_multilingual_v2', batch_id: groupBatchId, index: i, output_format: 'mp3_44100_128' })
+                    body: JSON.stringify({ text: seg.text, voice_id: voiceId, model_id: modelId, batch_id: groupBatchId, index: i, output_format: 'mp3_44100_128' })
                 });
                 const data = await resp.json();
                 if (!data.success) {
@@ -7125,15 +7176,56 @@ Now,I give you the JSONs:
             }
         }
 
+        async function generateVoiceoverCombined(segments) {
+            try {
+                const btn = document.getElementById('voiceToolStartBtn');
+                if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
+                const text = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
+                if (!text) { showError('未找到可生成的台词'); return; }
+                const batchId = jsonMergeBatchId || ('voiceover_combined_' + Date.now());
+                let voiceId = 'JNyLRc3LFmQDImliF0sT';
+                const voiceSel = document.getElementById('voiceToolVoiceSelect');
+                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+                let modelId = 'eleven_multilingual_v2';
+                const modelSel = document.getElementById('voiceToolModelSelect');
+                if (modelSel && modelSel.value) modelId = modelSel.value;
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId, batch_id: batchId, index: 0, output_format: 'mp3_44100_128' })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '合并生成失败');
+                } else {
+                    const c = document.getElementById('voiceToolResultContainer');
+                    const t = document.getElementById('voiceToolResultText');
+                    if (c && t) {
+                        const header = '<h6 class="mb-2"><i class="fas fa-music text-primary"></i> 合并生成结果</h6>';
+                        t.innerHTML = header + `<audio id="voiceCombinedAudio" controls src="${data.url}"></audio>\n<a id="voiceCombinedDownload" class="btn btn-sm btn-outline-info ms-2" href="${data.url}" download>下载音频</a>`;
+                        c.style.display = 'block';
+                        c.classList.add('fade-in');
+                    }
+                }
+            } catch (e) {
+                showError('合并生成错误：' + e.message);
+            } finally {
+                const btn = document.getElementById('voiceToolStartBtn');
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始生成配音'; }
+            }
+        }
+
         async function generateVoiceoverForSegment(seg, i) {
             try {
                 const btn = document.getElementById(`voiceRetry_${i}`);
                 if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
                 const batchId = jsonMergeBatchId || ('voiceover_' + Date.now());
+                const modelSel = document.getElementById('voiceToolModelSelect');
+                let modelId = 'eleven_multilingual_v2';
+                if (modelSel && modelSel.value) modelId = modelSel.value;
                 const resp = await fetch('/voiceover/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: seg.text, voice_id: 'JNyLRc3LFmQDImliF0sT', model_id: 'eleven_multilingual_v2', batch_id: batchId, index: i, output_format: 'mp3_44100_128' })
+                    body: JSON.stringify({ text: seg.text, voice_id: 'JNyLRc3LFmQDImliF0sT', model_id: modelId, batch_id: batchId, index: i, output_format: 'mp3_44100_128' })
                 });
                 const data = await resp.json();
                 if (!data.success) {

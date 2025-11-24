@@ -1566,6 +1566,47 @@ def elevenlabs_voices():
             pass
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/elevenlabs/models', methods=['GET'])
+def elevenlabs_models():
+    try:
+        print('[ElevenLabs] models endpoint called')
+        api_key = ELEVENLABS_API_KEY or (os.getenv('XI_API_KEY') or os.getenv('ELEVEN_LABS_API_KEY') or os.getenv('XI_API_KEY') or '')
+        explicit = (request.args.get('api_key') or '').strip()
+        if explicit:
+            api_key = explicit
+        if not api_key:
+            return jsonify({"success": False, "error": "缺少ElevenLabs API密钥"}), 400
+        base_url = 'https://api.elevenlabs.io'
+        url = f"{base_url}/v1/models"
+        headers = { 'xi-api-key': api_key }
+        resp = requests.get(url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            body_preview = ''
+            try:
+                body_preview = resp.text[:300]
+            except Exception:
+                pass
+            return jsonify({"success": False, "error": f"HTTP {resp.status_code}", "body": body_preview}), 500
+        data = resp.json()
+        items = []
+        try:
+            if isinstance(data, list):
+                items = data
+            else:
+                items = data.get('models') or data.get('items') or []
+        except Exception:
+            items = []
+        models = []
+        for m in items:
+            mid = (m.get('model_id') or m.get('id') or '').strip()
+            name = (m.get('name') or '').strip()
+            if mid:
+                models.append({ 'id': mid, 'name': name or mid })
+        print(f"[ElevenLabs] models count={len(models)}")
+        return jsonify({"success": True, "models": models})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     # 创建templates目录
     if not os.path.exists('templates'):
