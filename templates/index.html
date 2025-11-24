@@ -1151,8 +1151,7 @@ Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-
 
 **[ Input Data Note - CRITICAL ]**
 * The provided JSON files use the timestamp format: **`MM:SS:FF`** (Minutes:Seconds:Frames).
-* *Example:* `00:07:12` means **0 minutes, 7 seconds, 12 frames**.
-* The `time_segment` in the JSON (e.g., `"start": "00:07:12", "end": "00:17:05"`) represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
+* The `time_segment` in the JSON represents a long raw scene. You must **NOT** use the entire segment.
 
 **[ Core Task ]**
 Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "Ready-to-Edit" Decision List (EDL).
@@ -1163,10 +1162,9 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 * **Instantly Create a 'Story Gap':** Force the user's brain to ask "Why?" or "How did this happen?!"
 
 **[ 🏆 Gold-Standard Examples ]**
-* `"Okay buckle up because this drama is WILD.You won't believe this kid just K.O.'d a grown man to save his mom!"`
+* `"Okay buckle up because this drama is WILD. You won't believe this kid just K.O.'d a grown man to save his mom!"`
 * `"This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"`
 * `"SIKE! They treat him like trash, but we know he's actually the Billionaire CEO. Let the games begin"`
-* `"...SIKE! He's not there for her. He's there for her SISTER"` (Twist)
 
 **[ 🎬 Key Constraints: Duration & Calibration ]**
 
@@ -1175,25 +1173,27 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 * **Script Word Count:** Target **180 to 190 words** (Safe zone for fast-paced delivery).
 * **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 55-65 seconds**.
 
-**2. Footage Selection (The "Slicing" Rule)**
-* **Start Time:** Extract the `start` time string exactly as it appears in the JSON (MM:SS:FF).
-* **Duration:** You must decide how long to hold that shot (e.g., 3.0s, 4.5s). Do **NOT** use the JSON 'end' time.
-* The selected Visual **must have a >80% match** with the Script line. No "filler" footage.
+**2. Footage Selection (The "Anti-Repetition" Rule) - STRICT**
+* **Max 5 Seconds Per File:** You are strictly limited to using a **maximum of 5.0 seconds TOTAL** from any single JSON source file.
+    * *Example:* If you use `01.mp4` for 3 seconds, you can only use it one more time for 2 seconds max, or not at all.
+* **Spread the Story:** You must "hop" quickly between different files/episodes to construct the narrative.
+* **The "Slicing":** Extract the `start` time string exactly (MM:SS:FF). You must decide the duration (e.g., 2.5s, 4.0s). Do **NOT** use the JSON 'end' time.
+* **High Precision:** Since you only have <5s per file, pick only the absolute visual peak (The slap, the shock, the reveal). Visuals **must have a >90% match** with the Script line.
 
 **3. Structure & Pacing**
 * **0-5s:** The Hook (Visual violence/shock/twist).
-* **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding).
-* **45-55s:** The Setup (Lighting the Fuse. Do not explain anymore. Focus purely on the immediate threat or discovery.)
-* **50-60s:** The Cliffhanger (End on a major twist or question. Cut exactly when the tension is highest. The audience must be desperate to know the outcome.)
+* **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding). *Even though you are switching files rapidly, the narration must remain smooth and logically connected.*
+* **45-55s:** The Setup (Lighting the Fuse. Focus purely on the immediate threat.)
+* **55-60s:** The Cliffhanger (End on a major twist or question. Cut exactly when the tension is highest.)
 
 **[ Workflow ]**
-1.  **Analyze for Core Conflict:** Identify the main "A-Plot" (Revenge, Mistaken Identity).
-2.  **Select the Hook:** Scour `isHighlight: true` tags for the most shocking visual.
-3.  **Write Script:** "Hook + Story + Suspense" structure. Use punchy, short sentences.
-4.  **Match Footage:** Assign a specific `Start Time` and `Clip Duration` for every single line.
+1.  **Analyze for Core Conflict:** Identify the main "A-Plot".
+2.  **Select the Hook:** Find the most shocking visual tag (`isHighlight: true`).
+3.  **Write Script:** "Hook + Story + Suspense" structure.
+4.  **Match Footage:** Assign footage while strictly tracking the **"Max 5s per file"** limit.
 
 **[ Output Format Requirement ]**
-You **must** use the 5-column table format below. This table will be processed by a Python script for automated editing.
+You **must** use the 5-column table format below.
 
 | Script (Narration) | Visual Description | Source File | Start Time (MM:SS:FF) | Clip Duration (Sec) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1203,9 +1203,11 @@ You **must** use the 5-column table format below. This table will be processed b
 | Buckle up, this CEO is psycho! He just choked his own wife! | He grabs her neck aggressively. | 03.mp4.txt | 00:07:12 | 4.0 |
 
 **[ Final Mandate ]**
-Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"**. Do not fail the 5-second test. **Double-check that the sum of "Clip Duration" is  >55s and < 65s.**
+Your #1 goal is to sell the drama with high dopamine.
+**CRITICAL CHECK:** Ensure **no single source file** appears for more than **5 seconds** in the total list.
+**Double-check that the sum of ALL "Clip Duration" is >55s and < 65s.**
 
-Now,I give you the JSONs:
+Now, I give you the JSONs:
                         </textarea>
                     </div>
                     <div class="text-center">
@@ -2546,8 +2548,7 @@ Your **narration voice** is not neutral; it is **energetic, colloquial, and 'in-
 
 **[ Input Data Note - CRITICAL ]**
 * The provided JSON files use the timestamp format: **`MM:SS:FF`** (Minutes:Seconds:Frames).
-* *Example:* `00:07:12` means **0 minutes, 7 seconds, 12 frames**.
-* The `time_segment` in the JSON (e.g., "start": "00:07:12", "end": "00:17:05") represents a **long raw scene**. You must **NOT** use the entire segment. You must "slice" a small, precise piece (3-5 seconds) from it.
+* The `time_segment` in the JSON represents a long raw scene. You must **NOT** use the entire segment.
 
 **[ Core Task ]**
 Your task is to analyze **all** the provided JSON files, extract the single **most explosive core storyline** (prioritizing themes of **injustice, humiliation, mistaken identity, and revenge**), and then generate a complete "Ready-to-Edit" Decision List (EDL).
@@ -2558,9 +2559,9 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 * **Instantly Create a 'Story Gap':** Force the user's brain to ask "Why?" or "How did this happen?!"
 
 **[ 🏆 Gold-Standard Examples ]**
-* "Okay buckle up because this drama is WILD"
-* "This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"
-* "...SIKE! He's not there for her. He's there for her SISTER" (Twist)
+* `"Okay buckle up because this drama is WILD. You won't believe this kid just K.O.'d a grown man to save his mom!"`
+* `"This CEO is giving major red flags, right? He finds this girl in his room and immediately goes full-on psycho"`
+* `"SIKE! They treat him like trash, but we know he's actually the Billionaire CEO. Let the games begin"`
 
 **[ 🎬 Key Constraints: Duration & Calibration ]**
 
@@ -2569,24 +2570,27 @@ The first 1-2 lines must be so powerful that the user **cannot possibly scroll a
 * **Script Word Count:** Target **180 to 190 words** (Safe zone for fast-paced delivery).
 * **Clip Calculation:** The sum of all `Clip Duration` values must equal **approx 55-65 seconds**.
 
-**2. Footage Selection (The "Slicing" Rule)**
-* **Start Time:** Extract the `start` time string exactly as it appears in the JSON (MM:SS:FF).
-* **Duration:** You must decide how long to hold that shot (e.g., 3.0s, 4.5s). Do **NOT** use the JSON 'end' time.
-* The selected Visual **must have a >80% match** with the Script line. No "filler" footage.
+**2. Footage Selection (The "Anti-Repetition" Rule) - STRICT**
+* **Max 5 Seconds Per File:** You are strictly limited to using a **maximum of 5.0 seconds TOTAL** from any single JSON source file.
+    * *Example:* If you use `01.mp4` for 3 seconds, you can only use it one more time for 2 seconds max, or not at all.
+* **Spread the Story:** You must "hop" quickly between different files/episodes to construct the narrative.
+* **The "Slicing":** Extract the `start` time string exactly (MM:SS:FF). You must decide the duration (e.g., 2.5s, 4.0s). Do **NOT** use the JSON 'end' time.
+* **High Precision:** Since you only have <5s per file, pick only the absolute visual peak (The slap, the shock, the reveal). Visuals **must have a >90% match** with the Script line.
 
 **3. Structure & Pacing**
 * **0-5s:** The Hook (Visual violence/shock/twist).
-* **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding).
-* **50-60s:** The Cliffhanger (End on a major twist or question).
+* **5-50s:** The Story (Escalating stakes, Injustice, Misunderstanding). *Even though you are switching files rapidly, the narration must remain smooth and logically connected.*
+* **45-55s:** The Setup (Lighting the Fuse. Focus purely on the immediate threat.)
+* **55-60s:** The Cliffhanger (End on a major twist or question. Cut exactly when the tension is highest.)
 
 **[ Workflow ]**
-1.  **Analyze for Core Conflict:** Identify the main "A-Plot" (Revenge, Mistaken Identity).
-2.  **Select the Hook:** Scour `isHighlight: true` tags for the most shocking visual.
-3.  **Write Script:** "Hook + Story + Suspense" structure. Use punchy, short sentences.
-4.  **Match Footage:** Assign a specific `Start Time` and `Clip Duration` for every single line.
+1.  **Analyze for Core Conflict:** Identify the main "A-Plot".
+2.  **Select the Hook:** Find the most shocking visual tag (`isHighlight: true`).
+3.  **Write Script:** "Hook + Story + Suspense" structure.
+4.  **Match Footage:** Assign footage while strictly tracking the **"Max 5s per file"** limit.
 
 **[ Output Format Requirement ]**
-You **must** use the 5-column table format below. This table will be processed by a Python script for automated editing.
+You **must** use the 5-column table format below.
 
 | Script (Narration) | Visual Description | Source File | Start Time (MM:SS:FF) | Clip Duration (Sec) |
 | :--- | :--- | :--- | :--- | :--- |
@@ -2596,9 +2600,11 @@ You **must** use the 5-column table format below. This table will be processed b
 | Buckle up, this CEO is psycho! He just choked his own wife! | He grabs her neck aggressively. | 03.mp4.txt | 00:07:12 | 4.0 |
 
 **[ Final Mandate ]**
-Your #1 goal is to sell the drama. Your script must be a **"dopamine hit"**. Do not fail the 5-second test. **Double-check that the sum of "Clip Duration" is  >55s and < 65s.**
+Your #1 goal is to sell the drama with high dopamine.
+**CRITICAL CHECK:** Ensure **no single source file** appears for more than **5 seconds** in the total list.
+**Double-check that the sum of ALL "Clip Duration" is >55s and < 65s.**
 
-Now,I give you the JSONs:
+Now, I give you the JSONs:
                             </textarea>
                         </div>
                         <div class="mb-3">
@@ -2722,10 +2728,6 @@ Now,I give you the JSONs:
                                 <option value="segmented">逐段生成（每段分别生成）</option>
                                 <option value="combined">合并一次生成（所有台词拼接）</option>
                             </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="voiceToolModelSelect" class="form-label fw-bold"><i class="fas fa-cogs"></i> 选择模型</label>
-                            <select class="form-select" id="voiceToolModelSelect"></select>
                         </div>
                         <div class="mb-3">
                             <label for="voiceToolMarkdown" class="form-label fw-bold"><i class="fas fa-table"></i> 粘贴脚本表格（Markdown）</label>
@@ -7077,14 +7079,15 @@ Now,I give you the JSONs:
                     sel.innerHTML = '<option value="">无可用语音</option>';
                     return;
                 }
-                const priority = new Set(['JNyLRc3LFmQDImliF0sT','Wx3gkpXTFu48C9SvvTfk']);
+                const priorityName = '许你真心岁岁欢';
                 const top = [];
                 const rest = [];
                 for (const v of voices) {
-                    if (priority.has(String(v.id))) top.push(v); else rest.push(v);
+                    if (v.name === priorityName) top.push(v); else rest.push(v);
                 }
                 const ordered = top.concat(rest);
                 sel.innerHTML = ordered.map(v => `<option value="${v.id}">${escapeHtml(v.name)}</option>`).join('');
+                if (top.length) sel.value = top[0].id;
                 console.log('[VoiceTool] voices loaded count=', voices.length);
             } catch (_) {
                 const sel = document.getElementById('voiceToolVoiceSelect');
@@ -7104,9 +7107,11 @@ Now,I give you the JSONs:
                 if (!data.success) { sel.innerHTML = '<option value="">加载失败</option>'; return; }
                 const models = data.models || [];
                 if (!models.length) { sel.innerHTML = '<option value="">无可用模型</option>'; return; }
-                const priority = new Set(['eleven_multilingual_v2']);
+                const priorityName = 'Eleven v3 (alpha)';
                 const top = [], rest = [];
-                for (const m of models) { if (priority.has(String(m.id))) top.push(m); else rest.push(m); }
+                for (const m of models) {
+                    if ((m.name || m.id) === priorityName) top.push(m); else rest.push(m);
+                }
                 const ordered = top.concat(rest);
                 sel.innerHTML = ordered.map(m => `<option value="${m.id}">${escapeHtml(m.name || m.id)}</option>`).join('');
                 if (top.length) sel.value = top[0].id;
@@ -7148,11 +7153,11 @@ Now,I give you the JSONs:
                 if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
                 const batchId = jsonMergeBatchId || ('voiceover_' + Date.now());
                 const groupBatchId = batchId + (typeof gi === 'number' ? (`_script_${gi}`) : '');
-                let voiceId = 'JNyLRc3LFmQDImliF0sT';
+                let voiceId = '';
                 const sel = document.getElementById('voiceToolVoiceSelect');
                 if (sel && sel.value) voiceId = sel.value;
                 const modelSel = document.getElementById('voiceToolModelSelect');
-                let modelId = 'eleven_multilingual_v2';
+                let modelId = '';
                 if (modelSel && modelSel.value) modelId = modelSel.value;
                 const resp = await fetch('/voiceover/generate', {
                     method: 'POST',
@@ -7183,10 +7188,10 @@ Now,I give you the JSONs:
                 const text = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
                 if (!text) { showError('未找到可生成的台词'); return; }
                 const batchId = jsonMergeBatchId || ('voiceover_combined_' + Date.now());
-                let voiceId = 'JNyLRc3LFmQDImliF0sT';
+                let voiceId = '';
                 const voiceSel = document.getElementById('voiceToolVoiceSelect');
                 if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
-                let modelId = 'eleven_multilingual_v2';
+                let modelId = '';
                 const modelSel = document.getElementById('voiceToolModelSelect');
                 if (modelSel && modelSel.value) modelId = modelSel.value;
                 const resp = await fetch('/voiceover/generate', {
@@ -7219,13 +7224,16 @@ Now,I give you the JSONs:
                 const btn = document.getElementById(`voiceRetry_${i}`);
                 if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>生成中...'; }
                 const batchId = jsonMergeBatchId || ('voiceover_' + Date.now());
+                const voiceSel = document.getElementById('voiceToolVoiceSelect');
+                let voiceId = '';
+                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
                 const modelSel = document.getElementById('voiceToolModelSelect');
-                let modelId = 'eleven_multilingual_v2';
+                let modelId = '';
                 if (modelSel && modelSel.value) modelId = modelSel.value;
                 const resp = await fetch('/voiceover/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: seg.text, voice_id: 'JNyLRc3LFmQDImliF0sT', model_id: modelId, batch_id: batchId, index: i, output_format: 'mp3_44100_128' })
+                    body: JSON.stringify({ text: seg.text, voice_id: voiceId, model_id: modelId, batch_id: batchId, index: i, output_format: 'mp3_44100_128' })
                 });
                 const data = await resp.json();
                 if (!data.success) {
