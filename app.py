@@ -15,6 +15,29 @@ import requests
 import io
 import zipfile
 
+def _load_env_files():
+    paths = [".env.local", ".env"]
+    for p in paths:
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        s = line.strip()
+                        if not s or s.startswith("#"):
+                            continue
+                        k, sep, v = s.partition("=")
+                        if sep:
+                            key = k.strip()
+                            val = v.strip()
+                            if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                                val = val[1:-1]
+                            if key and val and key not in os.environ:
+                                os.environ[key] = val
+        except Exception:
+            pass
+
+_load_env_files()
+
 app = Flask(__name__)
 
 # 配置文件上传
@@ -805,7 +828,13 @@ def script_generate():
             elif model_provider and model_provider != 'deepseek':
                 print(f"[script_generate] task_id={task_id} call laozhang model={model_provider}")
                 api_key = os.environ.get('LAOZHANG_API_KEY', '').strip()
+                print(f"[script_generate] task_id={task_id} env LAOZHANG_API_KEY present={bool(api_key)}")
                 if not api_key:
+                    try:
+                        env_status = {k: bool(os.environ.get(k)) for k in ['LAOZHANG_API_KEY', 'BIGMODEL_API_KEY']}
+                        print(f"[script_generate] task_id={task_id} env keys status: {env_status}")
+                    except Exception as _e:
+                        print(f"[script_generate] task_id={task_id} env status check error={str(_e)}")
                     raise Exception('缺少LaoZhang API密钥')
                 full_input = f"{script_prompt}\n\n{combined_input}"
                 url = 'https://api.laozhang.ai/v1/chat/completions'
@@ -939,7 +968,13 @@ def script_generate_direct():
                     result = str(data_json)
             elif model_provider and model_provider != 'deepseek':
                 api_key = os.environ.get('LAOZHANG_API_KEY', '').strip()
+                print(f"[script_generate_direct] env LAOZHANG_API_KEY present={bool(api_key)}")
                 if not api_key:
+                    try:
+                        env_status = {k: bool(os.environ.get(k)) for k in ['LAOZHANG_API_KEY', 'BIGMODEL_API_KEY']}
+                        print(f"[script_generate_direct] env keys status: {env_status}")
+                    except Exception as _e:
+                        print(f"[script_generate_direct] env status check error={str(_e)}")
                     raise Exception('缺少LaoZhang API密钥')
                 full_input = f"{script_prompt}\n\n{combined_input}"
                 url = 'https://api.laozhang.ai/v1/chat/completions'
@@ -1036,13 +1071,9 @@ def edl_upload_batch():
             if f.filename == '':
                 continue
             fn = secure_filename(f.filename)
-            ts = str(int(time.time() * 1000))
-            saved_fn = f"{ts}_{fn}"
+            saved_fn = fn
             p = os.path.join(app.config['UPLOAD_FOLDER'], saved_fn)
             f.save(p)
-            original_name_map.setdefault(f.filename, []).append(saved_fn)
-            if secure_filename(f.filename) != f.filename:
-                original_name_map.setdefault(secure_filename(f.filename), []).append(saved_fn)
             saved.append({'original': f.filename, 'saved': saved_fn})
         return jsonify({'success': True, 'files': saved})
     except Exception as e:
@@ -1075,47 +1106,64 @@ def mmssff_to_frame_index(ts, fps):
 
 def resolve_source_file(name, allowed=None):
     base = os.path.basename(name).strip()
-    sbase = secure_filename(base)
-    patterns = {base, sbase}
-    if base.lower().endswith('.mp4.txt'):
-        patterns.add(base[:-4])
-        patterns.add(sbase[:-4])
-    if '.' not in base:
-        for ext in ['.mp4', '.MP4', '.mov', '.MOV', '.mkv', '.MKV']:
-            patterns.add(base + ext)
-            patterns.add(sbase + ext)
+    if not base:
+        return None
     allowed_set = None
+    allowed_saved = set()
+    allowed_sbase = set()
     if isinstance(allowed, list) and allowed:
         try:
             allowed_set = set([os.path.basename(str(a)).strip() for a in allowed if a])
         except Exception:
             allowed_set = None
+        try:
+            for a in (allowed_set or []):
+                sa = secure_filename(a)
+                if sa:
+                    allowed_sbase.add(sa)
+                mapped = original_name_map.get(a) or original_name_map.get(sa) or []
+                for saved in mapped:
+                    fname = os.path.basename(str(saved).strip())
+                    if fname:
+                        allowed_saved.add(fname)
+        except Exception:
+            pass
     try:
         for fname in os.listdir(app.config['UPLOAD_FOLDER']):
-            if (fname in patterns) or any(fname.endswith(p) for p in patterns):
-                if allowed_set and fname not in allowed_set:
+            if fname == base:
+                if allowed_set and (fname not in allowed_set and fname not in allowed_saved):
                     continue
                 p = os.path.join(app.config['UPLOAD_FOLDER'], fname)
                 if os.path.exists(p):
                     return p
     except Exception:
+        return None
+    sbase = secure_filename(base)
+    try:
+        mapped = original_name_map.get(base) or original_name_map.get(sbase) or []
+        for saved in mapped:
+            fname = os.path.basename(str(saved).strip())
+            if not fname:
+                continue
+            if allowed_set and (fname not in allowed_set and fname not in allowed_saved):
+                continue
+            p = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+            if os.path.exists(p):
+                return p
+    except Exception:
         pass
-    mapped = original_name_map.get(base) or original_name_map.get(sbase)
-    if mapped:
-        if isinstance(mapped, list):
-            for fn in mapped:
-                bfn = os.path.basename(fn)
-                if allowed_set and bfn not in allowed_set:
-                    continue
-                p = os.path.join(app.config['UPLOAD_FOLDER'], fn)
-                if os.path.exists(p):
-                    return p
-        else:
-            bfn = os.path.basename(mapped)
-            if not allowed_set or bfn in allowed_set:
-                p = os.path.join(app.config['UPLOAD_FOLDER'], mapped)
-                if os.path.exists(p):
-                    return p
+    try:
+        candidates = []
+        for fname in os.listdir(app.config['UPLOAD_FOLDER']):
+            if sbase and (fname.endswith(sbase) or any(fname.endswith(sa) for sa in allowed_sbase)):
+                candidates.append(fname)
+        if candidates:
+            candidates.sort()
+            p = os.path.join(app.config['UPLOAD_FOLDER'], candidates[-1])
+            if os.path.exists(p):
+                return p
+    except Exception:
+        pass
     return None
 
 def ensure_dir(path):
@@ -1263,7 +1311,8 @@ def edit_video_task(task_id, clips, fps, mode, allowed=None):
     list_path = os.path.join(seg_dir, 'list.txt')
     with open(list_path, 'w') as f:
         for i in range(1, total+1):
-            f.write(f"file 'seg_{i:03d}.mp4'\n")
+            abs_seg = os.path.abspath(os.path.join(seg_dir, f"seg_{i:03d}.mp4"))
+            f.write(f"file '{abs_seg}'\n")
     edl_tasks[task_id]['logs'].append(f"concat list {list_path}")
     out_path = os.path.join('outputs', 'edits', f"{task_id}.mp4")
     ok, log = run_ffmpeg_concat(list_path, out_path)
@@ -1309,9 +1358,21 @@ def video_edl_resolve():
         allowed = data.get('allowed') or None
         if not name:
             return jsonify({'success': False, 'error': '缺少name'}), 400
+        try:
+            print(f"[edl_resolve] name={name} allowed_len={(len(allowed) if isinstance(allowed, list) else 0)}")
+        except Exception:
+            pass
         p = resolve_source_file(name, allowed)
         if p:
+            try:
+                print(f"[edl_resolve] found path={p}")
+            except Exception:
+                pass
             return jsonify({'success': True, 'path': p})
+        try:
+            print(f"[edl_resolve] not_found name={name}")
+        except Exception:
+            pass
         return jsonify({'success': False, 'error': '未找到'}), 404
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1454,6 +1515,57 @@ def voiceover_generate():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/elevenlabs/voices', methods=['GET'])
+def elevenlabs_voices():
+    try:
+        api_key = ELEVENLABS_API_KEY or (os.getenv('XI_API_KEY') or os.getenv('ELEVEN_LABS_API_KEY') or os.getenv('XI_API_KEY') or '')
+        explicit = (request.args.get('api_key') or '').strip()
+        print(f"[elevenlabs_voices] explicit_provided={bool(explicit)} env_present={bool(api_key)}")
+        if explicit:
+            api_key = explicit
+        if not api_key:
+            print("[elevenlabs_voices] missing api key")
+            return jsonify({"success": False, "error": "缺少ElevenLabs API密钥"}), 400
+        base_url = 'https://api.elevenlabs.io'
+        url = f"{base_url}/v2/voices"
+        params = {}
+        q = (request.args.get('search') or '').strip()
+        if q:
+            params['search'] = q
+        page_size = request.args.get('page_size')
+        if page_size:
+            try:
+                params['page_size'] = int(page_size)
+            except Exception:
+                pass
+        headers = { 'xi-api-key': api_key }
+        resp = requests.get(url, headers=headers, params=params, timeout=30)
+        print(f"[elevenlabs_voices] status_code={resp.status_code}")
+        if resp.status_code != 200:
+            body_preview = ''
+            try:
+                body_preview = resp.text[:300]
+            except Exception:
+                pass
+            print(f"[elevenlabs_voices] error_body={body_preview}")
+            return jsonify({"success": False, "error": f"HTTP {resp.status_code}"}), 500
+        data = resp.json()
+        voices = []
+        items = data.get('voices') or data.get('items') or []
+        for v in items:
+            vid = v.get('voice_id') or v.get('id') or ''
+            name = v.get('name') or ''
+            if vid and name:
+                voices.append({ 'id': vid, 'name': name })
+        print(f"[elevenlabs_voices] voices_len={len(voices)}")
+        return jsonify({"success": True, "voices": voices})
+    except Exception as e:
+        try:
+            print(f"[elevenlabs_voices] exception={str(e)}")
+        except Exception:
+            pass
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     # 创建templates目录
     if not os.path.exists('templates'):
@@ -1464,6 +1576,10 @@ if __name__ == '__main__':
         os.makedirs('static')
 
     print("🚀 视频分析Web服务启动中...")
+    try:
+        print(f"🔑 Env presence: LAOZHANG_API_KEY={bool(os.getenv('LAOZHANG_API_KEY'))}, BIGMODEL_API_KEY={bool(os.getenv('BIGMODEL_API_KEY'))}, ELEVENLABS_API_KEY={bool(os.getenv('ELEVENLABS_API_KEY'))}")
+    except Exception as _e:
+        print(f"🔑 Env presence check error: {str(_e)}")
     print("📱 请在浏览器中访问: http://localhost:5001")
     print("⚠️  确保你的API密钥已正确配置")
 

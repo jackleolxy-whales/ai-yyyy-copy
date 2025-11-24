@@ -73,6 +73,18 @@ show_help() {
     echo
 }
 
+load_env() {
+    if [ -f ".env.local" ]; then
+        set -a
+        . ./.env.local
+        set +a
+    elif [ -f ".env" ]; then
+        set -a
+        . ./.env
+        set +a
+    fi
+}
+
 # 初始化项目环境
 setup_project() {
     print_info "初始化项目环境..."
@@ -117,8 +129,15 @@ start_server() {
         export PORT=8081
     fi
 
-    print_info "服务器将在 http://localhost:${PORT:-8080} 启动"
-    python run.py
+    load_env
+    print_info "服务器将在 http://localhost:${PORT:-5001} 启动"
+    waitress-serve --host 0.0.0.0 --port ${PORT:-5001} app:app
+}
+
+serve() {
+    load_env
+    print_info "服务器将在 http://localhost:${PORT:-5001} 启动"
+    waitress-serve --host 0.0.0.0 --port ${PORT:-5001} app:app
 }
 
 # 运行所有测试
@@ -354,6 +373,9 @@ main() {
             ;;
         start)
             start_server
+            ;;
+        serve)
+            serve
             ;;
         test)
             run_tests

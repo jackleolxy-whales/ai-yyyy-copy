@@ -56,7 +56,7 @@ def main():
         sys.exit(1)
 
     print("\n🌐 正在启动Web服务...")
-    print("📱 服务将在 http://localhost:5000 上运行")
+    print("📱 服务将在 http://localhost:5001 上运行")
     print("⚠️  按 Ctrl+C 停止服务")
     print("=" * 50)
 
@@ -66,7 +66,7 @@ def main():
     try:
         # 启动Flask应用
         from app import app
-        app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+        app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\n\n👋 服务已停止")
     except Exception as e:
