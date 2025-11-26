@@ -1049,6 +1049,7 @@
             <button type="button" class="btn btn-outline-warning" onclick="switchTool('script_tool')"><i class="fas fa-file-alt"></i> 脚本生成工具</button>
             <button type="button" class="btn btn-outline-success" onclick="switchTool('edl_tool')"><i class="fas fa-film"></i> 自动拼接工具</button>
             <button type="button" class="btn btn-outline-primary" onclick="switchTool('voice_tool')"><i class="fas fa-microphone"></i> 台词配音工具</button>
+            <button type="button" class="btn btn-outline-danger" onclick="switchTool('video_packaging_tool')"><i class="fas fa-magic"></i> 视频包装工具</button>
         </div>
     </div>
     <div class="container main-container">
@@ -1265,19 +1266,82 @@ Now, I give you the JSONs:
             </h5>
             <div class="card">
                 <div class="card-body">
+                    <!-- 配置区域 -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="step6VoiceSelect" class="form-label fw-bold">
+                                <i class="fas fa-microphone-alt"></i> 选择语音
+                            </label>
+                            <select class="form-select" id="step6VoiceSelect">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="step6ModelSelect" class="form-label fw-bold">
+                                <i class="fas fa-cogs"></i> 选择模型
+                            </label>
+                            <select class="form-select" id="step6ModelSelect">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="step6ModeSelect" class="form-label fw-bold">
+                                <i class="fas fa-sliders-h"></i> 生成模式
+                            </label>
+                            <select class="form-select" id="step6ModeSelect">
+                                <option value="segmented" selected>逐段生成（每段分别生成）</option>
+                                <option value="combined">合并一次生成（所有台词拼接）</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 原有说明信息 -->
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <div class="form-text text-muted">voice_id 固定为 JNyLRc3LFmQDImliF0sT</div>
+                            <div class="form-text text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                语音和模型已优化为最佳配置
+                            </div>
                         </div>
                         <div class="col-md-6 text-md-end">
-                            <div class="form-text text-muted">model_id 固定为 eleven_multilingual_v2</div>
+                            <div class="form-text text-muted">
+                                支持逐段和合并两种生成模式
+                            </div>
                         </div>
                     </div>
-                    </div>
+
                     <div class="text-center">
-                        <button type="button" class="btn btn-warning btn-lg" id="voiceoverGenerateBtn" onclick="startVoiceoverGeneration()">
+                        <button type="button" class="btn btn-warning btn-lg me-2" id="voiceoverGenerateBtn" onclick="startStep6VoiceoverGeneration()">
                             <i class="fas fa-play"></i> 开始配音生成
                         </button>
+                        <button type="button" class="btn btn-info btn-lg" id="voiceoverPreviewBtn" onclick="previewStep6Script()" style="display: none;">
+                            <i class="fas fa-eye"></i> 预览脚本
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 脚本编辑区域（合并模式显示） -->
+            <div class="mt-4" id="step6ScriptEditor" style="display: none;">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="fas fa-file-alt text-primary"></i> 拼接脚本（可编辑）
+                            </h6>
+                            <button class="btn btn-sm btn-primary" onclick="regenerateStep6Voiceover()">
+                                <i class="fas fa-sync"></i> 使用修改后的脚本重新生成
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control" id="step6CombinedScript" rows="8" placeholder="在此编辑拼接后的脚本文本"></textarea>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-lightbulb"></i>
+                                提示：修改脚本内容后点击"重新生成"按钮可使用新脚本生成配音
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2746,6 +2810,477 @@ Now, I give you the JSONs:
         </div>
     </div>
 
+    <!-- 视频包装工具 -->
+    <div class="container" id="videoPackagingToolSection" style="display: none;">
+        <div class="row justify-content-center">
+            <div class="col-lg-12">
+                <div class="card shadow-lg">
+                    <div class="card-header bg-gradient text-white" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                        <h2 class="header-title"><i class="fas fa-magic"></i> 视频包装工具</h2>
+                        <p class="mb-0">生成专业的视频编辑配置，支持画布、背景、视频、音频、字幕和水印设置</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <!-- 左侧配置区域 -->
+                            <div class="col-lg-8">
+                                <!-- 画布配置 -->
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-expand text-primary"></i> 画布配置</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label class="form-label">宽度 (px)</label>
+                                                <input type="number" class="form-control" id="canvasWidth" value="1080" min="1">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">高度 (px)</label>
+                                                <input type="number" class="form-control" id="canvasHeight" value="1920" min="1">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">背景颜色</label>
+                                                <input type="color" class="form-control form-control-color" id="canvasBackgroundColor" value="#000000">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 背景配置 -->
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-image text-success"></i> 背景配置</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">背景类型</label>
+                                            <select class="form-select" id="backgroundType" onchange="updateBackgroundConfig()">
+                                                <option value="">无背景</option>
+                                                <option value="color">纯色背景</option>
+                                                <option value="image">图片背景</option>
+                                                <option value="blur">前景虚化</option>
+                                            </select>
+                                        </div>
+                                        <div id="backgroundColorConfig" style="display: none;">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">背景颜色</label>
+                                                    <input type="color" class="form-control form-control-color" id="bgColor" value="#1a1a1a">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="backgroundImageConfig" style="display: none;">
+                                            <div class="row">
+                                                <div class="col-md-8">
+                                                    <label class="form-label">图片URL</label>
+                                                    <input type="url" class="form-control" id="bgImageUrl" placeholder="https://example.com/background.jpg">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <div class="form-check mt-4">
+                                                        <input class="form-check-input" type="checkbox" id="bgImageBlur">
+                                                        <label class="form-check-label" for="bgImageBlur">
+                                                            模糊背景图片
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="backgroundBlurConfig" style="display: none;">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">模糊半径 (0-1)</label>
+                                                    <input type="number" class="form-control" id="bgBlurRadius" value="0.5" min="0" max="1" step="0.1">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 视频轨道配置 -->
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-film text-info"></i> 视频轨道配置</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="form-label">X坐标 (0-1)</label>
+                                                <input type="number" class="form-control" id="videoX" value="0" min="0" max="1" step="0.01">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Y坐标 (0-1)</label>
+                                                <input type="number" class="form-control" id="videoY" value="0" min="0" max="1" step="0.01">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">宽度比例 (0-1)</label>
+                                                <input type="number" class="form-control" id="videoWidth" value="1" min="0" max="1" step="0.01">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">高度比例 (0-1)</label>
+                                                <input type="number" class="form-control" id="videoHeight" value="1" min="0" max="1" step="0.01">
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <label class="form-label">自适应模式</label>
+                                            <select class="form-select" id="videoAdaptMode">
+                                                <option value="Cover" selected>填满区域 (可能裁剪)</option>
+                                                <option value="Contain">完整显示 (可能留白)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 音频配置 -->
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-volume-up text-warning"></i> 音频配置</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label class="form-label">原视频音量 (0-100)</label>
+                                                <input type="range" class="form-range" id="originalVolume" value="100" min="0" max="100">
+                                                <div class="text-center"><span id="originalVolumeValue">100</span>%</div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">BGM音量 (0-100)</label>
+                                                <input type="range" class="form-range" id="bgmVolume" value="20" min="0" max="100">
+                                                <div class="text-center"><span id="bgmVolumeValue">20</span>%</div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">BGM文件URL</label>
+                                                <input type="url" class="form-control" id="bgmUrl" placeholder="https://example.com/bgm.mp3">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 水印配置 -->
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-stamp text-secondary"></i> 水印配置</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox" id="watermarkEnabled">
+                                                    <label class="form-check-label" for="watermarkEnabled">
+                                                        启用水印
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="watermarkConfig" style="display: none;">
+                                            <div class="row">
+                                                <div class="col-md-12">
+                                                    <label class="form-label">水印图片/视频URL</label>
+                                                    <input type="url" class="form-control" id="watermarkUrl" placeholder="https://example.com/watermark.png">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-3">
+                                                <div class="col-md-3">
+                                                    <label class="form-label">X坐标 (0-1)</label>
+                                                    <input type="number" class="form-control" id="watermarkX" value="0.7" min="0" max="1" step="0.01">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Y坐标 (0-1)</label>
+                                                    <input type="number" class="form-control" id="watermarkY" value="0.9" min="0" max="1" step="0.01">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">宽度比例 (0-1)</label>
+                                                    <input type="number" class="form-control" id="watermarkWidth" value="0.25" min="0" max="1" step="0.01">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">高度比例 (0-1)</label>
+                                                    <input type="number" class="form-control" id="watermarkHeight" value="0.08" min="0" max="1" step="0.01">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">不透明度 (0-1)</label>
+                                                    <input type="number" class="form-control" id="watermarkOpacity" value="0.3" min="0" max="1" step="0.01">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 右侧字幕配置区域 -->
+                            <div class="col-lg-4">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0"><i class="fas fa-closed-captioning text-danger"></i> 字幕配置</h5>
+                                        <button class="btn btn-sm btn-primary" onclick="addCustomSubtitle()">
+                                            <i class="fas fa-plus"></i> 添加自定义字幕
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <!-- 预设字幕 -->
+                                        <div class="subtitle-item mb-3" data-subtitle-id="title">
+                                            <h6 class="text-primary">标题</h6>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="titleEnabled" checked>
+                                                <label class="form-check-label" for="titleEnabled">
+                                                    启用标题
+                                                </label>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <label class="form-label">标题内容</label>
+                                                    <input type="text" class="form-control" id="titleContent" placeholder="输入标题文本">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-6">
+                                                    <label class="form-label">字号</label>
+                                                    <input type="number" class="form-control" id="titleSize" value="90">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label">颜色</label>
+                                                    <input type="color" class="form-control form-control-color" id="titleColor" value="#ffffff">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="subtitle-item mb-3" data-subtitle-id="subtitle">
+                                            <h6 class="text-success">字幕</h6>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="subtitleEnabled" checked>
+                                                <label class="form-check-label" for="subtitleEnabled">
+                                                    启用字幕
+                                                </label>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <label class="form-label">字幕内容</label>
+                                                    <textarea class="form-control" id="subtitleContent" rows="2" placeholder="输入字幕文本"></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-6">
+                                                    <label class="form-label">字号</label>
+                                                    <input type="number" class="form-control" id="subtitleSize" value="90">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label">颜色</label>
+                                                    <input type="color" class="form-control form-control-color" id="subtitleColor" value="#ffffff">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-12">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="subtitleKeywords" checked>
+                                                        <label class="form-check-label" for="subtitleKeywords">
+                                                            启用关键词高亮
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="subtitle-item mb-3" data-subtitle-id="name">
+                                            <h6 class="text-warning">人物姓名</h6>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="nameEnabled" checked>
+                                                <label class="form-check-label" for="nameEnabled">
+                                                    启用姓名
+                                                </label>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <label class="form-label">姓名</label>
+                                                    <input type="text" class="form-control" id="nameContent" placeholder="输入人物姓名">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-6">
+                                                    <label class="form-label">字号</label>
+                                                    <input type="number" class="form-control" id="nameSize" value="80">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label">颜色</label>
+                                                    <input type="color" class="form-control form-control-color" id="nameColor" value="#ffffff">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="subtitle-item mb-3" data-subtitle-id="position">
+                                            <h6 class="text-info">人物职位</h6>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="positionEnabled" checked>
+                                                <label class="form-check-label" for="positionEnabled">
+                                                    启用职位
+                                                </label>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <label class="form-label">职位</label>
+                                                    <input type="text" class="form-control" id="positionContent" placeholder="输入人物职位">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-2">
+                                                <div class="col-6">
+                                                    <label class="form-label">字号</label>
+                                                    <input type="number" class="form-control" id="positionSize" value="50">
+                                                </div>
+                                                <div class="col-6">
+                                                    <label class="form-label">颜色</label>
+                                                    <input type="color" class="form-control form-control-color" id="positionColor" value="#ffffff">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 自定义字幕容器 -->
+                                        <div id="customSubtitlesContainer"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮区域 -->
+                        <div class="row mt-4">
+                            <div class="col-12 text-center">
+                                <button type="button" class="btn btn-primary btn-lg me-2" onclick="generateVideoEditConfig()">
+                                    <i class="fas fa-cog"></i> 生成配置
+                                </button>
+                                <button type="button" class="btn btn-success btn-lg me-2" onclick="previewConfig()">
+                                    <i class="fas fa-eye"></i> 预览配置
+                                </button>
+                                <button type="button" class="btn btn-warning btn-lg me-2" onclick="exportConfig()">
+                                    <i class="fas fa-download"></i> 导出配置
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-lg me-2" onclick="showUploadModal()">
+                                    <i class="fas fa-upload"></i> 上传素材
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-lg me-2" onclick="processPackaging()" id="processPackagingBtn" style="display: none;">
+                                    <i class="fas fa-play"></i> 开始处理
+                                </button>
+                                <button type="button" class="btn btn-info btn-lg" onclick="loadDefaultConfig()">
+                                    <i class="fas fa-undo"></i> 加载默认配置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实时预览区域 -->
+                <div class="card shadow-lg mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-eye text-info"></i> 实时预览</h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" id="previewZoomOut" onclick="adjustPreviewZoom(-0.1)">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="previewZoomReset" onclick="resetPreviewZoom()">
+                                <span id="zoomLevel">100%</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="previewZoomIn" onclick="adjustPreviewZoom(0.1)">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body text-center" style="background: #f8f9fa; padding: 20px;">
+                        <div class="preview-container" style="display: inline-block; position: relative; overflow: hidden; border: 2px solid #dee2e6; border-radius: 8px; background: #ffffff;">
+                            <canvas id="previewCanvas" width="540" height="960" style="display: block; max-width: 100%; height: auto;"></canvas>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i>
+                                预览尺寸：<span id="previewDimensions">540 × 960</span> |
+                                缩放比例：<span id="actualZoomLevel">50%</span> |
+                                画布尺寸：<span id="canvasDimensions">1080 × 1920</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 配置结果显示区域 -->
+                <div class="card shadow-lg mt-4" id="configResultContainer" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-code"></i> 生成的配置</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre id="configResult" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+
+                <!-- 视频包装处理状态 -->
+                <div class="card shadow-lg mt-4" id="packagingStatusContainer" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-cogs text-info"></i> 处理状态</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div class="progress-bar" id="packagingProgressBar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
+                        <p id="packagingStatusText" class="text-muted mb-0">准备中...</p>
+                        <div id="packagingResultContainer" style="display: none;" class="mt-3">
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-success" onclick="downloadPackagingResult()">
+                                    <i class="fas fa-download"></i> 下载视频
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="downloadPackagingConfig()">
+                                    <i class="fas fa-file-code"></i> 下载配置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 视频包装文件上传模态框 -->
+    <div class="modal fade" id="videoPackagingUploadModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-upload"></i> 上传视频包装素材</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="videoPackagingUploadForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">文件类型</label>
+                            <select class="form-select" id="packagingFileType" required>
+                                <option value="">请选择文件类型</option>
+                                <option value="video">主视频</option>
+                                <option value="background">背景视频/图片</option>
+                                <option value="audio">音频文件</option>
+                                <option value="watermark">水印图片</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">选择文件</label>
+                            <input type="file" class="form-control" id="packagingFileInput" accept="video/*,audio/*,image/*" required>
+                            <div class="form-text">支持视频、音频和图片文件</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="packagingAutoFillConfig">
+                                <label class="form-check-label" for="packagingAutoFillConfig">
+                                    自动填充到配置表单
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="uploadProgressContainer" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar" id="uploadProgressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-center mt-2 mb-0">上传中...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="uploadPackagingFile()">上传文件</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let currentTaskId = null;
@@ -2753,6 +3288,66 @@ Now, I give you the JSONs:
         let displayedTaskIds = new Set();
         let taskIndexMap = {};
         let jsonMergeBatchId = null;
+
+        // 视频包装日志管理器
+        class PackagingLogger {
+            constructor() {
+                this.logs = [];
+                this.maxLogs = 1000;
+            }
+
+            log(level, message, details = null) {
+                const timestamp = new Date().toISOString();
+                const logEntry = {
+                    timestamp,
+                    level,
+                    message,
+                    details
+                };
+
+                this.logs.push(logEntry);
+
+                // 保持日志数量限制
+                if (this.logs.length > this.maxLogs) {
+                    this.logs = this.logs.slice(-this.maxLogs);
+                }
+
+                // 控制台输出
+                const consoleMessage = `[视频包装 ${level.toUpperCase()}] ${message}`;
+                if (details) {
+                    console.log(consoleMessage, details);
+                } else {
+                    console.log(consoleMessage);
+                }
+            }
+
+            info(message, details = null) {
+                this.log('info', message, details);
+            }
+
+            warning(message, details = null) {
+                this.log('warning', message, details);
+            }
+
+            error(message, details = null) {
+                this.log('error', message, details);
+            }
+
+            debug(message, details = null) {
+                this.log('debug', message, details);
+            }
+
+            getLogs() {
+                return this.logs;
+            }
+
+            clearLogs() {
+                this.logs = [];
+            }
+        }
+
+        // 创建全局日志实例
+        const packagingLogger = new PackagingLogger();
 
         // 输入方式切换
         document.querySelectorAll('input[name="inputMethod"]').forEach(radio => {
@@ -3075,34 +3670,45 @@ Now, I give you the JSONs:
                 const scriptTool = document.getElementById('scriptToolSection');
                 const edlTool = document.getElementById('edlToolSection');
                 const voiceTool = document.getElementById('voiceToolSection');
+                const videoPackagingTool = document.getElementById('videoPackagingToolSection');
                 if (tool === 'script_tool') {
                     if (workflow) workflow.style.display = 'none';
                     if (scriptTool) scriptTool.style.display = 'block';
                     if (edlTool) edlTool.style.display = 'none';
                     if (voiceTool) voiceTool.style.display = 'none';
+                    if (videoPackagingTool) videoPackagingTool.style.display = 'none';
                 } else if (tool === 'edl_tool') {
                     if (workflow) workflow.style.display = 'none';
                     if (scriptTool) scriptTool.style.display = 'none';
                     if (edlTool) edlTool.style.display = 'block';
                     if (voiceTool) voiceTool.style.display = 'none';
+                    if (videoPackagingTool) videoPackagingTool.style.display = 'none';
                 } else if (tool === 'voice_tool') {
                     if (workflow) workflow.style.display = 'none';
                     if (scriptTool) scriptTool.style.display = 'none';
                     if (edlTool) edlTool.style.display = 'none';
                     if (voiceTool) voiceTool.style.display = 'block';
+                    if (videoPackagingTool) videoPackagingTool.style.display = 'none';
                     try { loadElevenVoices(); } catch (e) {}
                     try { loadElevenModels(); } catch (e) {}
+                } else if (tool === 'video_packaging_tool') {
+                    if (workflow) workflow.style.display = 'none';
+                    if (scriptTool) scriptTool.style.display = 'none';
+                    if (edlTool) edlTool.style.display = 'none';
+                    if (voiceTool) voiceTool.style.display = 'none';
+                    if (videoPackagingTool) videoPackagingTool.style.display = 'block';
                 } else {
                     if (workflow) workflow.style.display = 'block';
                     if (scriptTool) scriptTool.style.display = 'none';
                     if (edlTool) edlTool.style.display = 'none';
                     if (voiceTool) voiceTool.style.display = 'none';
+                    if (videoPackagingTool) videoPackagingTool.style.display = 'none';
                 }
                 const group = document.querySelector('[aria-label="工具切换"]');
                 if (group) {
                     const btns = group.querySelectorAll('button');
                     btns.forEach(b => b.classList.remove('active'));
-                    const map = { workflow: 0, script_tool: 1, edl_tool: 2, voice_tool: 3 };
+                    const map = { workflow: 0, script_tool: 1, edl_tool: 2, voice_tool: 3, video_packaging_tool: 4 };
                     const idx = map[tool];
                     if (typeof idx === 'number' && btns[idx]) btns[idx].classList.add('active');
                 }
@@ -3115,10 +3721,16 @@ Now, I give you the JSONs:
                 const scriptTool = document.getElementById('scriptToolSection');
                 const edlTool = document.getElementById('edlToolSection');
                 const voiceTool = document.getElementById('voiceToolSection');
+                const videoPackagingTool = document.getElementById('videoPackagingToolSection');
                 if (workflow) workflow.style.display = 'block';
                 if (scriptTool) scriptTool.style.display = 'none';
                 if (edlTool) edlTool.style.display = 'none';
                 if (voiceTool) voiceTool.style.display = 'none';
+                if (videoPackagingTool) videoPackagingTool.style.display = 'none';
+
+                // 初始化视频包装工具事件监听器
+                initVideoPackagingTool();
+
                 try { loadElevenVoices(); } catch (e) {}
                 try { loadElevenModels(); } catch (e) {}
             } catch (e) { /* no-op */ }
@@ -3129,7 +3741,11 @@ Now, I give you the JSONs:
             if (container) { container.style.display = 'none'; }
             moveToNextStep();
             const section = document.getElementById('scriptExtractSection');
-            if (section) { section.style.display = 'block'; }
+            if (section) {
+                section.style.display = 'block';
+                // 初始化第6步语音和模型选择器
+                initStep6VoiceConfig();
+            }
             const vbtn = document.getElementById('videoEditNextStepButtonContainer');
             if (vbtn) { vbtn.style.display = 'block'; }
         }
@@ -7205,8 +7821,27 @@ Now, I give you the JSONs:
                     const c = document.getElementById('voiceToolResultContainer');
                     const t = document.getElementById('voiceToolResultText');
                     if (c && t) {
+                        const combinedScriptText = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
                         const header = '<h6 class="mb-2"><i class="fas fa-music text-primary"></i> 合并生成结果</h6>';
-                        t.innerHTML = header + `<audio id="voiceCombinedAudio" controls src="${data.url}"></audio>\n<a id="voiceCombinedDownload" class="btn btn-sm btn-outline-info ms-2" href="${data.url}" download>下载音频</a>`;
+                        const scriptSection = `
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0"><i class="fas fa-file-alt text-primary"></i> 拼接脚本（可编辑）</h6>
+                                    <button class="btn btn-sm btn-primary" onclick="regenerateVoiceoverWithEditedScript()">
+                                        <i class="fas fa-sync"></i> 使用修改后的脚本重新生成
+                                    </button>
+                                </div>
+                                <textarea class="form-control" id="voiceCombinedScriptText" rows="8" placeholder="在此编辑拼接后的脚本文本">${escapeHtml(combinedScriptText)}</textarea>
+                            </div>
+                        `;
+                        const audioSection = `
+                            <div class="mb-3">
+                                <h6 class="mb-2"><i class="fas fa-volume-up text-primary"></i> 生成的音频</h6>
+                                <audio id="voiceCombinedAudio" controls src="${data.url}"></audio>
+                                <a id="voiceCombinedDownload" class="btn btn-sm btn-outline-info ms-2" href="${data.url}" download>下载音频</a>
+                            </div>
+                        `;
+                        t.innerHTML = header + scriptSection + audioSection;
                         c.style.display = 'block';
                         c.classList.add('fade-in');
                     }
@@ -7216,6 +7851,89 @@ Now, I give you the JSONs:
             } finally {
                 const btn = document.getElementById('voiceToolStartBtn');
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> 开始生成配音'; }
+            }
+        }
+
+        // 使用编辑后的脚本重新生成配音
+        async function regenerateVoiceoverWithEditedScript() {
+            try {
+                const scriptTextarea = document.getElementById('voiceCombinedScriptText');
+                if (!scriptTextarea) {
+                    showError('找不到脚本编辑区域');
+                    return;
+                }
+
+                const editedText = scriptTextarea.value.trim();
+                if (!editedText) {
+                    showError('脚本内容不能为空');
+                    return;
+                }
+
+                // 禁用按钮并显示加载状态
+                const regenerateBtn = event.target;
+                const originalText = regenerateBtn.innerHTML;
+                regenerateBtn.disabled = true;
+                regenerateBtn.innerHTML = '<span class="loading-spinner"></span>重新生成中...';
+
+                // 获取当前选择的voice和model
+                let voiceId = '';
+                const voiceSel = document.getElementById('voiceToolVoiceSelect');
+                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+
+                let modelId = '';
+                const modelSel = document.getElementById('voiceToolModelSelect');
+                if (modelSel && modelSel.value) modelId = modelSel.value;
+
+                const batchId = 'voiceover_edited_' + Date.now();
+
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: editedText,
+                        voice_id: voiceId,
+                        model_id: modelId,
+                        batch_id: batchId,
+                        index: 0,
+                        output_format: 'mp3_44100_128'
+                    })
+                });
+
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '重新生成失败');
+                } else {
+                    // 更新音频播放器和下载链接
+                    const audioElement = document.getElementById('voiceCombinedAudio');
+                    const downloadElement = document.getElementById('voiceCombinedDownload');
+                    if (audioElement) audioElement.src = data.url;
+                    if (downloadElement) downloadElement.href = data.url;
+
+                    // 显示成功消息
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'alert alert-success alert-dismissible fade show mt-2';
+                    successMsg.innerHTML = `
+                        <i class="fas fa-check-circle"></i> 音频已成功重新生成！
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+
+                    const audioSection = audioElement.parentElement;
+                    audioSection.appendChild(successMsg);
+
+                    // 3秒后自动移除成功消息
+                    setTimeout(() => {
+                        if (successMsg.parentNode) {
+                            successMsg.parentNode.removeChild(successMsg);
+                        }
+                    }, 3000);
+                }
+            } catch (e) {
+                showError('重新生成错误：' + e.message);
+            } finally {
+                // 恢复按钮状态
+                const regenerateBtn = event.target;
+                regenerateBtn.disabled = false;
+                regenerateBtn.innerHTML = '<i class="fas fa-sync"></i> 使用修改后的脚本重新生成';
             }
         }
 
@@ -7251,6 +7969,324 @@ Now, I give you the JSONs:
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync"></i> 重试'; }
             }
         }
+
+        // ==================== 第6步台词配音功能扩展 ====================
+
+        // 初始化第6步语音配置
+        function initStep6VoiceConfig() {
+            try {
+                // 加载语音和模型选择器
+                loadStep6Voices();
+                loadStep6Models();
+
+                // 监听生成模式变化
+                const modeSelect = document.getElementById('step6ModeSelect');
+                if (modeSelect) {
+                    modeSelect.addEventListener('change', function() {
+                        const previewBtn = document.getElementById('voiceoverPreviewBtn');
+                        if (this.value === 'combined') {
+                            if (previewBtn) previewBtn.style.display = 'inline-block';
+                        } else {
+                            if (previewBtn) previewBtn.style.display = 'none';
+                            // 隐藏脚本编辑器
+                            const scriptEditor = document.getElementById('step6ScriptEditor');
+                            if (scriptEditor) scriptEditor.style.display = 'none';
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to initialize step 6 voice config:', e);
+            }
+        }
+
+        // 加载第6步语音选择器
+        async function loadStep6Voices() {
+            try {
+                const sel = document.getElementById('step6VoiceSelect');
+                if (!sel) return;
+
+                sel.innerHTML = '<option value="">加载中...</option>';
+                const resp = await fetch('/elevenlabs/voices?page_size=100');
+                if (!resp.ok) {
+                    sel.innerHTML = '<option value="">加载失败</option>';
+                    return;
+                }
+
+                const data = await resp.json();
+                if (!data.success) {
+                    sel.innerHTML = '<option value="">加载失败</option>';
+                    return;
+                }
+
+                const voices = data.voices || [];
+                const priorityName = '许你真心岁岁欢'; // 使用默认语音
+                const top = [], rest = [];
+
+                for (const v of voices) {
+                    if (v.name === priorityName) top.push(v); else rest.push(v);
+                }
+                const ordered = top.concat(rest);
+                sel.innerHTML = ordered.map(v => `<option value="${v.id}">${escapeHtml(v.name)}</option>`).join('');
+                if (top.length) sel.value = top[0].id;
+            } catch (e) {
+                console.error('Failed to load step 6 voices:', e);
+                const sel = document.getElementById('step6VoiceSelect');
+                if (sel) sel.innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        // 加载第6步模型选择器
+        async function loadStep6Models() {
+            try {
+                const sel = document.getElementById('step6ModelSelect');
+                if (!sel) return;
+
+                sel.innerHTML = '<option value="">加载中...</option>';
+                const resp = await fetch('/elevenlabs/models');
+                if (!resp.ok) {
+                    sel.innerHTML = '<option value="">加载失败</option>';
+                    return;
+                }
+
+                const data = await resp.json();
+                if (!data.success) {
+                    sel.innerHTML = '<option value="">加载失败</option>';
+                    return;
+                }
+
+                const models = data.models || [];
+                const priorityName = 'Eleven v3 (alpha)';
+                const top = [], rest = [];
+
+                for (const m of models) {
+                    if ((m.name || m.id) === priorityName) top.push(m); else rest.push(m);
+                }
+                const ordered = top.concat(rest);
+                sel.innerHTML = ordered.map(m => `<option value="${m.id}">${escapeHtml(m.name || m.id)}</option>`).join('');
+                if (top.length) sel.value = top[0].id;
+            } catch (e) {
+                console.error('Failed to load step 6 models:', e);
+                const sel = document.getElementById('step6ModelSelect');
+                if (sel) sel.innerHTML = '<option value="">加载失败</option>';
+            }
+        }
+
+        // 第6步配音生成主函数
+        async function startStep6VoiceoverGeneration() {
+            const mode = document.getElementById('step6ModeSelect').value;
+            const segments = collectNarrationSegments();
+
+            if (mode === 'combined') {
+                await generateStep6VoiceoverCombined(segments);
+            } else {
+                // 保持原有的逐段生成逻辑
+                await startVoiceoverGeneration();
+            }
+        }
+
+        // 第6步合并生成配音
+        async function generateStep6VoiceoverCombined(segments) {
+            try {
+                setStepStatus(6, 'processing', '台词配音生成中...');
+                updateStepProgress(6, 10);
+
+                const btn = document.getElementById('voiceoverGenerateBtn');
+                if (btn) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="loading-spinner"></span>生成中...';
+                }
+
+                const text = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
+                if (!text) {
+                    showError('未找到可生成的台词片段');
+                    return;
+                }
+
+                updateStepProgress(6, 30);
+
+                // 获取选择的voice和model
+                let voiceId = '';
+                const voiceSel = document.getElementById('step6VoiceSelect');
+                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+
+                let modelId = '';
+                const modelSel = document.getElementById('step6ModelSelect');
+                if (modelSel && modelSel.value) modelId = modelSel.value;
+
+                updateStepProgress(6, 50);
+
+                const batchId = 'step6_combined_' + Date.now();
+
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        voice_id: voiceId,
+                        model_id: modelId,
+                        batch_id: batchId,
+                        index: 0,
+                        output_format: 'mp3_44100_128'
+                    })
+                });
+
+                updateStepProgress(6, 80);
+
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '第6步合并生成失败');
+                } else {
+                    const combinedScriptText = text;
+                    const c = document.getElementById('scriptExtractResultContainer');
+                    const t = document.getElementById('scriptExtractResultText');
+
+                    if (c && t) {
+                        const header = '<h6 class="mb-2"><i class="fas fa-music text-primary"></i> 第6步合并生成结果</h6>';
+                        const scriptSection = `
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0"><i class="fas fa-file-alt text-primary"></i> 拼接脚本（可编辑）</h6>
+                                    <button class="btn btn-sm btn-primary" onclick="regenerateStep6Voiceover()">
+                                        <i class="fas fa-sync"></i> 使用修改后的脚本重新生成
+                                    </button>
+                                </div>
+                                <textarea class="form-control" id="step6CombinedScriptResult" rows="8">${escapeHtml(combinedScriptText)}</textarea>
+                            </div>
+                        `;
+                        const audioSection = `
+                            <div class="mb-3">
+                                <h6 class="mb-2"><i class="fas fa-volume-up text-primary"></i> 生成的音频</h6>
+                                <audio id="step6CombinedAudio" controls src="${data.url}"></audio>
+                                <a id="step6CombinedDownload" class="btn btn-sm btn-outline-info ms-2" href="${data.url}" download>下载音频</a>
+                            </div>
+                        `;
+                        t.innerHTML = header + scriptSection + audioSection;
+                        c.style.display = 'block';
+                        c.classList.add('fade-in');
+                    }
+
+                    updateStepProgress(6, 100);
+                    setStepStatus(6, 'completed', '台词配音生成完成');
+                }
+            } catch (e) {
+                showError('第6步合并生成错误：' + e.message);
+                setStepStatus(6, 'error', '台词配音生成失败');
+            } finally {
+                const btn = document.getElementById('voiceoverGenerateBtn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-play"></i> 开始配音生成';
+                }
+            }
+        }
+
+        // 预览第6步脚本
+        function previewStep6Script() {
+            const segments = collectNarrationSegments();
+            if (!segments || segments.length === 0) {
+                showError('没有可预览的台词片段');
+                return;
+            }
+
+            const combinedScript = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
+            const scriptEditor = document.getElementById('step6ScriptEditor');
+            const scriptTextarea = document.getElementById('step6CombinedScript');
+
+            if (scriptEditor && scriptTextarea) {
+                scriptTextarea.value = combinedScript;
+                scriptEditor.style.display = 'block';
+                scriptEditor.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // 重新生成第6步配音
+        async function regenerateStep6Voiceover() {
+            try {
+                const scriptTextarea = document.getElementById('step6CombinedScript');
+                if (!scriptTextarea) {
+                    showError('找不到脚本编辑区域');
+                    return;
+                }
+
+                const editedText = scriptTextarea.value.trim();
+                if (!editedText) {
+                    showError('脚本内容不能为空');
+                    return;
+                }
+
+                // 禁用按钮并显示加载状态
+                const regenerateBtn = event.target;
+                const originalText = regenerateBtn.innerHTML;
+                regenerateBtn.disabled = true;
+                regenerateBtn.innerHTML = '<span class="loading-spinner"></span>重新生成中...';
+
+                // 获取当前选择的voice和model
+                let voiceId = '';
+                const voiceSel = document.getElementById('step6VoiceSelect');
+                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+
+                let modelId = '';
+                const modelSel = document.getElementById('step6ModelSelect');
+                if (modelSel && modelSel.value) modelId = modelSel.value;
+
+                const batchId = 'step6_edited_' + Date.now();
+
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: editedText,
+                        voice_id: voiceId,
+                        model_id: modelId,
+                        batch_id: batchId,
+                        index: 0,
+                        output_format: 'mp3_44100_128'
+                    })
+                });
+
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '第6步重新生成失败');
+                } else {
+                    // 更新音频播放器和下载链接
+                    const audioElement = document.getElementById('step6CombinedAudio');
+                    const downloadElement = document.getElementById('step6CombinedDownload');
+                    const resultTextarea = document.getElementById('step6CombinedScriptResult');
+
+                    if (audioElement) audioElement.src = data.url;
+                    if (downloadElement) downloadElement.href = data.url;
+                    if (resultTextarea) resultTextarea.value = editedText;
+
+                    // 显示成功消息
+                    const scriptEditor = document.getElementById('step6ScriptEditor');
+                    if (scriptEditor) {
+                        const successMsg = document.createElement('div');
+                        successMsg.className = 'alert alert-success alert-dismissible fade show mt-2';
+                        successMsg.innerHTML = `
+                            <i class="fas fa-check-circle"></i> 第6步音频已成功重新生成！
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        `;
+                        scriptEditor.appendChild(successMsg);
+
+                        // 3秒后自动移除成功消息
+                        setTimeout(() => {
+                            if (successMsg.parentNode) {
+                                successMsg.parentNode.removeChild(successMsg);
+                            }
+                        }, 3000);
+                    }
+                }
+            } catch (e) {
+                showError('第6步重新生成错误：' + e.message);
+            } finally {
+                // 恢复按钮状态
+                const regenerateBtn = event.target;
+                regenerateBtn.disabled = false;
+                regenerateBtn.innerHTML = '<i class="fas fa-sync"></i> 使用修改后的脚本重新生成';
+            }
+        }
+
+        // ==================== 原有配音生成函数 ====================
 
         async function startVoiceoverGeneration() {
             if (!jsonMergeBatchId) { showError('缺少批次ID，请先完成第5步'); return; }
@@ -7340,6 +8376,1137 @@ Now, I give you the JSONs:
                 const btn = document.getElementById('copyExtract' + i);
                 if (btn) btn.onclick = () => navigator.clipboard.writeText(s);
             });
+        }
+
+        // ==================== 视频包装工具 JavaScript ====================
+
+        let customSubtitleCount = 0;
+        let previewZoom = 0.5; // 默认缩放比例
+        let previewUpdateTimer = null;
+
+        // 更新预览缩放
+        function adjustPreviewZoom(delta) {
+            previewZoom = Math.max(0.1, Math.min(2.0, previewZoom + delta));
+            updatePreviewCanvas();
+            updateZoomDisplay();
+        }
+
+        // 重置预览缩放
+        function resetPreviewZoom() {
+            previewZoom = 0.5;
+            updatePreviewCanvas();
+            updateZoomDisplay();
+        }
+
+        // 更新缩放显示
+        function updateZoomDisplay() {
+            const canvas = document.getElementById('previewCanvas');
+            const actualZoom = Math.round(previewZoom * 100);
+            document.getElementById('zoomLevel').textContent = actualZoom + '%';
+            document.getElementById('actualZoomLevel').textContent = actualZoom + '%';
+        }
+
+        // 更新预览画布尺寸
+        function updatePreviewCanvas() {
+            const canvas = document.getElementById('previewCanvas');
+            const canvasConfig = getCanvasConfig();
+
+            // 根据缩放比例计算预览尺寸
+            const previewWidth = Math.round(canvasConfig.width * previewZoom);
+            const previewHeight = Math.round(canvasConfig.height * previewZoom);
+
+            canvas.width = previewWidth;
+            canvas.height = previewHeight;
+
+            // 更新尺寸显示
+            document.getElementById('previewDimensions').textContent = `${previewWidth} × ${previewHeight}`;
+            document.getElementById('canvasDimensions').textContent = `${canvasConfig.width} × ${canvasConfig.height}`;
+
+            // 重新渲染预览
+            renderPreview();
+        }
+
+        // 渲染预览
+        function renderPreview() {
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+
+            if (!canvas || !ctx) return;
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 获取所有配置
+            const canvasConfig = getCanvasConfig();
+            const backgroundConfig = getBackgroundConfig();
+            const videoConfig = getVideoConfig();
+            const subtitleConfigs = getSubtitleConfigs();
+            const watermarkConfig = getWatermarkConfig();
+
+            // 渲染背景
+            renderBackground(ctx, canvasConfig, backgroundConfig);
+
+            // 渲染视频占位区域
+            renderVideoPlaceholder(ctx, canvasConfig, videoConfig);
+
+            // 渲染字幕
+            renderSubtitles(ctx, canvasConfig, subtitleConfigs);
+
+            // 渲染水印
+            renderWatermark(ctx, canvasConfig, watermarkConfig);
+        }
+
+        // 渲染背景
+        function renderBackground(ctx, canvasConfig, backgroundConfig) {
+            if (!backgroundConfig) {
+                // 使用画布背景色
+                ctx.fillStyle = canvasConfig.backgroundColor;
+                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                return;
+            }
+
+            switch (backgroundConfig.type) {
+                case 'color':
+                    ctx.fillStyle = backgroundConfig.color;
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    break;
+
+                case 'image':
+                    // 绘制图片背景占位符
+                    ctx.fillStyle = '#f0f0f0';
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    ctx.fillStyle = '#666';
+                    ctx.font = '14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('背景图片', ctx.canvas.width / 2, ctx.canvas.height / 2 - 10);
+                    ctx.font = '12px Arial';
+                    ctx.fillText(backgroundConfig.url || '未设置URL', ctx.canvas.width / 2, ctx.canvas.height / 2 + 10);
+
+                    if (backgroundConfig.imageBlur) {
+                        // 模糊效果提示
+                        ctx.strokeStyle = '#999';
+                        ctx.strokeRect(10, 10, ctx.canvas.width - 20, ctx.canvas.height - 20);
+                    }
+                    break;
+
+                case 'blur':
+                    // 前景虚化背景
+                    const gradient = ctx.createRadialGradient(
+                        ctx.canvas.width / 2, ctx.canvas.height / 2, 0,
+                        ctx.canvas.width / 2, ctx.canvas.height / 2, Math.min(ctx.canvas.width, ctx.canvas.height) / 2
+                    );
+                    gradient.addColorStop(0, 'rgba(200, 200, 200, 0.2)');
+                    gradient.addColorStop(1, 'rgba(100, 100, 100, 0.8)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+                    // 模糊半径提示
+                    ctx.fillStyle = '#666';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`模糊半径: ${backgroundConfig.blurRadius}`, ctx.canvas.width / 2, ctx.canvas.height / 2);
+                    break;
+            }
+        }
+
+        // 渲染视频占位区域
+        function renderVideoPlaceholder(ctx, canvasConfig, videoConfig) {
+            const x = videoConfig.x * ctx.canvas.width;
+            const y = videoConfig.y * ctx.canvas.height;
+            const width = videoConfig.width * ctx.canvas.width;
+            const height = videoConfig.height * ctx.canvas.height;
+
+            // 绘制视频区域边框
+            ctx.strokeStyle = '#007bff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(x, y, width, height);
+            ctx.setLineDash([]);
+
+            // 填充半透明背景
+            ctx.fillStyle = 'rgba(0, 123, 255, 0.1)';
+            ctx.fillRect(x, y, width, height);
+
+            // 添加视频标签
+            ctx.fillStyle = '#007bff';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('视频区域', x + width / 2, y + height / 2 - 10);
+            ctx.font = '12px Arial';
+            ctx.fillText(`${Math.round(width)} × ${Math.round(height)}`, x + width / 2, y + height / 2 + 10);
+            ctx.fillText(videoConfig.adaptMode, x + width / 2, y + height / 2 + 25);
+        }
+
+        // 渲染字幕
+        function renderSubtitles(ctx, canvasConfig, subtitleConfigs) {
+            subtitleConfigs.forEach(subtitle => {
+                if (!subtitle.enabled || !subtitle.content) return;
+
+                // 计算字幕位置（按比例缩放到预览画布）
+                const x = subtitle.x * ctx.canvas.width;
+                const y = subtitle.y * ctx.canvas.height;
+                const textWidth = subtitle.textwidth * ctx.canvas.width;
+
+                // 设置字体样式
+                const fontSize = Math.max(8, Math.round(subtitle.size * previewZoom)); // 最小8px
+                ctx.font = `${subtitle.fontface.Bold ? 'bold ' : ''}${fontSize}px ${subtitle.font}`;
+                ctx.fillStyle = subtitle.color;
+                ctx.textAlign = subtitle.align.toLowerCase();
+
+                // 处理多行文本
+                const lines = subtitle.content.split('\n');
+                const lineHeight = fontSize * 1.2;
+
+                lines.forEach((line, index) => {
+                    const lineY = y + (index * lineHeight);
+
+                    // 添加描边效果（如果启用）
+                    if (subtitle.stroke.width > 0) {
+                        ctx.strokeStyle = subtitle.stroke.color;
+                        ctx.lineWidth = subtitle.stroke.width;
+                        ctx.strokeText(line, x, lineY);
+                    }
+
+                    // 添加阴影效果
+                    if (subtitle.shadow.width > 0) {
+                        ctx.shadowColor = subtitle.shadow.color;
+                        ctx.shadowBlur = subtitle.shadow.blur * previewZoom;
+                        ctx.shadowOffsetX = subtitle.shadow.xshift * previewZoom;
+                        ctx.shadowOffsetY = subtitle.shadow.yshift * previewZoom;
+                    }
+
+                    ctx.fillText(line, x, lineY);
+
+                    // 重置阴影
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
+                });
+            });
+        }
+
+        // 渲染水印
+        function renderWatermark(ctx, canvasConfig, watermarkConfig) {
+            if (!watermarkConfig || !watermarkConfig.enabled) return;
+
+            const x = watermarkConfig.x * ctx.canvas.width;
+            const y = watermarkConfig.y * ctx.canvas.height;
+            const width = watermarkConfig.width * ctx.canvas.width;
+            const height = watermarkConfig.height * ctx.canvas.height;
+
+            // 绘制水印占位符
+            ctx.globalAlpha = watermarkConfig.opacity;
+            ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
+            ctx.fillRect(x, y, width, height);
+
+            // 添加水印标签
+            ctx.globalAlpha = watermarkConfig.opacity;
+            ctx.fillStyle = '#666';
+            ctx.font = `${Math.max(10, Math.round(12 * previewZoom))}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText('水印', x + width / 2, y + height / 2);
+
+            ctx.globalAlpha = 1.0; // 重置透明度
+        }
+
+        // 防抖更新预览
+        function debouncedUpdatePreview() {
+            if (previewUpdateTimer) {
+                clearTimeout(previewUpdateTimer);
+            }
+            previewUpdateTimer = setTimeout(() => {
+                renderPreview();
+            }, 100); // 100ms防抖
+        }
+
+        // 初始化视频包装工具
+        function initVideoPackagingTool() {
+            // 初始化预览
+            updatePreviewCanvas();
+            updateZoomDisplay();
+
+            // 音频滑块事件监听
+            const originalVolume = document.getElementById('originalVolume');
+            const bgmVolume = document.getElementById('bgmVolume');
+
+            if (originalVolume) {
+                originalVolume.addEventListener('input', function() {
+                    document.getElementById('originalVolumeValue').textContent = this.value;
+                    debouncedUpdatePreview();
+                });
+            }
+
+            if (bgmVolume) {
+                bgmVolume.addEventListener('input', function() {
+                    document.getElementById('bgmVolumeValue').textContent = this.value;
+                    debouncedUpdatePreview();
+                });
+            }
+
+            // 水印启用/禁用事件
+            const watermarkEnabled = document.getElementById('watermarkEnabled');
+            if (watermarkEnabled) {
+                watermarkEnabled.addEventListener('change', function() {
+                    const config = document.getElementById('watermarkConfig');
+                    config.style.display = this.checked ? 'block' : 'none';
+                    debouncedUpdatePreview();
+                });
+            }
+
+            // 画布配置事件监听
+            ['canvasWidth', 'canvasHeight', 'canvasBackgroundColor'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', debouncedUpdatePreview);
+                    element.addEventListener('change', updatePreviewCanvas);
+                }
+            });
+
+            // 背景配置事件监听
+            const backgroundType = document.getElementById('backgroundType');
+            if (backgroundType) {
+                backgroundType.addEventListener('change', function() {
+                    updateBackgroundConfig();
+                    debouncedUpdatePreview();
+                });
+            }
+
+            ['bgColor', 'bgImageUrl', 'bgImageBlur', 'bgBlurRadius'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', debouncedUpdatePreview);
+                    element.addEventListener('change', debouncedUpdatePreview);
+                }
+            });
+
+            // 视频配置事件监听
+            ['videoX', 'videoY', 'videoWidth', 'videoHeight', 'videoAdaptMode'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', debouncedUpdatePreview);
+                    element.addEventListener('change', debouncedUpdatePreview);
+                }
+            });
+
+            // 水印配置事件监听
+            ['watermarkUrl', 'watermarkX', 'watermarkY', 'watermarkWidth', 'watermarkHeight', 'watermarkOpacity'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', debouncedUpdatePreview);
+                    element.addEventListener('change', debouncedUpdatePreview);
+                }
+            });
+
+            // 字幕配置事件监听
+            const subtitleIds = ['title', 'subtitle', 'name', 'position'];
+            subtitleIds.forEach(id => {
+                // 启用/禁用复选框
+                const enabledCheckbox = document.getElementById(id + 'Enabled');
+                if (enabledCheckbox) {
+                    enabledCheckbox.addEventListener('change', debouncedUpdatePreview);
+                }
+
+                // 内容输入框
+                const contentInput = document.getElementById(id + 'Content');
+                if (contentInput) {
+                    contentInput.addEventListener('input', debouncedUpdatePreview);
+                }
+
+                // 样式控件
+                ['Size', 'Color'].forEach(suffix => {
+                    const element = document.getElementById(id + suffix);
+                    if (element) {
+                        element.addEventListener('input', debouncedUpdatePreview);
+                        element.addEventListener('change', debouncedUpdatePreview);
+                    }
+                });
+            });
+
+            // 特殊字幕功能
+            const subtitleKeywords = document.getElementById('subtitleKeywords');
+            if (subtitleKeywords) {
+                subtitleKeywords.addEventListener('change', debouncedUpdatePreview);
+            }
+        }
+
+        // 更新背景配置显示
+        function updateBackgroundConfig() {
+            const type = document.getElementById('backgroundType').value;
+            const colorConfig = document.getElementById('backgroundColorConfig');
+            const imageConfig = document.getElementById('backgroundImageConfig');
+            const blurConfig = document.getElementById('backgroundBlurConfig');
+
+            // 隐藏所有配置
+            colorConfig.style.display = 'none';
+            imageConfig.style.display = 'none';
+            blurConfig.style.display = 'none';
+
+            // 显示对应配置
+            if (type === 'color') {
+                colorConfig.style.display = 'block';
+            } else if (type === 'image') {
+                imageConfig.style.display = 'block';
+            } else if (type === 'blur') {
+                blurConfig.style.display = 'block';
+            }
+        }
+
+        // 添加自定义字幕
+        function addCustomSubtitle() {
+            customSubtitleCount++;
+            const container = document.getElementById('customSubtitlesContainer');
+            const subtitleId = `custom-${Date.now()}`;
+
+            const subtitleHTML = `
+                <div class="subtitle-item mb-3 border p-3 rounded" data-subtitle-id="${subtitleId}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-info mb-0">自定义字幕 #${customSubtitleCount}</h6>
+                        <button class="btn btn-sm btn-danger" onclick="removeCustomSubtitle('${subtitleId}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="${subtitleId}Enabled" checked>
+                        <label class="form-check-label" for="${subtitleId}Enabled">
+                            启用此字幕
+                        </label>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <label class="form-label">字幕名称</label>
+                            <input type="text" class="form-control" id="${subtitleId}Name" value="未命名字幕">
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <label class="form-label">字幕内容</label>
+                            <textarea class="form-control" id="${subtitleId}Content" rows="2" placeholder="输入字幕文本"></textarea>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <label class="form-label">字号</label>
+                            <input type="number" class="form-control" id="${subtitleId}Size" value="90">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">颜色</label>
+                            <input type="color" class="form-control form-control-color" id="${subtitleId}Color" value="#ffffff">
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <label class="form-label">X坐标 (0-1)</label>
+                            <input type="number" class="form-control" id="${subtitleId}X" value="0.5" min="0" max="1" step="0.01">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Y坐标 (0-1)</label>
+                            <input type="number" class="form-control" id="${subtitleId}Y" value="0.5" min="0" max="1" step="0.01">
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <label class="form-label">文字宽度比例 (0-1)</label>
+                            <input type="number" class="form-control" id="${subtitleId}TextWidth" value="0.8" min="0" max="1" step="0.01">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', subtitleHTML);
+
+            // 为新添加的自定义字幕添加事件监听器
+            setTimeout(() => {
+                // 启用/禁用复选框
+                const enabledCheckbox = document.getElementById(subtitleId + 'Enabled');
+                if (enabledCheckbox) {
+                    enabledCheckbox.addEventListener('change', debouncedUpdatePreview);
+                }
+
+                // 内容输入框
+                const contentInput = document.getElementById(subtitleId + 'Content');
+                if (contentInput) {
+                    contentInput.addEventListener('input', debouncedUpdatePreview);
+                }
+
+                // 样式和位置控件
+                ['Name', 'Size', 'Color', 'X', 'Y', 'TextWidth'].forEach(suffix => {
+                    const element = document.getElementById(subtitleId + suffix);
+                    if (element) {
+                        element.addEventListener('input', debouncedUpdatePreview);
+                        element.addEventListener('change', debouncedUpdatePreview);
+                    }
+                });
+            }, 10); // 延迟10ms确保DOM更新完成
+        }
+
+        // 移除自定义字幕
+        function removeCustomSubtitle(subtitleId) {
+            const element = document.querySelector(`[data-subtitle-id="${subtitleId}"]`);
+            if (element) {
+                element.remove();
+                debouncedUpdatePreview();
+            }
+        }
+
+        // 生成视频编辑配置
+        function generateVideoEditConfig() {
+            try {
+                const config = {
+                    canvas: getCanvasConfig(),
+                    video: getVideoConfig(),
+                    subtitle_track_clips: getSubtitleConfigs()
+                };
+
+                // 添加可选配置
+                const background = getBackgroundConfig();
+                if (background) {
+                    config.background = background;
+                }
+
+                const audio = getAudioConfig();
+                if (audio) {
+                    config.audio = audio;
+                }
+
+                const watermark = getWatermarkConfig();
+                if (watermark) {
+                    config.watermark = watermark;
+                }
+
+                // 显示配置结果
+                const resultContainer = document.getElementById('configResultContainer');
+                const resultElement = document.getElementById('configResult');
+
+                if (resultContainer && resultElement) {
+                    resultElement.textContent = JSON.stringify(config, null, 2);
+                    resultContainer.style.display = 'block';
+                    resultContainer.scrollIntoView({ behavior: 'smooth' });
+                }
+
+                return config;
+            } catch (error) {
+                alert('生成配置时出错：' + error.message);
+                return null;
+            }
+        }
+
+        // 获取画布配置
+        function getCanvasConfig() {
+            return {
+                width: parseInt(document.getElementById('canvasWidth').value),
+                height: parseInt(document.getElementById('canvasHeight').value),
+                backgroundColor: document.getElementById('canvasBackgroundColor').value
+            };
+        }
+
+        // 获取背景配置
+        function getBackgroundConfig() {
+            const type = document.getElementById('backgroundType').value;
+            if (!type) return null;
+
+            const canvas = getCanvasConfig();
+            const config = {
+                type: type,
+                width: canvas.width,
+                height: canvas.height
+            };
+
+            if (type === 'color') {
+                config.color = document.getElementById('bgColor').value;
+            } else if (type === 'image') {
+                config.url = document.getElementById('bgImageUrl').value;
+                config.imageBlur = document.getElementById('bgImageBlur').checked;
+            } else if (type === 'blur') {
+                config.blurRadius = parseFloat(document.getElementById('bgBlurRadius').value);
+            }
+
+            return config;
+        }
+
+        // 获取视频配置
+        function getVideoConfig() {
+            return {
+                x: parseFloat(document.getElementById('videoX').value),
+                y: parseFloat(document.getElementById('videoY').value),
+                width: parseFloat(document.getElementById('videoWidth').value),
+                height: parseFloat(document.getElementById('videoHeight').value),
+                adaptMode: document.getElementById('videoAdaptMode').value
+            };
+        }
+
+        // 获取音频配置
+        function getAudioConfig() {
+            const originalVolume = parseInt(document.getElementById('originalVolume').value);
+            const bgmVolume = parseInt(document.getElementById('bgmVolume').value);
+            const bgmUrl = document.getElementById('bgmUrl').value.trim();
+
+            // 如果所有值都是默认值且没有BGM URL，则返回null
+            if (originalVolume === 100 && bgmVolume === 20 && !bgmUrl) {
+                return null;
+            }
+
+            const config = {
+                originalVolume: originalVolume,
+                bgmVolume: bgmVolume
+            };
+
+            if (bgmUrl) {
+                config.bgmUrl = bgmUrl;
+            }
+
+            return config;
+        }
+
+        // 获取字幕配置
+        function getSubtitleConfigs() {
+            const subtitles = [];
+
+            // 预设字幕
+            const presetSubtitles = [
+                { id: 'title', type: 'title', name: '标题' },
+                { id: 'subtitle', type: 'subtitle', name: '字幕' },
+                { id: 'name', type: 'name', name: '人物姓名' },
+                { id: 'position', type: 'position', name: '人物职位' }
+            ];
+
+            presetSubtitles.forEach(preset => {
+                const enabled = document.getElementById(preset.id + 'Enabled').checked;
+                if (!enabled) return;
+
+                const subtitle = {
+                    id: preset.id,
+                    type: preset.type,
+                    name: preset.name,
+                    enabled: true,
+                    font: 'Microsoft YaHei',
+                    size: parseInt(document.getElementById(preset.id + 'Size').value),
+                    color: document.getElementById(preset.id + 'Color').value,
+                    fontface: {
+                        Bold: false,
+                        Italic: false,
+                        Underline: false
+                    },
+                    align: 'Center',
+                    x: preset.id === 'title' ? 0.5 : preset.id === 'subtitle' ? 0.5 : 0.1,
+                    y: preset.id === 'title' ? 0.05 : preset.id === 'subtitle' ? 0.8 : preset.id === 'name' ? 0.58 : 0.63,
+                    textwidth: preset.id === 'title' || preset.id === 'subtitle' ? 0.8 : 0.4,
+                    stroke: {
+                        width: 0,
+                        color: '#000000'
+                    },
+                    shadow: {
+                        width: preset.id === 'subtitle' ? 1 : (preset.id === 'name' || preset.id === 'position' ? 1 : 0),
+                        color: '#000000',
+                        xshift: preset.id === 'name' || preset.id === 'position' ? 4 : 0,
+                        yshift: preset.id === 'name' || preset.id === 'position' ? 8 : 0,
+                        xbord: preset.id === 'name' || preset.id === 'position' ? 4 : 0,
+                        ybord: preset.id === 'name' || preset.id === 'position' ? 8 : 0,
+                        blur: preset.id === 'name' || preset.id === 'position' ? 10 : 0,
+                        opacity: 0.8
+                    },
+                    content: document.getElementById(preset.id + 'Content').value.trim()
+                };
+
+                if (preset.id === 'subtitle') {
+                    subtitle.enable_keywords = document.getElementById('subtitleKeywords').checked;
+                }
+
+                if (subtitle.content) {
+                    subtitles.push(subtitle);
+                }
+            });
+
+            // 自定义字幕
+            const customSubtitleElements = document.querySelectorAll('[data-subtitle-id^="custom-"]');
+            customSubtitleElements.forEach(element => {
+                const subtitleId = element.dataset.subtitleId;
+                const enabled = document.getElementById(subtitleId + 'Enabled').checked;
+                if (!enabled) return;
+
+                const subtitle = {
+                    id: subtitleId,
+                    type: 'customized',
+                    name: document.getElementById(subtitleId + 'Name').value,
+                    enabled: true,
+                    font: 'Microsoft YaHei',
+                    size: parseInt(document.getElementById(subtitleId + 'Size').value),
+                    color: document.getElementById(subtitleId + 'Color').value,
+                    fontface: {
+                        Bold: false,
+                        Italic: false,
+                        Underline: false
+                    },
+                    align: 'Center',
+                    x: parseFloat(document.getElementById(subtitleId + 'X').value),
+                    y: parseFloat(document.getElementById(subtitleId + 'Y').value),
+                    textwidth: parseFloat(document.getElementById(subtitleId + 'TextWidth').value),
+                    stroke: {
+                        width: 0,
+                        color: '#000000'
+                    },
+                    shadow: {
+                        width: 1,
+                        color: '#000000',
+                        xshift: 0,
+                        yshift: 0,
+                        xbord: 0,
+                        ybord: 0,
+                        blur: 0,
+                        opacity: 0.8
+                    },
+                    content: document.getElementById(subtitleId + 'Content').value.trim()
+                };
+
+                if (subtitle.content) {
+                    subtitles.push(subtitle);
+                }
+            });
+
+            return subtitles;
+        }
+
+        // 获取水印配置
+        function getWatermarkConfig() {
+            const enabled = document.getElementById('watermarkEnabled').checked;
+            if (!enabled) return null;
+
+            const url = document.getElementById('watermarkUrl').value.trim();
+            if (!url) return null;
+
+            return {
+                enabled: true,
+                mediaURL: url,
+                x: parseFloat(document.getElementById('watermarkX').value),
+                y: parseFloat(document.getElementById('watermarkY').value),
+                width: parseFloat(document.getElementById('watermarkWidth').value),
+                height: parseFloat(document.getElementById('watermarkHeight').value),
+                opacity: parseFloat(document.getElementById('watermarkOpacity').value)
+            };
+        }
+
+        // 预览配置
+        function previewConfig() {
+            const config = generateVideoEditConfig();
+            if (config) {
+                alert('配置生成成功！请在下方查看完整的JSON配置。');
+            }
+        }
+
+        // 导出配置
+        function exportConfig() {
+            const config = generateVideoEditConfig();
+            if (config) {
+                const dataStr = JSON.stringify(config, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(dataBlob);
+                link.download = `video-edit-config-${new Date().getTime()}.json`;
+                link.click();
+
+                URL.revokeObjectURL(link.href);
+            }
+        }
+
+        // 加载默认配置
+        function loadDefaultConfig() {
+            try {
+                // 画布默认配置
+                document.getElementById('canvasWidth').value = 1080;
+                document.getElementById('canvasHeight').value = 1920;
+                document.getElementById('canvasBackgroundColor').value = '#000000';
+
+                // 背景默认配置
+                document.getElementById('backgroundType').value = '';
+                updateBackgroundConfig();
+
+                // 视频默认配置
+                document.getElementById('videoX').value = 0;
+                document.getElementById('videoY').value = 0;
+                document.getElementById('videoWidth').value = 1;
+                document.getElementById('videoHeight').value = 1;
+                document.getElementById('videoAdaptMode').value = 'Cover';
+
+                // 音频默认配置
+                document.getElementById('originalVolume').value = 100;
+                document.getElementById('originalVolumeValue').textContent = 100;
+                document.getElementById('bgmVolume').value = 20;
+                document.getElementById('bgmVolumeValue').textContent = 20;
+                document.getElementById('bgmUrl').value = '';
+
+                // 水印默认配置
+                document.getElementById('watermarkEnabled').checked = false;
+                document.getElementById('watermarkConfig').style.display = 'none';
+                document.getElementById('watermarkUrl').value = '';
+                document.getElementById('watermarkX').value = 0.7;
+                document.getElementById('watermarkY').value = 0.9;
+                document.getElementById('watermarkWidth').value = 0.25;
+                document.getElementById('watermarkHeight').value = 0.08;
+                document.getElementById('watermarkOpacity').value = 0.3;
+
+                // 字幕默认配置
+                loadDefaultSubtitleConfig();
+
+                // 清除自定义字幕
+                document.getElementById('customSubtitlesContainer').innerHTML = '';
+                customSubtitleCount = 0;
+
+                // 隐藏配置结果
+                document.getElementById('configResultContainer').style.display = 'none';
+
+                // 更新预览
+                updatePreviewCanvas();
+                updateZoomDisplay();
+
+                alert('已加载默认配置！');
+            } catch (error) {
+                alert('加载默认配置时出错：' + error.message);
+            }
+        }
+
+        // 加载默认字幕配置
+        function loadDefaultSubtitleConfig() {
+            // 预设字幕默认值
+            const defaults = {
+                title: { content: '', size: 90, color: '#ffffff', enabled: true },
+                subtitle: { content: '', size: 90, color: '#ffffff', enabled: true, keywords: true },
+                name: { content: '', size: 80, color: '#ffffff', enabled: true },
+                position: { content: '', size: 50, color: '#ffffff', enabled: true }
+            };
+
+            Object.keys(defaults).forEach(key => {
+                const config = defaults[key];
+                document.getElementById(key + 'Enabled').checked = config.enabled;
+                document.getElementById(key + 'Content').value = config.content;
+                document.getElementById(key + 'Size').value = config.size;
+                document.getElementById(key + 'Color').value = config.color;
+
+                if (key === 'subtitle' && config.keywords !== undefined) {
+                    document.getElementById('subtitleKeywords').checked = config.keywords;
+                }
+            });
+        }
+
+        // ==================== 视频包装上传和处理功能 ====================
+
+        // 全局变量存储上传的文件
+        let uploadedPackagingFiles = {
+            video: null,
+            background: null,
+            audio: null,
+            watermark: null
+        };
+
+        let currentPackagingTaskId = null;
+        let packagingStatusInterval = null;
+
+        // 显示上传模态框
+        function showUploadModal() {
+            const modal = new bootstrap.Modal(document.getElementById('videoPackagingUploadModal'));
+            modal.show();
+        }
+
+        // 上传包装文件
+        async function uploadPackagingFile() {
+            const startTime = Date.now();
+            packagingLogger.info('开始上传包装文件');
+
+            const fileType = document.getElementById('packagingFileType').value;
+            const fileInput = document.getElementById('packagingFileInput');
+            const autoFill = document.getElementById('packagingAutoFillConfig').checked;
+
+            packagingLogger.info('上传参数检查', {
+                fileType,
+                hasFile: fileInput.files && fileInput.files.length > 0,
+                fileName: fileInput.files?.[0]?.name,
+                fileSize: fileInput.files?.[0]?.size,
+                autoFill
+            });
+
+            if (!fileType) {
+                packagingLogger.warning('上传失败：未选择文件类型');
+                alert('请选择文件类型');
+                return;
+            }
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                packagingLogger.warning('上传失败：未选择文件');
+                alert('请选择文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('type', fileType);
+
+            packagingLogger.info('准备发送上传请求');
+
+            // 显示上传进度
+            document.getElementById('uploadProgressContainer').style.display = 'block';
+            document.getElementById('uploadProgressBar').style.width = '10%';
+
+            try {
+                packagingLogger.info('发送上传请求');
+                const response = await fetch('/api/video/packaging/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                document.getElementById('uploadProgressBar').style.width = '100%';
+
+                const uploadTime = Date.now() - startTime;
+                packagingLogger.info('上传响应接收', {
+                    status: response.status,
+                    success: result.success,
+                    uploadTime: `${uploadTime}ms`,
+                    result
+                });
+
+                if (result.success) {
+                    // 存储上传的文件信息
+                    uploadedPackagingFiles[fileType] = result;
+                    packagingLogger.info('文件信息存储成功', { fileType, result });
+
+                    // 自动填充配置
+                    if (autoFill) {
+                        packagingLogger.info('开始自动填充配置');
+                        await autoFillConfig(fileType, result);
+                        packagingLogger.info('自动填充配置完成');
+                    }
+
+                    // 显示处理按钮
+                    updateProcessButtonVisibility();
+                    packagingLogger.info('界面更新完成');
+
+                    alert(`文件上传成功！文件名：${result.original_name}`);
+                    packagingLogger.info('上传成功提示已显示');
+
+                    // 关闭模态框
+                    const modalEl = document.getElementById('videoPackagingUploadModal');
+                    if (modalEl) {
+                        // 先移除焦点，避免aria-hidden冲突
+                        document.activeElement.blur();
+
+                        setTimeout(() => {
+                            const modal = bootstrap.Modal.getInstance(modalEl);
+                            if (modal) {
+                                modal.hide();
+                            }
+                        }, 50);
+                    }
+
+                    // 重置表单
+                    document.getElementById('videoPackagingUploadForm').reset();
+                    document.getElementById('uploadProgressContainer').style.display = 'none';
+                    document.getElementById('uploadProgressBar').style.width = '0%';
+
+                    packagingLogger.info('上传流程完成', { totalUploadTime: `${Date.now() - startTime}ms` });
+                } else {
+                    packagingLogger.error('上传失败', result);
+                    alert('文件上传失败：' + result.error);
+                }
+            } catch (error) {
+                const errorTime = Date.now() - startTime;
+                packagingLogger.error('上传异常', {
+                    error: error.message,
+                    uploadTime: `${errorTime}ms`,
+                    stack: error.stack
+                });
+                alert('文件上传出错：' + error.message);
+            } finally {
+                document.getElementById('uploadProgressContainer').style.display = 'none';
+                document.getElementById('uploadProgressBar').style.width = '0%';
+            }
+        }
+
+        // 自动填充配置
+        async function autoFillConfig(fileType, fileInfo) {
+            try {
+                switch (fileType) {
+                    case 'video':
+                        document.getElementById('videoFileUrl').value = fileInfo.file_url;
+                        break;
+                    case 'background':
+                        document.getElementById('backgroundFileUrl').value = fileInfo.file_url;
+                        document.getElementById('backgroundEnabled').checked = true;
+                        break;
+                    case 'audio':
+                        document.getElementById('audioFileUrl').value = fileInfo.file_url;
+                        document.getElementById('audioEnabled').checked = true;
+                        break;
+                    case 'watermark':
+                        document.getElementById('watermarkFileUrl').value = fileInfo.file_url;
+                        document.getElementById('watermarkEnabled').checked = true;
+                        break;
+                }
+
+                // 触发预览更新
+                debouncedUpdatePreview();
+            } catch (error) {
+                console.error('自动填充配置出错：', error);
+            }
+        }
+
+        // 更新处理按钮可见性
+        function updateProcessButtonVisibility() {
+            const hasFiles = Object.values(uploadedPackagingFiles).some(file => file !== null);
+            const processBtn = document.getElementById('processPackagingBtn');
+
+            if (hasFiles) {
+                processBtn.style.display = 'inline-block';
+            } else {
+                processBtn.style.display = 'none';
+            }
+        }
+
+        // 处理视频包装
+        async function processPackaging() {
+            const startTime = Date.now();
+            packagingLogger.info('开始视频包装处理');
+
+            try {
+                // 生成配置
+                packagingLogger.info('生成VideoEditConfig');
+                const config = generateVideoEditConfig();
+                if (!config) {
+                    packagingLogger.warning('配置生成失败');
+                    alert('请先生成配置');
+                    return;
+                }
+
+                // 准备输入文件映射
+                const inputFiles = {};
+                Object.keys(uploadedPackagingFiles).forEach(key => {
+                    if (uploadedPackagingFiles[key]) {
+                        inputFiles[key] = uploadedPackagingFiles[key].file_url;
+                    }
+                });
+
+                packagingLogger.info('输入文件映射准备完成', {
+                    configKeys: Object.keys(config),
+                    inputFiles: Object.keys(inputFiles),
+                    fileDetails: uploadedPackagingFiles
+                });
+
+                packagingLogger.info('发送处理请求');
+                const response = await fetch('/api/video/packaging/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        config: config,
+                        input_files: inputFiles
+                    })
+                });
+
+                const result = await response.json();
+                const requestTime = Date.now() - startTime;
+
+                packagingLogger.info('处理请求响应', {
+                    status: response.status,
+                    success: result.success,
+                    taskId: result.task_id,
+                    requestTime: `${requestTime}ms`,
+                    result
+                });
+
+                if (result.success) {
+                    currentPackagingTaskId = result.task_id;
+                    packagingLogger.info('任务ID设置', { taskId: result.task_id });
+
+                    // 显示状态容器
+                    document.getElementById('packagingStatusContainer').style.display = 'block';
+                    document.getElementById('packagingResultContainer').style.display = 'none';
+
+                    // 开始状态轮询
+                    packagingLogger.info('启动状态轮询');
+                    startPackagingStatusPolling();
+
+                    alert('视频包装任务已启动，正在处理中...');
+                    packagingLogger.info('处理启动提示已显示');
+                } else {
+                    packagingLogger.error('处理启动失败', result);
+                    alert('启动视频包装失败：' + result.error);
+                }
+            } catch (error) {
+                const errorTime = Date.now() - startTime;
+                packagingLogger.error('处理异常', {
+                    error: error.message,
+                    processTime: `${errorTime}ms`,
+                    stack: error.stack
+                });
+                alert('处理视频包装出错：' + error.message);
+            }
+        }
+
+        // 开始状态轮询
+        function startPackagingStatusPolling() {
+            if (packagingStatusInterval) {
+                clearInterval(packagingStatusInterval);
+            }
+
+            packagingStatusInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/video/packaging/status/${currentPackagingTaskId}`);
+                    const result = await response.json();
+
+                    if (result.success) {
+                        updatePackagingStatus(result.status);
+
+                        // 检查是否完成
+                        if (result.status.status === 'completed') {
+                            clearInterval(packagingStatusInterval);
+                            showPackagingResult(result.status);
+                        } else if (result.status.status === 'error') {
+                            clearInterval(packagingStatusInterval);
+                            alert('视频包装处理失败：' + result.status.error);
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取处理状态出错：', error);
+                }
+            }, 2000); // 每2秒轮询一次
+        }
+
+        // 更新处理状态
+        function updatePackagingStatus(status) {
+            const progressBar = document.getElementById('packagingProgressBar');
+            const statusText = document.getElementById('packagingStatusText');
+
+            progressBar.style.width = status.progress + '%';
+            progressBar.textContent = status.progress + '%';
+            progressBar.setAttribute('aria-valuenow', status.progress);
+
+            const statusMap = {
+                'queued': '排队中...',
+                'processing': '处理中...',
+                'completed': '处理完成',
+                'error': '处理失败'
+            };
+
+            statusText.textContent = statusMap[status.status] || status.status;
+        }
+
+        // 显示处理结果
+        function showPackagingResult(status) {
+            document.getElementById('packagingResultContainer').style.display = 'block';
+        }
+
+        // 下载包装结果
+        function downloadPackagingResult() {
+            if (currentPackagingTaskId) {
+                window.open(`/api/video/packaging/download/${currentPackagingTaskId}`, '_blank');
+            }
+        }
+
+        // 下载包装配置
+        function downloadPackagingConfig() {
+            if (currentPackagingTaskId) {
+                window.open(`/api/video/packaging/config/${currentPackagingTaskId}`, '_blank');
+            }
         }
     </script>
 </body>

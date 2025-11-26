@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_file
 from flask import stream_with_context
 import os
 import re
@@ -14,6 +14,8 @@ from werkzeug.utils import secure_filename
 import requests
 import io
 import zipfile
+import logging
+from datetime import datetime
 
 def _load_env_files():
     paths = [".env.local", ".env"]
@@ -40,6 +42,21 @@ _load_env_files()
 
 app = Flask(__name__)
 
+# 配置日志
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+logging.basicConfig(
+    level=logging.INFO,
+    format=log_format,
+    handlers=[
+        logging.FileHandler('app.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+
+# 创建专用日志器
+logger = logging.getLogger(__name__)
+packaging_logger = logging.getLogger('video_packaging')
+
 # 配置文件上传
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -48,8 +65,12 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-# 允许的视频文件扩展名
-ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'}
+# 允许的文件扩展名
+ALLOWED_EXTENSIONS = {
+    'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv',  # 视频
+    'mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac',          # 音频
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'  # 图片
+}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -1604,6 +1625,529 @@ def elevenlabs_models():
                 models.append({ 'id': mid, 'name': name or mid })
         print(f"[ElevenLabs] models count={len(models)}")
         return jsonify({"success": True, "models": models})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# 视频包装任务存储
+packaging_tasks = {}
+packaging_status = {}
+
+import json
+import hashlib
+from datetime import datetime
+
+class VideoPackager:
+    def __init__(self):
+        packaging_logger.info("VideoPackager initialized")
+
+    def log_packaging_step(self, step, details=None, level='info'):
+        """记录包装步骤日志"""
+        message = f"[PACKAGING] {step}"
+        if details:
+            message += f" - {details}"
+
+        if level == 'error':
+            packaging_logger.error(message)
+        elif level == 'warning':
+            packaging_logger.warning(message)
+        else:
+            packaging_logger.info(message)
+
+    def generate_ffmpeg_command(self, config, input_files, output_path):
+        """根据VideoEditConfig生成FFmpeg命令"""
+        self.log_packaging_step("开始生成FFmpeg命令", f"输出路径: {output_path}")
+
+        commands = []
+        inputs = []
+        filters = []
+
+        # 解析画布配置
+        canvas = config.get('canvas', {})
+        width = canvas.get('width', 540)
+        height = canvas.get('height', 960)
+
+        self.log_packaging_step("解析画布配置", f"尺寸: {width}x{height}, 背景色: {canvas.get('backgroundColor', '#000000')}")
+
+        # 基础输出设置
+        base_cmd = ['ffmpeg', '-y']
+
+        # 跟踪输入文件索引
+        input_index = 0
+
+        # 处理背景层
+        background = config.get('background', {})
+        if background.get('fileUrl'):
+            self.log_packaging_step("处理背景层", f"类型: {background.get('type', 'unknown')}")
+
+            bg_file = input_files.get('background')
+            if bg_file:
+                # 转换API路径为实际文件路径
+                if bg_file.startswith('/api/video/packaging/file/'):
+                    filename = bg_file.split('/')[-1]
+                    bg_file = os.path.join(app.config['UPLOAD_FOLDER'], 'packaging', filename)
+                    self.log_packaging_step("背景文件路径转换", f"API路径 -> 本地路径: {bg_file}")
+
+                inputs.extend(['-i', bg_file])
+                bg_input_index = input_index
+                input_index += 1
+
+                # 背景缩放和透明度
+                opacity = background.get('opacity', 1.0)
+                bg_filter = f"[{bg_input_index}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
+                if opacity < 1.0:
+                    bg_filter += f",format=yuva444p,colorchannelmixer=aa={opacity}"
+                    self.log_packaging_step("背景透明度设置", f"透明度: {opacity}")
+
+                bg_filter += "[bg]"
+                filters.append(bg_filter)
+                self.log_packaging_step("背景滤镜生成", bg_filter)
+            else:
+                self.log_packaging_step("背景文件缺失", "input_files中没有找到background文件", "warning")
+        else:
+            self.log_packaging_step("跳过背景层", "未配置背景文件")
+
+        # 处理主视频层
+        video = config.get('video', {})
+        if video.get('fileUrl'):
+            self.log_packaging_step("处理主视频层", "检测到主视频配置")
+
+            video_file = input_files.get('video')
+            if video_file:
+                # 转换API路径为实际文件路径
+                if video_file.startswith('/api/video/packaging/file/'):
+                    filename = video_file.split('/')[-1]
+                    video_file = os.path.join(app.config['UPLOAD_FOLDER'], 'packaging', filename)
+                    self.log_packaging_step("主视频文件路径转换", f"API路径 -> 本地路径: {video_file}")
+
+                inputs.extend(['-i', video_file])
+                video_input_index = input_index
+                input_index += 1
+
+                # 视频位置和尺寸
+                x = video.get('x', 0)
+                y = video.get('y', 0)
+                v_width = video.get('width', width)
+                v_height = video.get('height', height)
+
+                self.log_packaging_step("主视频尺寸配置", f"位置: ({x}, {y}), 尺寸: {v_width}x{v_height}")
+
+                # 视频缩放
+                video_opacity = video.get('opacity', 1.0)
+                video_filter = f"[{video_input_index}:v]scale={v_width}:{v_height}"
+                if video_opacity < 1.0:
+                    video_filter += f",format=yuva444p,colorchannelmixer=aa={video_opacity}"
+                    self.log_packaging_step("主视频透明度设置", f"透明度: {video_opacity}")
+
+                video_filter += "[video]"
+                filters.append(video_filter)
+                self.log_packaging_step("主视频滤镜生成", video_filter)
+            else:
+                self.log_packaging_step("主视频文件缺失", "input_files中没有找到video文件", "warning")
+        else:
+            self.log_packaging_step("跳过主视频层", "未配置主视频文件")
+
+        # 处理音频
+        audio = config.get('audio', {})
+        audio_input_index = None
+        if audio.get('fileUrl'):
+            self.log_packaging_step("处理音频层", "检测到音频配置")
+
+            audio_file = input_files.get('audio')
+            if audio_file:
+                # 转换API路径为实际文件路径
+                if audio_file.startswith('/api/video/packaging/file/'):
+                    filename = audio_file.split('/')[-1]
+                    audio_file = os.path.join(app.config['UPLOAD_FOLDER'], 'packaging', filename)
+                    self.log_packaging_step("音频文件路径转换", f"API路径 -> 本地路径: {audio_file}")
+
+                inputs.extend(['-i', audio_file])
+                audio_input_index = input_index
+                input_index += 1
+
+                # 音频处理
+                volume = audio.get('volume', 1.0)
+                audio_filter = ""
+                if volume != 1.0:
+                    audio_filter += f"volume={volume}"
+                    self.log_packaging_step("音频音量设置", f"音量倍数: {volume}")
+
+                # 淡入淡出
+                fade_in = audio.get('fadeIn')
+                if fade_in:
+                    fade_duration = fade_in.get('duration', 1)
+                    audio_filter += f",afade=t=in:st=0:d={fade_duration}"
+                    self.log_packaging_step("音频淡入效果", f"淡入时长: {fade_duration}秒")
+
+                fade_out = audio.get('fadeOut')
+                if fade_out:
+                    fade_start = fade_out.get('start', 5)
+                    fade_duration = fade_out.get('duration', 1)
+                    audio_filter += f",afade=t=out:st={fade_start}:d={fade_duration}"
+                    self.log_packaging_step("音频淡出效果", f"开始时间: {fade_start}秒, 时长: {fade_duration}秒")
+
+                if audio_filter:
+                    full_audio_filter = f"[{audio_input_index}:a]{audio_filter}[audio_out]"
+                    filters.append(full_audio_filter)
+                    self.log_packaging_step("音频滤镜生成", full_audio_filter)
+                else:
+                    self.log_packaging_step("跳过音频滤镜", "音频无需特殊处理")
+            else:
+                self.log_packaging_step("音频文件缺失", "input_files中没有找到audio文件", "warning")
+        else:
+            self.log_packaging_step("跳过音频层", "未配置音频文件")
+
+        # 合成视频层
+        self.log_packaging_step("开始视频层合成", "配置视频叠加逻辑")
+        if background.get('fileUrl') and video.get('fileUrl'):
+            overlay_filter = "[bg][video]overlay=0:0[final_video]"
+            filters.append(overlay_filter)
+            self.log_packaging_step("视频叠加配置", "背景层 + 主视频层")
+        elif video.get('fileUrl'):
+            copy_filter = "[video]copy[final_video]"
+            filters.append(copy_filter)
+            self.log_packaging_step("视频叠加配置", "仅主视频层")
+        elif background.get('fileUrl'):
+            copy_filter = "[bg]copy[final_video]"
+            filters.append(copy_filter)
+            self.log_packaging_step("视频叠加配置", "仅背景层")
+        else:
+            self.log_packaging_step("警告", "没有配置任何视频层", "warning")
+
+        # 添加滤镜链
+        if filters:
+            filter_complex = ";".join(filters)
+            base_cmd.extend(['-filter_complex', filter_complex])
+            self.log_packaging_step("滤镜链配置", f"滤镜数量: {len(filters)}")
+            self.log_packaging_step("完整滤镜链", filter_complex)
+        else:
+            self.log_packaging_step("跳过滤镜链", "没有配置滤镜")
+
+        # 输出映射
+        video_streams = 0
+        audio_streams = 0
+
+        if video.get('fileUrl') or background.get('fileUrl'):
+            base_cmd.extend(['-map', '[final_video]'])
+            video_streams = 1
+            self.log_packaging_step("视频流映射", "映射最终视频流")
+
+        if audio.get('fileUrl') and audio_input_index is not None:
+            if audio_filter:
+                base_cmd.extend(['-map', '[audio_out]'])
+                self.log_packaging_step("音频流映射", "映射处理后音频流")
+            else:
+                base_cmd.extend(['-map', f'{audio_input_index}:a'])
+                self.log_packaging_step("音频流映射", f"映射原始音频流 {audio_input_index}")
+            audio_streams = 1
+
+        # 输出设置
+        self.log_packaging_step("配置输出编码", "H.264视频 + AAC音频")
+        base_cmd.extend([
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'medium',
+            '-crf', '23',
+            '-r', '30',
+            output_path
+        ])
+
+        final_command = base_cmd + inputs
+        self.log_packaging_step("FFmpeg命令生成完成", f"总参数数: {len(final_command)}, 输入流: {len(inputs)}, 视频流: {video_streams}, 音频流: {audio_streams}")
+
+        return final_command
+
+    def process_video_async(self, task_id, config, input_files):
+        """异步处理视频包装"""
+        try:
+            print(f"[Packaging] Starting task {task_id}")
+            print(f"[Packaging] Config: {json.dumps(config, indent=2)}")
+            print(f"[Packaging] Input files: {json.dumps(input_files, indent=2)}")
+
+            packaging_status[task_id] = {"status": "processing", "progress": 10}
+
+            # 创建输出目录
+            output_dir = f"outputs/packaging/{task_id}"
+            os.makedirs(output_dir, exist_ok=True)
+            print(f"[Packaging] Created output directory: {output_dir}")
+
+            output_path = os.path.join(output_dir, "output.mp4")
+
+            packaging_status[task_id] = {"status": "processing", "progress": 30}
+
+            # 生成FFmpeg命令
+            command = self.generate_ffmpeg_command(config, input_files, output_path)
+            print(f"[Packaging] Generated command: {' '.join(command)}")
+
+            packaging_status[task_id] = {"status": "processing", "progress": 50}
+
+            # 检查输入文件是否存在
+            for file_type, file_path in input_files.items():
+                if file_path.startswith('/api/video/packaging/file/'):
+                    filename = file_path.split('/')[-1]
+                    full_path = os.path.join(app.config['UPLOAD_FOLDER'], 'packaging', filename)
+                    if not os.path.exists(full_path):
+                        raise Exception(f"Input file not found: {full_path}")
+                    print(f"[Packaging] Verified input file: {full_path}")
+
+            packaging_status[task_id] = {"status": "processing", "progress": 60}
+
+            # 执行FFmpeg命令
+            print(f"[Packaging] Executing FFmpeg...")
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5分钟超时
+            )
+
+            print(f"[Packaging] FFmpeg return code: {result.returncode}")
+            print(f"[Packaging] FFmpeg stdout: {result.stdout}")
+            print(f"[Packaging] FFmpeg stderr: {result.stderr}")
+
+            if result.returncode != 0:
+                error_msg = f"FFmpeg processing failed (code {result.returncode}): {result.stderr}"
+                print(f"[Packaging] Error: {error_msg}")
+                raise Exception(error_msg)
+
+            packaging_status[task_id] = {"status": "processing", "progress": 90}
+
+            # 验证输出文件
+            if not os.path.exists(output_path):
+                raise Exception(f"Output file not created: {output_path}")
+
+            # 生成配置文件
+            config_path = os.path.join(output_dir, "config.json")
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+
+            print(f"[Packaging] Task {task_id} completed successfully")
+            packaging_status[task_id] = {
+                "status": "completed",
+                "progress": 100,
+                "output_url": f"/api/video/packaging/download/{task_id}",
+                "config_url": f"/api/video/packaging/config/{task_id}"
+            }
+
+        except Exception as e:
+            print(f"[Packaging] Task {task_id} failed: {str(e)}")
+            packaging_status[task_id] = {
+                "status": "error",
+                "progress": 0,
+                "error": str(e)
+            }
+
+# 全局视频包装器实例
+video_packager = VideoPackager()
+
+@app.route('/api/video/packaging/upload', methods=['POST'])
+def upload_packaging_file():
+    """上传视频包装素材文件"""
+    start_time = time.time()
+    client_ip = request.remote_addr
+
+    logger.info(f"[PACKAGING-UPLOAD] 开始上传 - 客户端IP: {client_ip}")
+
+    try:
+        if 'file' not in request.files:
+            logger.warning(f"[PACKAGING-UPLOAD] 上传失败 - 未提供文件 - IP: {client_ip}")
+            return jsonify({"success": False, "error": "No file provided"}), 400
+
+        file = request.files['file']
+        file_type = request.form.get('type', 'video')  # video, audio, background, watermark
+
+        logger.info(f"[PACKAGING-UPLOAD] 文件信息 - 文件名: {file.filename}, 类型: {file_type}, IP: {client_ip}")
+
+        if file.filename == '':
+            logger.warning(f"[PACKAGING-UPLOAD] 上传失败 - 文件名为空 - IP: {client_ip}")
+            return jsonify({"success": False, "error": "No file selected"}), 400
+
+        if file and allowed_file(file.filename):
+            # 创建唯一的文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{timestamp}_{file_type}_{secure_filename(file.filename)}"
+
+            # 创建上传目录
+            upload_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'packaging')
+            os.makedirs(upload_dir, exist_ok=True)
+
+            file_path = os.path.join(upload_dir, filename)
+
+            # 记录上传开始
+            logger.info(f"[PACKAGING-UPLOAD] 开始保存文件 - 目标路径: {file_path}")
+            file.save(file_path)
+
+            file_size = os.path.getsize(file_path)
+            upload_time = time.time() - start_time
+
+            logger.info(f"[PACKAGING-UPLOAD] 文件保存成功 - 文件大小: {file_size}字节, 耗时: {upload_time:.2f}秒, IP: {client_ip}")
+
+            # 返回文件信息
+            file_info = {
+                "success": True,
+                "filename": filename,
+                "original_name": file.filename,
+                "file_type": file_type,
+                "file_path": file_path,
+                "file_url": f"/api/video/packaging/file/{filename}",
+                "file_size": file_size
+            }
+
+            return jsonify(file_info)
+
+        logger.warning(f"[PACKAGING-UPLOAD] 文件类型不允许 - 文件名: {file.filename}, IP: {client_ip}")
+        return jsonify({"success": False, "error": "File type not allowed"}), 400
+
+    except Exception as e:
+        error_time = time.time() - start_time
+        logger.error(f"[PACKAGING-UPLOAD] 上传异常 - 错误: {str(e)}, 耗时: {error_time:.2f}秒, IP: {client_ip}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/video/packaging/process', methods=['POST'])
+def process_video_packaging():
+    """处理视频包装"""
+    start_time = time.time()
+    client_ip = request.remote_addr
+
+    logger.info(f"[PACKAGING-PROCESS] 开始处理 - 客户端IP: {client_ip}")
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            logger.warning(f"[PACKAGING-PROCESS] 处理失败 - 未提供配置数据 - IP: {client_ip}")
+            return jsonify({"success": False, "error": "No configuration provided"}), 400
+
+        # 生成任务ID
+        task_id = str(uuid.uuid4())
+
+        # 解析配置
+        config = data.get('config', {})
+        input_files = data.get('input_files', {})
+
+        logger.info(f"[PACKAGING-PROCESS] 任务创建 - 任务ID: {task_id}, IP: {client_ip}")
+        logger.info(f"[PACKAGING-PROCESS] 配置信息 - 画布: {config.get('canvas', {})}")
+        logger.info(f"[PACKAGING-PROCESS] 输入文件数量: {len(input_files)}, 文件类型: {list(input_files.keys())}")
+
+        # 存储任务信息
+        packaging_tasks[task_id] = {
+            "config": config,
+            "input_files": input_files,
+            "created_at": datetime.now().isoformat(),
+            "client_ip": client_ip
+        }
+
+        # 初始化状态
+        packaging_status[task_id] = {"status": "queued", "progress": 0}
+
+        logger.info(f"[PACKAGING-PROCESS] 启动异步处理 - 任务ID: {task_id}")
+
+        # 启动异步处理
+        thread = threading.Thread(
+            target=video_packager.process_video_async,
+            args=(task_id, config, input_files)
+        )
+        thread.daemon = True
+        thread.start()
+
+        setup_time = time.time() - start_time
+        logger.info(f"[PACKAGING-PROCESS] 任务启动成功 - 任务ID: {task_id}, 准备耗时: {setup_time:.3f}秒, IP: {client_ip}")
+
+        return jsonify({
+            "success": True,
+            "task_id": task_id,
+            "status": "queued"
+        })
+
+    except Exception as e:
+        error_time = time.time() - start_time
+        logger.error(f"[PACKAGING-PROCESS] 处理异常 - 错误: {str(e)}, 耗时: {error_time:.3f}秒, IP: {client_ip}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/video/packaging/status/<task_id>', methods=['GET'])
+def get_packaging_status(task_id):
+    """获取视频包装任务状态"""
+    try:
+        if task_id not in packaging_status:
+            return jsonify({"success": False, "error": "Task not found"}), 404
+
+        status = packaging_status[task_id]
+        return jsonify({
+            "success": True,
+            "task_id": task_id,
+            "status": status
+        })
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/video/packaging/download/<task_id>', methods=['GET'])
+def download_packaging_result(task_id):
+    """下载视频包装结果"""
+    try:
+        if task_id not in packaging_status:
+            return jsonify({"success": False, "error": "Task not found"}), 404
+
+        status = packaging_status[task_id]
+        if status.get('status') != 'completed':
+            return jsonify({"success": False, "error": "Task not completed"}), 400
+
+        # 构建文件路径
+        output_path = f"outputs/packaging/{task_id}/output.mp4"
+
+        if not os.path.exists(output_path):
+            return jsonify({"success": False, "error": "Output file not found"}), 404
+
+        def generate():
+            with open(output_path, 'rb') as f:
+                data = f.read(1024)
+                while data:
+                    yield data
+                    data = f.read(1024)
+
+        response = Response(
+            generate(),
+            mimetype='video/mp4',
+            headers={
+                "Content-Disposition": f"attachment; filename=packaged_video_{task_id}.mp4"
+            }
+        )
+        return response
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/video/packaging/config/<task_id>', methods=['GET'])
+def download_packaging_config(task_id):
+    """下载视频包装配置"""
+    try:
+        if task_id not in packaging_tasks:
+            return jsonify({"success": False, "error": "Task not found"}), 404
+
+        config_path = f"outputs/packaging/{task_id}/config.json"
+
+        if not os.path.exists(config_path):
+            return jsonify({"success": False, "error": "Config file not found"}), 404
+
+        return send_file(
+            config_path,
+            as_attachment=True,
+            download_name=f"packaging_config_{task_id}.json"
+        )
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/video/packaging/file/<filename>', methods=['GET'])
+def get_packaging_file(filename):
+    """获取上传的包装文件"""
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'packaging', filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({"success": False, "error": "File not found"}), 404
+
+        return send_file(file_path)
+
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
