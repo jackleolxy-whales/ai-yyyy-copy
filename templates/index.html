@@ -1376,12 +1376,19 @@ Now, I give you the JSONs:
                                 <option value="frames">按帧数</option>
                             </select>
                         </div>
-                        <div class="col-md-9 d-flex align-items-end justify-content-end">
+                        <div class="col-md-4">
+                            <label for="edlOriginalVolume" class="form-label fw-bold"><i class="fas fa-volume-up"></i> 原声音量 (<span id="edlOriginalVolumeValue">100</span>%)</label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="range" class="form-range flex-grow-1" id="edlOriginalVolume" min="0" max="100" value="100" oninput="document.getElementById('edlOriginalVolumeValue').textContent = this.value">
+                                <small class="text-muted">0%=静音 100%=原声</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end justify-content-end">
                             <button type="button" class="btn btn-outline-light me-2" id="fillEdlFromStep5Btn" onclick="fillEdlFromStep5()">
-                                <i class="fas fa-table"></i> 从第5步填充剪辑
+                                <i class="fas fa-table"></i> 从第5步填充
                             </button>
                             <button type="button" class="btn btn-info" id="startVideoEditBtn" onclick="startAutoVideoEdit()">
-                                <i class="fas fa-play"></i> 开始自动拼接
+                                <i class="fas fa-play"></i> 开始拼接
                             </button>
                         </div>
                     </div>
@@ -2727,7 +2734,14 @@ Now, I give you the JSONs:
                                     <option value="frames">按帧数</option>
                                 </select>
                             </div>
-                            <div class="col-md-6 d-flex align-items-end justify-content-end">
+                            <div class="col-md-4">
+                                <label for="edlToolOriginalVolume" class="form-label fw-bold"><i class="fas fa-volume-up"></i> 原声音量 (<span id="edlToolOriginalVolumeValue">100</span>%)</label>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input type="range" class="form-range flex-grow-1" id="edlToolOriginalVolume" min="0" max="100" value="100" oninput="document.getElementById('edlToolOriginalVolumeValue').textContent = this.value">
+                                    <small class="text-muted">0%=静音 100%=原声</small>
+                                </div>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end justify-content-end">
                                 <button type="button" class="btn btn-info" id="startEdlToolBtn" onclick="startEdlToolEdit()"><i class="fas fa-play"></i> 开始自动拼接</button>
                             </div>
                         </div>
@@ -2747,7 +2761,7 @@ Now, I give you the JSONs:
                         <div class="d-flex gap-2">
                             <button class="btn btn-sm btn-outline-light" onclick="addEdlToolRow()"><i class="fas fa-plus"></i> 添加行</button>
                             <button class="btn btn-sm btn-outline-light" onclick="clearEdlToolRows()"><i class="fas fa-trash"></i> 清空</button>
-                            <button class="btn btn-sm btn-outline-warning" onclick="replaceInvalidEdlToolSources()"><i class="fas fa-wrench"></i> 一键替换不可用源文件</button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="replaceInvalidEdlToolSources()" style="display: none;"><i class="fas fa-wrench"></i> 一键替换不可用源文件</button>
                             <button class="btn btn-sm btn-outline-info" onclick="pasteMarkdownToEdlTool()"><i class="fas fa-paste"></i> 一键粘贴Markdown填充</button>
                         </div>
                     </div>
@@ -4472,12 +4486,14 @@ Now, I give you the JSONs:
             const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
             const modeEl = document.getElementById('edlToolMode');
             const mode = modeEl ? (modeEl.value || 'time') : 'time';
+            const volumeEl = document.getElementById('edlToolOriginalVolume');
+            const originalVolume = volumeEl ? Math.max(0, Math.min(100, parseInt(volumeEl.value || '100', 10))) : 100;
             const clips = getEdlToolClipsFromTable();
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
             const allowed = (Array.isArray(window.edlLastUploadedFiles) && window.edlLastUploadedFiles.length) ? window.edlLastUploadedFiles : [];
             if (!allowed.length) { showError('请先在独立拼接工具中上传素材'); return; }
             try {
-                try { console.log('EDL tool start payload', { fps, mode, clips }); } catch(e){}
+                try { console.log('EDL tool start payload', { fps, mode, originalVolume, clips }); } catch(e){}
                 const sources = Array.from(new Set(clips.map(c => (c.source_file||'').trim()).filter(Boolean)));
                 const checks = await Promise.all(sources.map(async (n) => {
                     try {
@@ -4498,7 +4514,7 @@ Now, I give you the JSONs:
             if (pc) pc.style.display = 'block';
             const btn = document.getElementById('startEdlToolBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
-            fetchJsonWithFallback('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, clips, allowed_files: allowed }) })
+            fetchJsonWithFallback('/video/edl/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fps, mode, original_volume: originalVolume, clips, allowed_files: allowed }) })
             .then(data=>{
                 try { console.log('EDL tool start response', data); } catch(e){}
                 if (!data.success) { showError(data.error||'拼接失败'); if(btn){btn.disabled=false;btn.innerHTML='<i class="fas fa-play"></i> 开始自动拼接';} return; }
@@ -4807,6 +4823,8 @@ Now, I give you the JSONs:
             const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
             const modeEl = document.getElementById('edlMode');
             const mode = modeEl ? (modeEl.value || 'time') : 'time';
+            const volumeEl = document.getElementById('edlOriginalVolume');
+            const originalVolume = volumeEl ? Math.max(0, Math.min(100, parseInt(volumeEl.value || '100', 10))) : 100;
             const clips = getEdlClipsFromTable();
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
             try {
@@ -4840,11 +4858,11 @@ Now, I give you the JSONs:
             if (pc) pc.style.display = 'block';
             const btn = document.getElementById('startVideoEditBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<span class="loading-spinner"></span>拼接中...'; }
-            try { console.log('EDL start payload', { fps, mode, clips }); } catch(e){}
+            try { console.log('EDL start payload', { fps, mode, originalVolume, clips }); } catch(e){}
             fetch('/video/edl/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fps, mode, clips, allowed_files: ((typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : []) })
+                body: JSON.stringify({ fps, mode, original_volume: originalVolume, clips, allowed_files: ((typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : []) })
             })
             .then(r=>r.json())
             .then(data=>{
@@ -4903,6 +4921,8 @@ Now, I give you the JSONs:
             const fps = fpsEl ? Math.max(1, Math.min(120, parseInt(fpsEl.value || '30', 10))) : 30;
             const modeEl = document.getElementById('edlMode');
             const mode = modeEl ? (modeEl.value || 'time') : 'time';
+            const volumeEl = document.getElementById('edlOriginalVolume');
+            const originalVolume = volumeEl ? Math.max(0, Math.min(100, parseInt(volumeEl.value || '100', 10))) : 100;
             const clips = (window.edlBatchClips && window.edlBatchClips[index]) ? window.edlBatchClips[index] : [];
             if (!clips.length) { showError('剪辑清单为空或不合法'); return; }
             try {
@@ -4920,7 +4940,7 @@ Now, I give you the JSONs:
             fetch('/video/edl/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fps, mode, clips, allowed_files: ((typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : []) })
+                body: JSON.stringify({ fps, mode, original_volume: originalVolume, clips, allowed_files: ((typeof uploadedFilenames !== 'undefined' && Array.isArray(uploadedFilenames)) ? uploadedFilenames : []) })
             })
             .then(r=>r.json())
             .then(data=>{
@@ -8085,6 +8105,22 @@ Now, I give you the JSONs:
         }
 
         // 第6步合并生成配音
+        // 按批次分组台词片段
+        function groupSegmentsByBatch(segments) {
+            const groups = {};
+            segments.forEach(seg => {
+                const batchKey = seg.batch !== null ? `batch_${seg.batch}` : 'single';
+                if (!groups[batchKey]) {
+                    groups[batchKey] = {
+                        batchIndex: seg.batch,
+                        segments: []
+                    };
+                }
+                groups[batchKey].segments.push(seg);
+            });
+            return Object.values(groups);
+        }
+
         async function generateStep6VoiceoverCombined(segments) {
             try {
                 setStepStatus(6, 'processing', '台词配音生成中...');
@@ -8096,11 +8132,14 @@ Now, I give you the JSONs:
                     btn.innerHTML = '<span class="loading-spinner"></span>生成中...';
                 }
 
-                const text = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
-                if (!text) {
+                if (!segments || segments.length === 0) {
                     showError('未找到可生成的台词片段');
                     return;
                 }
+
+                // 按批次分组
+                const batchGroups = groupSegmentsByBatch(segments);
+                console.log(`[DEBUG] 第6步合并生成：发现 ${batchGroups.length} 个脚本结果`);
 
                 updateStepProgress(6, 30);
 
@@ -8115,59 +8154,146 @@ Now, I give you the JSONs:
 
                 updateStepProgress(6, 50);
 
-                const batchId = 'step6_combined_' + Date.now();
+                const results = [];
+                const progressStep = 40 / batchGroups.length;
 
-                const resp = await fetch('/voiceover/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: text,
-                        voice_id: voiceId,
-                        model_id: modelId,
-                        batch_id: batchId,
-                        index: 0,
-                        output_format: 'mp3_44100_128'
-                    })
-                });
+                // 为每个批次分别生成合并音频
+                for (let i = 0; i < batchGroups.length; i++) {
+                    const group = batchGroups[i];
+                    const batchText = group.segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
 
-                updateStepProgress(6, 80);
-
-                const data = await resp.json();
-                if (!data.success) {
-                    showError(data.error || '第6步合并生成失败');
-                } else {
-                    const combinedScriptText = text;
-                    const c = document.getElementById('scriptExtractResultContainer');
-                    const t = document.getElementById('scriptExtractResultText');
-
-                    if (c && t) {
-                        const header = '<h6 class="mb-2"><i class="fas fa-music text-primary"></i> 第6步合并生成结果</h6>';
-                        const scriptSection = `
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0"><i class="fas fa-file-alt text-primary"></i> 拼接脚本（可编辑）</h6>
-                                    <button class="btn btn-sm btn-primary" onclick="regenerateStep6Voiceover()">
-                                        <i class="fas fa-sync"></i> 使用修改后的脚本重新生成
-                                    </button>
-                                </div>
-                                <textarea class="form-control" id="step6CombinedScriptResult" rows="8">${escapeHtml(combinedScriptText)}</textarea>
-                            </div>
-                        `;
-                        const audioSection = `
-                            <div class="mb-3">
-                                <h6 class="mb-2"><i class="fas fa-volume-up text-primary"></i> 生成的音频</h6>
-                                <audio id="step6CombinedAudio" controls src="${data.url}"></audio>
-                                <a id="step6CombinedDownload" class="btn btn-sm btn-outline-info ms-2" href="${data.url}" download>下载音频</a>
-                            </div>
-                        `;
-                        t.innerHTML = header + scriptSection + audioSection;
-                        c.style.display = 'block';
-                        c.classList.add('fade-in');
+                    if (!batchText) {
+                        console.log(`[DEBUG] 跳过空批次 ${group.batchIndex}`);
+                        continue;
                     }
 
-                    updateStepProgress(6, 100);
-                    setStepStatus(6, 'completed', '台词配音生成完成');
+                    const batchId = 'step6_combined_' + Date.now() + '_batch_' + (group.batchIndex !== null ? group.batchIndex : 'single');
+
+                    console.log(`[DEBUG] 生成批次 ${group.batchIndex !== null ? group.batchIndex + 1 : '单个'}，文本长度: ${batchText.length}`);
+
+                    const resp = await fetch('/voiceover/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: batchText,
+                            voice_id: voiceId,
+                            model_id: modelId,
+                            batch_id: batchId,
+                            index: i,
+                            output_format: 'mp3_44100_128'
+                        })
+                    });
+
+                    const data = await resp.json();
+                    if (!data.success) {
+                        console.error(`[ERROR] 批次 ${group.batchIndex} 生成失败:`, data.error);
+                        results.push({
+                            batchIndex: group.batchIndex,
+                            success: false,
+                            error: data.error || '生成失败',
+                            text: batchText
+                        });
+                    } else {
+                        console.log(`[DEBUG] 批次 ${group.batchIndex} 生成成功: ${data.url}`);
+                        results.push({
+                            batchIndex: group.batchIndex,
+                            success: true,
+                            url: data.url,
+                            text: batchText
+                        });
+                    }
+
+                    updateStepProgress(6, 50 + (i + 1) * progressStep);
                 }
+
+                updateStepProgress(6, 90);
+
+                // 渲染结果
+                const c = document.getElementById('scriptExtractResultContainer');
+                const t = document.getElementById('scriptExtractResultText');
+
+                if (c && t) {
+                    let header = '<h6 class="mb-3"><i class="fas fa-music text-primary"></i> 第6步分别合并生成结果</h6>';
+                    let resultsHtml = '';
+
+                    results.forEach((result, idx) => {
+                        const batchLabel = result.batchIndex !== null ? `脚本结果 ${result.batchIndex + 1}` : '单个脚本';
+                        const batchId = `step6_batch_${result.batchIndex !== null ? result.batchIndex : 'single'}`;
+
+                        if (result.success) {
+                            resultsHtml += `
+                                <div class="card mb-3">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0"><i class="fas fa-file-alt text-primary"></i> ${batchLabel}</h6>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="regenerateStep6BatchVoiceover(${result.batchIndex})">
+                                            <i class="fas fa-sync"></i> 重新生成
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="form-label mb-0"><small class="text-muted">脚本文本（可编辑）</small></label>
+                                                <button class="btn btn-sm btn-outline-success" id="${batchId}_simplify" onclick="simplifyBatchScript(${result.batchIndex})">
+                                                    <i class="fas fa-magic"></i> 简化文案
+                                                </button>
+                                            </div>
+                                            <textarea class="form-control" id="${batchId}_script" rows="6">${escapeHtml(result.text)}</textarea>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label"><small class="text-muted">生成的音频</small></label>
+                                            <audio id="${batchId}_audio" controls src="${result.url}" style="width: 100%;"></audio>
+                                            <a class="btn btn-sm btn-outline-info mt-2" href="${result.url}" download>下载音频</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            resultsHtml += `
+                                <div class="card mb-3 border-danger">
+                                    <div class="card-header bg-danger text-white">
+                                        <h6 class="mb-0"><i class="fas fa-exclamation-triangle"></i> ${batchLabel} - 生成失败</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-danger">
+                                            <small>${result.error}</small>
+                                        </div>
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <label class="form-label mb-0"><small class="text-muted">原始脚本文本</small></label>
+                                                <button class="btn btn-sm btn-outline-success" id="${batchId}_simplify" onclick="simplifyBatchScript(${result.batchIndex})">
+                                                    <i class="fas fa-magic"></i> 简化文案
+                                                </button>
+                                            </div>
+                                            <textarea class="form-control" id="${batchId}_script" rows="6" readonly>${escapeHtml(result.text)}</textarea>
+                                        </div>
+                                        <button class="btn btn-sm btn-warning" onclick="regenerateStep6BatchVoiceover(${result.batchIndex})">
+                                            <i class="fas fa-redo"></i> 重试生成
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    t.innerHTML = header + resultsHtml;
+                    c.style.display = 'block';
+                    c.classList.add('fade-in');
+                }
+
+                updateStepProgress(6, 100);
+
+                const successCount = results.filter(r => r.success).length;
+                const totalCount = results.length;
+
+                if (successCount === totalCount) {
+                    setStepStatus(6, 'completed', `台词配音生成完成（${successCount}/${totalCount}个脚本结果）`);
+                } else if (successCount > 0) {
+                    setStepStatus(6, 'warning', `部分生成完成（${successCount}/${totalCount}个脚本结果）`);
+                    showError(`部分脚本结果生成失败：${successCount}/${totalCount} 成功`);
+                } else {
+                    setStepStatus(6, 'error', '台词配音生成失败');
+                }
+
             } catch (e) {
                 showError('第6步合并生成错误：' + e.message);
                 setStepStatus(6, 'error', '台词配音生成失败');
@@ -8188,12 +8314,52 @@ Now, I give you the JSONs:
                 return;
             }
 
-            const combinedScript = segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
+            // 按批次分组显示脚本
+            const batchGroups = groupSegmentsByBatch(segments);
+            let previewContent = '';
+
+            batchGroups.forEach(group => {
+                const batchLabel = group.batchIndex !== null ? `脚本结果 ${group.batchIndex + 1}` : '单个脚本';
+                const batchScript = group.segments.map(s => String(s.text || '').trim()).filter(Boolean).join('\n');
+
+                previewContent += `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-file-alt text-primary"></i> ${batchLabel}</h6>
+                        </div>
+                        <div class="card-body">
+                            <textarea class="form-control" rows="${Math.max(3, group.segments.length)}" readonly>${escapeHtml(batchScript)}</textarea>
+                        </div>
+                    </div>
+                `;
+            });
+
             const scriptEditor = document.getElementById('step6ScriptEditor');
             const scriptTextarea = document.getElementById('step6CombinedScript');
 
             if (scriptEditor && scriptTextarea) {
-                scriptTextarea.value = combinedScript;
+                // 创建一个临时的预览容器
+                const previewContainer = document.createElement('div');
+                previewContainer.id = 'step6ScriptPreview';
+                previewContainer.innerHTML = `
+                    <div class="mb-3">
+                        <h6><i class="fas fa-eye text-primary"></i> 脚本预览（按批次分组）</h6>
+                        <small class="text-muted">这是将要生成的台词脚本预览，按脚本结果分组显示</small>
+                    </div>
+                    ${previewContent}
+                `;
+
+                // 隐藏原有的脚本编辑器，显示预览
+                scriptTextarea.parentElement.style.display = 'none';
+
+                // 移除之前的预览（如果存在）
+                const existingPreview = document.getElementById('step6ScriptPreview');
+                if (existingPreview) {
+                    existingPreview.remove();
+                }
+
+                // 添加新的预览
+                scriptTextarea.parentElement.parentNode.appendChild(previewContainer);
                 scriptEditor.style.display = 'block';
                 scriptEditor.scrollIntoView({ behavior: 'smooth' });
             }
@@ -8283,6 +8449,207 @@ Now, I give you the JSONs:
                 const regenerateBtn = event.target;
                 regenerateBtn.disabled = false;
                 regenerateBtn.innerHTML = '<i class="fas fa-sync"></i> 使用修改后的脚本重新生成';
+            }
+        }
+
+        // 重新生成第6步批次配音
+        async function regenerateStep6BatchVoiceover(batchIndex) {
+            try {
+                const batchId = `step6_batch_${batchIndex !== null ? batchIndex : 'single'}`;
+                const scriptTextarea = document.getElementById(`${batchId}_script`);
+
+                if (!scriptTextarea) {
+                    showError('找不到批次的脚本编辑区域');
+                    return;
+                }
+
+                const editedText = scriptTextarea.value.trim();
+                if (!editedText) {
+                    showError('脚本内容不能为空');
+                    return;
+                }
+
+                // 禁用按钮并显示加载状态
+                const regenerateBtn = event.target;
+                const originalText = regenerateBtn.innerHTML;
+                regenerateBtn.disabled = true;
+                regenerateBtn.innerHTML = '<span class="loading-spinner"></span>重新生成中...';
+
+                // 获取当前选择的voice和model
+                let voiceId = '';
+                const voiceSel = document.getElementById('step6VoiceSelect');
+                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+
+                let modelId = '';
+                const modelSel = document.getElementById('step6ModelSelect');
+                if (modelSel && modelSel.value) modelId = modelSel.value;
+
+                const newBatchId = 'step6_edited_' + Date.now() + '_batch_' + (batchIndex !== null ? batchIndex : 'single');
+
+                const resp = await fetch('/voiceover/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: editedText,
+                        voice_id: voiceId,
+                        model_id: modelId,
+                        batch_id: newBatchId,
+                        index: 0,
+                        output_format: 'mp3_44100_128'
+                    })
+                });
+
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || `批次${batchIndex !== null ? batchIndex + 1 : ''}重新生成失败`);
+                } else {
+                    // 更新音频播放器和下载链接
+                    const audioElement = document.getElementById(`${batchId}_audio`);
+                    if (audioElement) {
+                        audioElement.src = data.url;
+                        // 找到下载链接并更新
+                        const downloadLink = audioElement.parentElement.querySelector('a');
+                        if (downloadLink) downloadLink.href = data.url;
+                    }
+
+                    // 如果是失败状态的卡片，转换为成功状态
+                    const cardElement = scriptTextarea.closest('.card');
+                    if (cardElement && cardElement.classList.contains('border-danger')) {
+                        const batchLabel = batchIndex !== null ? `脚本结果 ${batchIndex + 1}` : '单个脚本';
+                        const newCardContent = `
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-file-alt text-primary"></i> ${batchLabel}</h6>
+                                <button class="btn btn-sm btn-outline-primary" onclick="regenerateStep6BatchVoiceover(${batchIndex})">
+                                    <i class="fas fa-sync"></i> 重新生成
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <label class="form-label mb-0"><small class="text-muted">脚本文本（可编辑）</small></label>
+                                        <button class="btn btn-sm btn-outline-success" id="${batchId}_simplify" onclick="simplifyBatchScript(${batchIndex})">
+                                            <i class="fas fa-magic"></i> 简化文案
+                                        </button>
+                                    </div>
+                                    <textarea class="form-control" id="${batchId}_script" rows="6">${escapeHtml(editedText)}</textarea>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label"><small class="text-muted">生成的音频</small></label>
+                                    <audio id="${batchId}_audio" controls src="${data.url}" style="width: 100%;"></audio>
+                                    <a class="btn btn-sm btn-outline-info mt-2" href="${data.url}" download>下载音频</a>
+                                </div>
+                            </div>
+                        `;
+                        cardElement.className = 'card mb-3';
+                        cardElement.innerHTML = newCardContent;
+                    }
+
+                    // 显示成功消息
+                    const cardBody = scriptTextarea.closest('.card-body');
+                    if (cardBody) {
+                        const successMsg = document.createElement('div');
+                        successMsg.className = 'alert alert-success alert-dismissible fade show mt-2';
+                        successMsg.innerHTML = `
+                            <i class="fas fa-check-circle"></i> 音频已成功重新生成！
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        `;
+                        cardBody.appendChild(successMsg);
+
+                        // 3秒后自动移除成功消息
+                        setTimeout(() => {
+                            if (successMsg.parentNode) {
+                                successMsg.parentNode.removeChild(successMsg);
+                            }
+                        }, 3000);
+                    }
+                }
+            } catch (e) {
+                showError(`批次重新生成错误：${e.message}`);
+            } finally {
+                // 恢复按钮状态
+                const regenerateBtn = event.target;
+                regenerateBtn.disabled = false;
+                regenerateBtn.innerHTML = '<i class="fas fa-sync"></i> 重新生成';
+            }
+        }
+
+        // 简化第6步批次文案
+        async function simplifyBatchScript(batchIndex) {
+            try {
+                const batchId = `step6_batch_${batchIndex !== null ? batchIndex : 'single'}`;
+                const scriptTextarea = document.getElementById(`${batchId}_script`);
+                const simplifyBtn = document.getElementById(`${batchId}_simplify`);
+
+                if (!scriptTextarea || !simplifyBtn) {
+                    showError('找不到批次的脚本区域或简化按钮');
+                    return;
+                }
+
+                const originalText = scriptTextarea.value.trim();
+                if (!originalText) {
+                    showError('脚本文本不能为空');
+                    return;
+                }
+
+                // 禁用按钮并显示加载状态
+                simplifyBtn.disabled = true;
+                simplifyBtn.innerHTML = '<span class="loading-spinner"></span>简化中...';
+
+                // 构建AI简化提示词
+                const prompt = "You are an expert script editor. Your task is to shorten the provided English script while maintaining its meaning and flow.\n\nPlease follow these strict rules:\n1. Reduce the character count by approximately 10% while preserving the original meaning and tone.\n2. Keep the dialogue structure and paragraph breaks.\n3. Output EXACTLY ONE simplified version.\n4. Output ONLY the result text. Do not include any introductory words, explanations, notes, or quotation marks.\n\nInput script:\n" + originalText;
+
+                const resp = await fetch('/deepseek/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        video_result: prompt,
+                        user_prompt: ''
+                    })
+                });
+
+                const data = await resp.json();
+                if (!data.success) {
+                    showError(data.error || '简化文案失败');
+                } else {
+                    const simplifiedText = data.result || '';
+                    if (simplifiedText.trim()) {
+                        // 更新脚本文本框
+                        scriptTextarea.value = simplifiedText.trim();
+
+                        // 如果文本框是只读的，改为可编辑
+                        scriptTextarea.readOnly = false;
+
+                        // 显示成功消息
+                        const cardBody = scriptTextarea.closest('.card-body');
+                        if (cardBody) {
+                            const successMsg = document.createElement('div');
+                            successMsg.className = 'alert alert-success alert-dismissible fade show mt-2';
+                            successMsg.innerHTML = `
+                                <i class="fas fa-check-circle"></i> 文案已成功简化！字符数从 ${originalText.length} 减少到 ${simplifiedText.trim().length}。
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            `;
+                            cardBody.appendChild(successMsg);
+
+                            // 3秒后自动移除成功消息
+                            setTimeout(() => {
+                                if (successMsg.parentNode) {
+                                    successMsg.parentNode.removeChild(successMsg);
+                                }
+                            }, 3000);
+                        }
+                    } else {
+                        showError('简化后的文案为空，请重试');
+                    }
+                }
+            } catch (e) {
+                showError('简化文案错误：' + e.message);
+            } finally {
+                // 恢复按钮状态
+                const simplifyBtn = document.getElementById(`${batchId}_simplify`);
+                if (simplifyBtn) {
+                    simplifyBtn.disabled = false;
+                    simplifyBtn.innerHTML = '<i class="fas fa-magic"></i> 简化文案';
+                }
             }
         }
 

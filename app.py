@@ -1217,15 +1217,52 @@ def run_ffmpeg_segment_frames(src, start_frame, end_frame, fps, out_path):
     log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
     return p2.returncode == 0, log
 
-def run_ffmpeg_concat(list_path, out_path):
-    cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-c:a', 'aac', out_path]
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if p.returncode == 0:
-        return True, p.stderr.decode('utf-8', errors='ignore')
-    cmd_vo = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-an', out_path]
-    p2 = subprocess.run(cmd_vo, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
-    return p2.returncode == 0, log
+def run_ffmpeg_concat(list_path, out_path, original_volume=100):
+    # 确保音量参数在有效范围内
+    original_volume = max(0, min(100, int(original_volume or 100)))
+    print(f"[DEBUG] run_ffmpeg_concat called with original_volume={original_volume}%")
+
+    # 如果音量是100%，使用原始命令
+    if original_volume == 100:
+        cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-c:a', 'aac', out_path]
+        p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if p.returncode == 0:
+            return True, p.stderr.decode('utf-8', errors='ignore')
+        # 备用：无音频版本
+        cmd_vo = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-an', out_path]
+        p2 = subprocess.run(cmd_vo, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
+        return p2.returncode == 0, log
+
+    # 如果音量不是100%，应用音量滤镜
+    if original_volume == 0:
+        # 音量为0，只输出视频无音频
+        cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-an', out_path]
+        p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        log = p.stderr.decode('utf-8', errors='ignore')
+        return p.returncode == 0, log
+    else:
+        # 应用音量滤镜
+        volume_factor = original_volume / 100.0
+        print(f"[DEBUG] Applying volume filter with factor={volume_factor}")
+        cmd = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path,
+               '-filter_complex', f'[0:a]volume={volume_factor}[a]',
+               '-map', '0:v', '-map', '[a]',
+               '-c:v', 'libx264', '-c:a', 'aac', out_path]
+        print(f"[DEBUG] FFmpeg volume command: {' '.join(cmd)}")
+        p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        print(f"[DEBUG] FFmpeg volume command return code: {p.returncode}")
+        if p.returncode == 0:
+            print(f"[DEBUG] Volume filter succeeded")
+            return True, p.stderr.decode('utf-8', errors='ignore')
+        else:
+            print(f"[DEBUG] Volume filter failed, stderr: {p.stderr.decode('utf-8', errors='ignore')}")
+        # 备用：无音频版本
+        print(f"[DEBUG] Falling back to video-only version")
+        cmd_vo = ['ffmpeg', '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', list_path, '-c:v', 'libx264', '-an', out_path]
+        p2 = subprocess.run(cmd_vo, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        log = (p.stderr.decode('utf-8', errors='ignore') or '') + '\n' + (p2.stderr.decode('utf-8', errors='ignore') or '')
+        return p2.returncode == 0, log
 
 def ffprobe_resolution(path):
     try:
@@ -1260,9 +1297,14 @@ def run_ffmpeg_concat_filter(seg_dir, total, out_path):
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return p.returncode == 0, p.stderr.decode('utf-8', errors='ignore')
 
-def edit_video_task(task_id, clips, fps, mode, allowed=None):
+def edit_video_task(task_id, clips, fps, mode, allowed=None, original_volume=100):
     edl_tasks[task_id] = {'progress': 0, 'status': '初始化', 'done': False, 'logs': []}
-    edl_tasks[task_id]['logs'].append(f"task={task_id} start total_clips={len(clips)} fps={fps}")
+    edl_tasks[task_id]['logs'].append(f"task={task_id} start total_clips={len(clips)} fps={fps} original_volume={original_volume}%")
+    print(f"[DEBUG] EDL_TASK_START: task_id={task_id}, total_clips={len(clips)}, fps={fps}, original_volume={original_volume}%")
+
+    # 计算预期总时长
+    total_expected_duration = sum(clip.get('duration_sec', 0) for clip in clips)
+    print(f"[DEBUG] EXPECTED_TOTAL_DURATION: {total_expected_duration}s")
     try:
         edl_tasks[task_id]['logs'].append(f"clips_payload={clips}")
     except Exception:
@@ -1279,7 +1321,16 @@ def edit_video_task(task_id, clips, fps, mode, allowed=None):
         edl_tasks[task_id]['status'] = f"处理片段 {i}/{total}"
         edl_tasks[task_id]['current_index'] = i
         req_name = clip.get('source_file','')
+
+        # 详细调试每个片段信息
+        clip_duration = float(clip.get('duration_sec', 0))
+        clip_start_ts = clip.get('start_ts', '')
+        print(f"[DEBUG CLIP {i}]: source_file={req_name}, duration_sec={clip_duration}, start_ts={clip_start_ts}")
+        print(f"[DEBUG CLIP {i}]: clip_data={clip}")
+
         src = resolve_source_file(req_name, allowed)
+        print(f"[DEBUG RESOLVE {i}]: resolved_source={src}")
+
         if not src:
             try:
                 base = os.path.basename((req_name or '').strip())
@@ -1306,45 +1357,114 @@ def edit_video_task(task_id, clips, fps, mode, allowed=None):
         ts = clip.get('start_ts','')
         dur = float(clip.get('duration_sec',0))
         out_seg = os.path.join(seg_dir, f"seg_{i:03d}.mp4")
+
+        print(f"[DEBUG FFMPEG {i}]: ts={ts}, dur={dur}, out_seg={out_seg}")
+
         if (mode or 'time') == 'frames':
             sf = mmssff_to_frame_index(ts, fps)
             if sf is None or dur <= 0:
+                print(f"[DEBUG ERROR {i}]: Invalid frames ts={ts} dur={dur}")
                 edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"非法帧值: {ts}/{dur}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
                 edl_tasks[task_id]['logs'].append(f"invalid frames ts={ts} dur={dur}")
                 return
             ef = sf + int(round(dur * max(1, fps)))
+            print(f"[DEBUG FFMPEG {i}]: FRAMES mode - sf={sf}, ef={ef}, fps={fps}")
             edl_tasks[task_id]['logs'].append(f"clip {i}/{total} src={src} start_frame={sf} end_frame={ef} fps={fps} out={out_seg}")
             ok, log = run_ffmpeg_segment_frames(src, sf, ef, fps, out_seg)
         else:
             hhmmss = mmssff_to_hhmmss_ms(ts, fps)
             if not hhmmss or dur <= 0:
+                print(f"[DEBUG ERROR {i}]: Invalid time ts={ts} dur={dur} hhmmss={hhmmss}")
                 edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"非法时间值: {ts}/{dur}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
                 edl_tasks[task_id]['logs'].append(f"invalid ts/dur ts={ts} dur={dur}")
                 return
+            print(f"[DEBUG FFMPEG {i}]: TIME mode - hhmmss={hhmmss}, dur={dur}")
             edl_tasks[task_id]['logs'].append(f"clip {i}/{total} src={src} start={hhmmss} dur={dur} out={out_seg}")
             ok, log = run_ffmpeg_segment(src, hhmmss, dur, out_seg)
+
+        print(f"[DEBUG RESULT {i}]: FFmpeg segment ok={ok}, log={log[:100] if log else 'None'}")
+
         if not ok:
+            print(f"[DEBUG ERROR {i}]: FFmpeg segment failed: {log[:200] if log else 'Unknown error'}")
             edl_tasks[task_id] = {'progress': int((i-1)/total*100), 'status': '错误', 'error': f"片段生成失败: {log[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
             edl_tasks[task_id]['logs'].append(f"ffmpeg segment error: {log[:200]}")
             return
+
+        # 验证生成的片段文件
+        if os.path.exists(out_seg):
+            file_size = os.path.getsize(out_seg)
+            print(f"[DEBUG VERIFIED {i}]: Segment file exists, size={file_size} bytes")
+            # 尝试获取实际视频时长
+            try:
+                import subprocess
+                result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', out_seg],
+                                      capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    actual_duration = float(result.stdout.strip())
+                    print(f"[DEBUG DURATION {i}]: Expected={dur}s, Actual={actual_duration}s, Diff={actual_duration - dur}s")
+                else:
+                    print(f"[DEBUG DURATION {i}]: Failed to get duration - ffprobe error")
+            except Exception as e:
+                print(f"[DEBUG DURATION {i}]: Exception getting duration - {e}")
+        else:
+            print(f"[DEBUG ERROR {i}]: Segment file was not created: {out_seg}")
+
         edl_tasks[task_id]['logs'].append(f"segment ok {out_seg}")
         edl_tasks[task_id]['progress'] = int((i/total)*100)
+    # 计算所有片段的总预期时长
+    total_expected_duration = sum(float(clip.get('duration_sec', 0)) for clip in clips)
+    print(f"[DEBUG CONCAT SUMMARY]: Expected total duration={total_expected_duration}s from {total} segments")
+
     list_path = os.path.join(seg_dir, 'list.txt')
     with open(list_path, 'w') as f:
         for i in range(1, total+1):
             abs_seg = os.path.abspath(os.path.join(seg_dir, f"seg_{i:03d}.mp4"))
             f.write(f"file '{abs_seg}'\n")
+            # 验证每个片段文件在拼接列表中存在
+            if os.path.exists(abs_seg):
+                size = os.path.getsize(abs_seg)
+                print(f"[DEBUG CONCAT LIST {i}]: {abs_seg} exists, size={size}")
+            else:
+                print(f"[DEBUG CONCAT ERROR {i}]: {abs_seg} does not exist!")
+
+    print(f"[DEBUG CONCAT]: Created list file {list_path}")
     edl_tasks[task_id]['logs'].append(f"concat list {list_path}")
+
     out_path = os.path.join('outputs', 'edits', f"{task_id}.mp4")
-    ok, log = run_ffmpeg_concat(list_path, out_path)
+    print(f"[DEBUG CONCAT]: Starting concatenation to {out_path}")
+
+    ok, log = run_ffmpeg_concat(list_path, out_path, original_volume)
+    print(f"[DEBUG CONCAT RESULT]: Primary concat ok={ok}, log={log[:100] if log else 'None'}")
+
+    # 如果拼接成功，验证最终输出文件的时长
+    if ok and os.path.exists(out_path):
+        try:
+            import subprocess
+            result = subprocess.run(['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', out_path],
+                                  capture_output=True, text=True, timeout=15)
+            if result.returncode == 0:
+                final_duration = float(result.stdout.strip())
+                duration_diff = final_duration - total_expected_duration
+                print(f"[DEBUG FINAL DURATION]: Expected={total_expected_duration}s, Actual={final_duration}s, Difference={duration_diff}s")
+                if abs(duration_diff) > 0.1:  # 如果差异超过0.1秒
+                    print(f"[WARNING]: Duration mismatch detected! Missing {abs(duration_diff)} seconds")
+            else:
+                print(f"[DEBUG FINAL DURATION]: Failed to get final duration - ffprobe error: {result.stderr}")
+        except Exception as e:
+            print(f"[DEBUG FINAL DURATION]: Exception getting final duration - {e}")
+
     if not ok:
+        print(f"[DEBUG CONCAT]: Primary concat failed, trying fallback method")
         edl_tasks[task_id]['logs'].append(f"ffmpeg concat error: {log[:200]}")
         ok2, log2 = run_ffmpeg_concat_filter(seg_dir, total, out_path)
+        print(f"[DEBUG CONCAT FALLBACK RESULT]: ok={ok2}, log={log2[:100] if log2 else 'None'}")
         if not ok2:
             combined = (log or '') + '\n' + (log2 or '')
             edl_tasks[task_id] = {'progress': 100, 'status': '错误', 'error': f"拼接失败: {combined[:400]}", 'done': True, 'logs': edl_tasks[task_id]['logs']}
             edl_tasks[task_id]['logs'].append(f"ffmpeg concat filter error: {log2[:200]}")
             return
+
+    print(f"[DEBUG CONCAT]: Concatenation completed successfully")
     edl_tasks[task_id] = {'progress': 100, 'status': '完成', 'output_path': out_path, 'done': True, 'logs': edl_tasks[task_id]['logs']}
     edl_tasks[task_id]['logs'].append(f"output {out_path}")
 
@@ -1354,16 +1474,24 @@ def video_edl_start():
         if request.method == 'OPTIONS':
             return Response(status=200)
         data = request.get_json(silent=True) or {}
+        print(f"[DEBUG] /video/edl/start received data: {data}")
         fps = int(data.get('fps', 30))
         mode = (data.get('mode') or 'time').strip()
         if mode not in ('time','frames'):
             mode = 'time'
         clips = data.get('clips') or []
         allowed = data.get('allowed_files') or None
+        original_volume = data.get('original_volume', 100)
+        # 确保音量参数在有效范围内
+        try:
+            original_volume = max(0, min(100, int(original_volume)))
+        except (ValueError, TypeError):
+            original_volume = 100
+        print(f"[DEBUG] Processed: fps={fps}, mode={mode}, clips_count={len(clips)}, original_volume={original_volume}")
         if not clips:
             return jsonify({'success': False, 'error': '剪辑清单为空'}), 400
         tid = str(uuid.uuid4()).replace('-', '')
-        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps, mode, allowed), daemon=True)
+        t = threading.Thread(target=edit_video_task, args=(tid, clips, fps, mode, allowed, original_volume), daemon=True)
         t.start()
         return jsonify({'success': True, 'task_id': tid})
     except Exception as e:
