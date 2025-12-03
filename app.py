@@ -16,6 +16,7 @@ import io
 import zipfile
 import logging
 from datetime import datetime
+import json
 
 def _load_env_files():
     paths = [".env.local", ".env"]
@@ -787,6 +788,14 @@ def script_generate():
             if result.get("type") == source_type and result.get("success", False):
                 if result.get("batch_id") == batch_id:
                     merged_texts.append(result.get("result", ""))
+        alt_step5_texts = []
+        if source_type != 'script_generate':
+            for task_id, result in deepseek_results.items():
+                if result.get("type") in ("script_generate", "script_extract") and result.get("success", False):
+                    if result.get("batch_id") == batch_id:
+                        alt_step5_texts.append(result.get("result", ""))
+            if alt_step5_texts:
+                merged_texts = alt_step5_texts
 
         if not merged_texts:
             if source_type == 'json_merge':
@@ -794,7 +803,46 @@ def script_generate():
             else:
                 return jsonify({"success": False, "error": "未找到第5步的脚本生成结果"})
 
-        combined_input = "\n\n".join([t for t in merged_texts if t])
+        def _extract_script_narration(raw):
+            try:
+                if isinstance(raw, dict):
+                    if 'Script (Narration)' in raw:
+                        v = raw.get('Script (Narration)')
+                        return str(v or '').strip()
+                    for k in ('Script', 'Narration', 'script', 'narration'):
+                        if k in raw:
+                            v = raw.get(k)
+                            return str(v or '').strip()
+                    return ''
+                s = str(raw or '').strip()
+                if s.startswith('```'):
+                    s = re.sub(r'^```[a-zA-Z]*\n?', '', s)
+                    s = re.sub(r'\n?```$', '', s)
+                try:
+                    obj = json.loads(s)
+                    return _extract_script_narration(obj)
+                except Exception:
+                    pass
+                m = re.search(r'Script\s*\(Narration\)\s*[:：]\s*(.+)', s, re.IGNORECASE | re.DOTALL)
+                if m:
+                    val = m.group(1)
+                    nxt = re.search(r'\n[A-Za-z][^\n]{0,50}[:：]', val)
+                    if nxt:
+                        val = val[:nxt.start()]
+                    return str(val or '').strip()
+            except Exception:
+                return ''
+            return ''
+
+        if source_type == 'script_generate' or alt_step5_texts:
+            narrations = []
+            for t in merged_texts:
+                n = _extract_script_narration(t)
+                if n:
+                    narrations.append(n)
+            combined_input = "\n\n".join(narrations)
+        else:
+            combined_input = "\n\n".join([t for t in merged_texts if t])
         def _preview_text(label, text):
             try:
                 sample = text[:300]
