@@ -102,6 +102,25 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
               <option value="gemini-2.5-flash">gemini-2.5-flash</option>
             </select>
           </div>
+          <div class="mb-3">
+            <label class="form-label">配音设置（ElevenLabs）</label>
+            <div class="row g-2">
+              <div class="col-md-12">
+                <select class="form-select" id="ttsModelId">
+                  <option value="eleven_multilingual_v2" selected>eleven_multilingual_v2（默认）</option>
+                  <option value="eleven_monolingual_v1">eleven_monolingual_v1</option>
+                  <option value="eleven_v3">Eleven v3 (alpha)</option>
+                </select>
+              </div>
+            </div>
+            <div class="row g-2 mt-2">
+              <div class="col-md-12">
+                <select class="form-select" id="ttsVoiceSelect">
+                  <option value="">选择音色</option>
+                </select>
+              </div>
+            </div>
+          </div>
           <button type="submit" class="btn btn-primary" id="submitBtn"><i class="fa fa-upload me-1"></i>开始上传并分析</button>
         </form>
       </div>
@@ -119,6 +138,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
     const modelEl = document.getElementById('modelSelect');
     const statusEl = document.getElementById('statusBox');
     const resultsEl = document.getElementById('results');
+    let elevenVoices = [];
     const btnEl = document.getElementById('submitBtn');
 
     formEl.addEventListener('submit', async (e) => {
@@ -182,6 +202,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
           const html = DOMPurify.sanitize(marked.parse(raw));
           md.innerHTML = html;
           styleTables(md);
+          injectTtsControls(md, window.currentBatchId || '', idx);
         } catch (e) {
           const pre = document.createElement('pre');
           pre.textContent = raw;
@@ -295,6 +316,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
                   const html = DOMPurify.sanitize(marked.parse(raw));
                   ref.md.innerHTML = html;
                   styleTables(ref.md);
+                  injectTtsControls(ref.md, batchId, it.index);
                   ref.raw = raw;
                   if (ref.copyBtn) ref.copyBtn.disabled = false;
                 } catch (e) {
@@ -324,6 +346,234 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
         t.classList.add('table', 'table-striped', 'table-bordered');
       });
     }
+
+    function getTtsConfig() {
+      const midEl = document.getElementById('ttsModelId');
+      const DEFAULT_MODEL = 'eleven_v3';
+      const voice_id = localStorage.getItem('episode_tts_voice_id') || '21m00Tcm4TlvDq8ikWAM';
+      const savedModel = localStorage.getItem('episode_tts_model_id');
+      const model_id = (midEl && midEl.value.trim()) || (savedModel || DEFAULT_MODEL);
+      return { voice_id, model_id };
+    }
+
+    (function initTtsConfigInputs(){
+      const midEl = document.getElementById('ttsModelId');
+      const voiceSelectEl = document.getElementById('ttsVoiceSelect');
+      try {
+        const savedModel = localStorage.getItem('episode_tts_model_id');
+        if (midEl && savedModel) {
+          midEl.value = savedModel;
+        } else if (midEl) {
+          midEl.value = 'eleven_v3';
+        }
+      } catch (_) {}
+      if (midEl) midEl.addEventListener('change', () => { try { localStorage.setItem('episode_tts_model_id', midEl.value.trim()); } catch(_){} });
+      if (voiceSelectEl) {
+        voiceSelectEl.addEventListener('change', () => {
+          const vid = voiceSelectEl.value.trim();
+          try { localStorage.setItem('episode_tts_voice_id', vid); } catch(_){}
+        });
+      }
+    })();
+
+    // Load voices and models from backend endpoints
+    (async function loadElevenLabsOptions(){
+      try {
+        // Models
+        try {
+          const r = await fetch('/elevenlabs/models');
+          const d = await r.json();
+          if (d && d.success && Array.isArray(d.models)) {
+            const midEl = document.getElementById('ttsModelId');
+            if (midEl) {
+              const current = midEl.value;
+              midEl.innerHTML = '';
+              d.models.forEach((m) => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name || m.id;
+                midEl.appendChild(opt);
+              });
+              const savedModel = localStorage.getItem('episode_tts_model_id');
+              const defaultModel = 'eleven_v3';
+              midEl.value = (savedModel && d.models.find(x => x.id === savedModel) ? savedModel : (d.models.find(x => x.id === defaultModel) ? defaultModel : (d.models[0] ? d.models[0].id : '')));
+              try { localStorage.setItem('episode_tts_model_id', midEl.value); } catch(_){}
+            }
+          }
+        } catch (e) { epLog('models:load:error', { message: e.message }); }
+
+        await loadVoices('');
+      } catch (e) {}
+    })();
+
+    async function loadVoices(search) {
+      try {
+        const base = '/elevenlabs/voices';
+        const params = [];
+        if (search) params.push('search=' + encodeURIComponent(search));
+        const url = params.length ? (base + '?' + params.join('&')) : base;
+        const r = await fetch(url);
+        const d = await r.json();
+        if (d && d.success && Array.isArray(d.voices)) {
+          elevenVoices = d.voices;
+          const voiceSelectEl = document.getElementById('ttsVoiceSelect');
+          if (voiceSelectEl) {
+            const savedVoice = localStorage.getItem('episode_tts_voice_id');
+            voiceSelectEl.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '选择音色';
+            voiceSelectEl.appendChild(placeholder);
+            elevenVoices.forEach((v) => {
+              const opt = document.createElement('option');
+              opt.value = v.id;
+              opt.textContent = v.name || v.id;
+              voiceSelectEl.appendChild(opt);
+            });
+            if (savedVoice && elevenVoices.find(x => x.id === savedVoice)) {
+              voiceSelectEl.value = savedVoice;
+            }
+          }
+        }
+      } catch (e) { epLog('voices:load:error', { message: e.message }); }
+    }
+
+    function debounce(fn, delay) {
+      let t;
+      return function() {
+        clearTimeout(t);
+        t = setTimeout(fn, delay);
+      };
+    }
+
+    function injectTtsControls(root, batchId, fileIndex) {
+      try {
+        epLog('inject:start', { batchId, fileIndex });
+        const tables = root.querySelectorAll('table');
+        tables.forEach((table) => {
+          const rows = table.querySelectorAll('tr');
+          rows.forEach((tr, i) => {
+            const cells = tr.querySelectorAll('th, td');
+            if (!cells || cells.length < 2) return;
+            if (i === 0) {
+              const th = document.createElement('th');
+              th.textContent = 'TTS';
+              tr.appendChild(th);
+            } else {
+              const narrationCell = cells[1];
+              const ttsCell = document.createElement('td');
+              const genBtn = document.createElement('button');
+              genBtn.type = 'button';
+              genBtn.className = 'btn btn-sm btn-outline-light me-2';
+              genBtn.textContent = '生成配音';
+              const audioEl = document.createElement('audio');
+              audioEl.controls = true;
+              audioEl.style.display = 'none';
+              const dl = document.createElement('a');
+              dl.className = 'btn btn-sm btn-outline-success ms-2';
+              dl.textContent = '下载';
+              dl.style.display = 'none';
+              genBtn.onclick = async () => {
+                const text = (narrationCell.textContent || '').trim();
+                if (!text) return;
+                epLog('tts:click', { batchId, fileIndex, row: i, text_len: text.length });
+                genBtn.disabled = true;
+                const old = genBtn.textContent;
+                genBtn.textContent = '生成中...';
+              try {
+                const cfg = getTtsConfig();
+                epLog('tts:request', { voice_id: cfg.voice_id, model_id: cfg.model_id });
+                const resp = await fetch('/episode/narration/tts', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ text, batch_id: batchId || '', index: fileIndex, row: i, voice_id: cfg.voice_id, model_id: cfg.model_id })
+                });
+                  const data = await resp.json();
+                  if (data && data.success && data.url) {
+                    const url = data.url + '?t=' + Date.now();
+                    audioEl.src = url;
+                    audioEl.style.display = '';
+                    dl.href = url;
+                    dl.download = `line_${String(i).padStart(3,'0')}.mp3`;
+                    dl.style.display = '';
+                    try { audioEl.play(); } catch (_) {}
+                    epLog('tts:success', { url });
+                  } else {
+                    const err = data && data.error ? data.error : '生成失败';
+                    epLog('tts:fail', { error: err });
+                    alert(err);
+                  }
+                } catch (e) {
+                  epLog('tts:error', { message: e.message });
+                  alert('生成出错：' + e.message);
+                } finally {
+                  genBtn.disabled = false;
+                  genBtn.textContent = old;
+                }
+              };
+              ttsCell.appendChild(genBtn);
+              ttsCell.appendChild(audioEl);
+              ttsCell.appendChild(dl);
+              tr.appendChild(ttsCell);
+            }
+          });
+        });
+        epLog('inject:done', { tables: root.querySelectorAll('table').length });
+      } catch (e) {}
+    }
+
+    // Console logging helpers
+    function epLog(event, payload) {
+      try {
+        const ts = new Date().toISOString();
+        console.log(`[Episode] ${ts} ${event}`, payload || {});
+      } catch (_) {}
+    }
+
+    // Wrap fetch for episode endpoints
+    (function wrapFetch(){
+      try {
+        const of = window.fetch;
+        window.fetch = async function(input, init){
+          const url = typeof input === 'string' ? input : (input && input.url);
+          const method = (init && init.method) || 'GET';
+          if (url && url.includes('/episode/narration')) {
+            epLog('fetch:start', { url, method });
+          }
+          try {
+            const resp = await of(input, init);
+            if (url && url.includes('/episode/narration')) {
+              epLog('fetch:resp', { url, status: resp.status });
+            }
+            return resp;
+          } catch (e) {
+            if (url && url.includes('/episode/narration')) {
+              epLog('fetch:error', { url, method, message: e.message });
+            }
+            throw e;
+          }
+        };
+      } catch (_) {}
+    })();
+
+    // Extra form logging without altering existing handler
+    (function attachFormLog(){
+      try {
+        const form = document.getElementById('episodeForm');
+        const filesEl = document.getElementById('episodeFiles');
+        const promptEl = document.getElementById('userPrompt');
+        const modelEl = document.getElementById('modelSelect');
+        if (form) {
+          form.addEventListener('submit', () => {
+            epLog('form:submit', {
+              files_count: (filesEl && filesEl.files && filesEl.files.length) || 0,
+              prompt_len: (promptEl && promptEl.value && promptEl.value.length) || 0,
+              model: (modelEl && modelEl.value) || ''
+            });
+          });
+        }
+      } catch (_) {}
+    })();
 
     async function copyText(text) {
       try {

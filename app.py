@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, Response, send_file
+from flask import g
 from flask import stream_with_context
 import os
 import re
@@ -17,6 +18,7 @@ import zipfile
 import logging
 from datetime import datetime
 import json
+import concurrent.futures
 
 def _load_env_files():
     paths = [".env.local", ".env"]
@@ -57,6 +59,7 @@ logging.basicConfig(
 # 创建专用日志器
 logger = logging.getLogger(__name__)
 packaging_logger = logging.getLogger('video_packaging')
+episode_logger = logging.getLogger('episode_narration')
 
 # 配置文件上传
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024
@@ -84,6 +87,51 @@ deepseek_status = {}
 edl_tasks = {}
 original_name_map = {}
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
+episode_results = {}
+episode_status = {}
+_voices_cache = {}
+_models_cache = {}
+_cache_ttl_sec = 600
+
+def _episode_analyze_one(batch_id, index, filename, save_path, user_prompt, model):
+    try:
+        try:
+            items = episode_status.get(batch_id, {}).get('items')
+            if items and 0 <= index < len(items):
+                items[index]['status'] = 'processing'
+        except Exception:
+            pass
+        t0 = time.time()
+        analyzer = VideoAnalyzer()
+        result_text = analyzer.analyze_video_local(save_path, user_prompt, model=model, max_tokens=None, stream=False)
+        t1 = time.time()
+        duration_ms = int((t1 - t0) * 1000)
+        res = {'index': index, 'filename': filename, 'success': True, 'result': result_text, 'model': model, 'duration_ms': duration_ms}
+        try:
+            if isinstance(episode_results.get(batch_id), list) and 0 <= index < len(episode_results[batch_id]):
+                episode_results[batch_id][index] = res
+            else:
+                episode_results.setdefault(batch_id, []).append(res)
+            st = episode_status.get(batch_id, {})
+            if st:
+                st['count'] = st.get('count', 0) + 1
+                items = st.get('items')
+                if items and 0 <= index < len(items):
+                    items[index]['status'] = 'done'
+                    items[index]['duration_ms'] = duration_ms
+                    items[index]['model'] = model
+        except Exception:
+            pass
+        return res
+    except Exception as e:
+        try:
+            st = episode_status.get(batch_id, {})
+            items = st.get('items') if st else None
+            if items and 0 <= index < len(items):
+                items[index]['status'] = 'failed'
+        except Exception:
+            pass
+        raise e
 
 @app.after_request
 def add_cors_headers(resp):
@@ -1148,6 +1196,108 @@ def edl_upload_batch():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+# Episode Narration logging hooks
+@app.before_request
+def _episode_before_request():
+    try:
+        path = request.path or ''
+        if path.startswith('/episode/narration'):
+            g.__episode_start__ = time.time()
+            meta = {
+                'method': request.method,
+                'path': path,
+                'args': dict(request.args or {}),
+                'content_type': request.headers.get('Content-Type', ''),
+                'content_length': request.headers.get('Content-Length')
+            }
+            episode_logger.info(f"EPISODE_REQ_START {json.dumps(meta, ensure_ascii=False)}")
+    except Exception:
+        pass
+
+@app.after_request
+def _episode_after_request(resp):
+    try:
+        path = request.path or ''
+        if path.startswith('/episode/narration'):
+            t0 = getattr(g, '__episode_start__', None)
+            dur_ms = int((time.time() - t0) * 1000) if t0 else None
+            meta = {
+                'method': request.method,
+                'path': path,
+                'status': resp.status_code,
+                'duration_ms': dur_ms,
+                'resp_type': resp.headers.get('Content-Type', '')
+            }
+            episode_logger.info(f"EPISODE_REQ_DONE {json.dumps(meta, ensure_ascii=False)}")
+    except Exception:
+        pass
+    return resp
+
+@app.teardown_request
+def _episode_teardown_request(err):
+    try:
+        if err is not None:
+            path = request.path or ''
+            if path.startswith('/episode/narration'):
+                episode_logger.error(f"EPISODE_REQ_ERR {str(err)}")
+    except Exception:
+        pass
+
+@app.route('/episode/narration/tts', methods=['POST'])
+def episode_narration_tts():
+    try:
+        data = request.get_json(silent=True) or {}
+        text = (data.get('text') or '').strip()
+        voice_id = (data.get('voice_id') or '21m00Tcm4TlvDq8ikWAM').strip()
+        model_id = (data.get('model_id') or 'eleven_multilingual_v2').strip()
+        batch_id = str(data.get('batch_id') or 'default').strip()
+        index = int(data.get('index') or 0)
+        row = int(data.get('row') or 0)
+        api_key = ELEVENLABS_API_KEY or (os.getenv('XI_API_KEY') or os.getenv('ELEVEN_LABS_API_KEY') or '')
+        explicit_key = (data.get('api_key') or '').strip()
+        if explicit_key:
+            api_key = explicit_key
+        if not api_key:
+            return jsonify({'success': False, 'error': '缺少ELEVENLABS_API_KEY'})
+        if not text:
+            return jsonify({'success': False, 'error': '文本为空'})
+        out_dir = os.path.join('static', 'voiceover', f'episode_tts_{batch_id}_{index}')
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except Exception:
+            pass
+        out_path = os.path.join(out_dir, f'line_{row:03d}.mp3')
+        url = f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream'
+        payload = {
+            'text': text,
+            'model_id': model_id,
+            'voice_settings': {
+                'stability': 0.5,
+                'similarity_boost': 0.75
+            }
+        }
+        headers = {
+            'xi-api-key': api_key,
+            'accept': 'audio/mpeg',
+            'Content-Type': 'application/json'
+        }
+        r = requests.post(url, json=payload, headers=headers, timeout=60)
+        if r.status_code >= 400:
+            try:
+                err_txt = r.text[:500]
+            except Exception:
+                err_txt = str(r.status_code)
+            return jsonify({'success': False, 'error': f'ElevenLabs错误: {err_txt}'})
+        try:
+            with open(out_path, 'wb') as f:
+                f.write(r.content)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'保存失败: {str(e)}'})
+        rel = out_path.replace('\\', '/')
+        return jsonify({'success': True, 'file': rel, 'url': '/' + rel})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
 def mmssff_to_hhmmss_ms(ts, fps):
     m = re.match(r"^(\d{2}):(\d{2}):(\d{2})$", ts)
     if not m:
@@ -1725,36 +1875,80 @@ def elevenlabs_voices():
             return jsonify({"success": False, "error": "缺少ElevenLabs API密钥"}), 400
         base_url = 'https://api.elevenlabs.io'
         url = f"{base_url}/v2/voices"
-        params = {}
+        base_params = {}
         q = (request.args.get('search') or '').strip()
         if q:
-            params['search'] = q
-        page_size = request.args.get('page_size')
-        if page_size:
+            base_params['search'] = q
+        req_ps = request.args.get('page_size')
+        ps = 100
+        if req_ps:
             try:
-                params['page_size'] = int(page_size)
+                ps = min(int(req_ps), 100)
             except Exception:
-                pass
+                ps = 100
+        cache_key = f"k={bool(api_key)}|q={q}|ps={ps}"
+        now = time.time()
+        try:
+            cached = _voices_cache.get(cache_key)
+            if cached and (now - cached['ts'] < _cache_ttl_sec):
+                print(f"[elevenlabs_voices] cache_hit key={cache_key}")
+                return jsonify({"success": True, "voices": cached['data']})
+        except Exception:
+            pass
         headers = { 'xi-api-key': api_key }
-        resp = requests.get(url, headers=headers, params=params, timeout=30)
-        print(f"[elevenlabs_voices] status_code={resp.status_code}")
-        if resp.status_code != 200:
-            body_preview = ''
-            try:
-                body_preview = resp.text[:300]
-            except Exception:
-                pass
-            print(f"[elevenlabs_voices] error_body={body_preview}")
-            return jsonify({"success": False, "error": f"HTTP {resp.status_code}"}), 500
-        data = resp.json()
         voices = []
-        items = data.get('voices') or data.get('items') or []
-        for v in items:
-            vid = v.get('voice_id') or v.get('id') or ''
-            name = v.get('name') or ''
-            if vid and name:
-                voices.append({ 'id': vid, 'name': name })
-        print(f"[elevenlabs_voices] voices_len={len(voices)}")
+        next_token = None
+        has_more = True
+        loops = 0
+        while has_more and loops < 50:
+            loops += 1
+            params = dict(base_params)
+            params['page_size'] = ps
+            if next_token:
+                params['next_page_token'] = next_token
+            resp = requests.get(url, headers=headers, params=params, timeout=30)
+            print(f"[elevenlabs_voices] page_status={resp.status_code} loops={loops}")
+            if resp.status_code != 200:
+                body_preview = ''
+                try:
+                    body_preview = resp.text[:300]
+                except Exception:
+                    pass
+                print(f"[elevenlabs_voices] error_body={body_preview}")
+                break
+            data = resp.json()
+            items = data.get('voices') or data.get('items') or []
+            for v in items:
+                vid = (v.get('voice_id') or v.get('id') or '').strip()
+                name = (v.get('name') or '').strip()
+                if vid and name:
+                    voices.append({ 'id': vid, 'name': name })
+            has_more = bool(data.get('has_more'))
+            next_token = data.get('next_page_token')
+            if not has_more or not next_token:
+                break
+        # Deduplicate by id
+        try:
+            seen = set()
+            deduped = []
+            for v in voices:
+                if v['id'] in seen:
+                    continue
+                seen.add(v['id'])
+                deduped.append(v)
+            voices = deduped
+        except Exception:
+            pass
+        print(f"[elevenlabs_voices] voices_total={len(voices)} loops={loops}")
+        try:
+            _voices_cache[cache_key] = { 'ts': now, 'data': voices }
+        except Exception:
+            pass
+        if not voices:
+            cached = _voices_cache.get(cache_key)
+            if cached:
+                print(f"[elevenlabs_voices] cache_fallback_empty key={cache_key}")
+                return jsonify({"success": True, "voices": cached['data']})
         return jsonify({"success": True, "voices": voices})
     except Exception as e:
         try:
@@ -1775,12 +1969,28 @@ def elevenlabs_models():
             return jsonify({"success": False, "error": "缺少ElevenLabs API密钥"}), 400
         base_url = 'https://api.elevenlabs.io'
         url = f"{base_url}/v1/models"
+        cache_key = f"k={bool(api_key)}"
+        now = time.time()
+        try:
+            cached = _models_cache.get(cache_key)
+            if cached and (now - cached['ts'] < _cache_ttl_sec):
+                print(f"[ElevenLabs] models cache_hit key={cache_key}")
+                return jsonify({"success": True, "models": cached['data']})
+        except Exception:
+            pass
         headers = { 'xi-api-key': api_key }
         resp = requests.get(url, headers=headers, timeout=30)
         if resp.status_code != 200:
             body_preview = ''
             try:
                 body_preview = resp.text[:300]
+            except Exception:
+                pass
+            try:
+                cached = _models_cache.get(cache_key)
+                if cached:
+                    print(f"[ElevenLabs] models cache_fallback key={cache_key}")
+                    return jsonify({"success": True, "models": cached['data']})
             except Exception:
                 pass
             return jsonify({"success": False, "error": f"HTTP {resp.status_code}", "body": body_preview}), 500
@@ -1800,6 +2010,10 @@ def elevenlabs_models():
             if mid:
                 models.append({ 'id': mid, 'name': name or mid })
         print(f"[ElevenLabs] models count={len(models)}")
+        try:
+            _models_cache[cache_key] = { 'ts': now, 'data': models }
+        except Exception:
+            pass
         return jsonify({"success": True, "models": models})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -2326,6 +2540,142 @@ def get_packaging_file(filename):
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/episode/narration', methods=['GET'])
+def episode_narration_page():
+    return render_template('episode_narration.html')
+
+@app.route('/episode/narration/upload_batch', methods=['POST', 'OPTIONS'])
+def episode_narration_upload_batch():
+    try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
+        if 'episode_files' not in request.files:
+            return jsonify({'success': False, 'error': '没有选择文件'})
+        files = request.files.getlist('episode_files')
+        if not files or files[0].filename == '':
+            return jsonify({'success': False, 'error': '没有选择文件'})
+        user_prompt = (request.form.get('user_prompt') or (request.json or {}).get('user_prompt') or '').strip()
+        model = (request.form.get('model') or (request.json or {}).get('model') or '').strip() or 'gemini-2.5-pro'
+        batch_id = str(int(time.time() * 1000))
+        out_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'episode_narration', batch_id)
+        os.makedirs(out_dir, exist_ok=True)
+        results = []
+        saved = []
+        for i, f in enumerate(files):
+            filename = secure_filename(f.filename)
+            if not allowed_file(filename):
+                results.append({'index': i, 'filename': filename, 'success': False, 'error': '文件格式不支持'})
+                continue
+            save_path = os.path.join(out_dir, filename)
+            try:
+                f.save(save_path)
+                saved.append((i, filename, save_path))
+            except Exception as e:
+                results.append({'index': i, 'filename': filename, 'success': False, 'error': str(e)})
+
+        episode_status[batch_id] = {
+            'status': 'processing',
+            'count': 0,
+            'total': len(saved),
+            'items': [{'index': idx, 'filename': fname, 'status': 'queued'} for (idx, fname, _p) in saved],
+            'prompt': user_prompt,
+            'model': model,
+            'out_dir': out_dir
+        }
+        episode_results[batch_id] = [None] * len(saved)
+        def _episode_run_batch(batch_id_, saved_, prompt_, model_):
+            max_workers = max(1, min(len(saved_), (os.cpu_count() or 4)))
+            if saved_:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(_episode_analyze_one, batch_id_, idx, fname, path, prompt_, model_): (idx, fname, path) for (idx, fname, path) in saved_}
+                    for fut in concurrent.futures.as_completed(futures):
+                        try:
+                            res = fut.result()
+                        except Exception as e:
+                            idx, fname, _p = futures[fut]
+                            if isinstance(episode_results.get(batch_id_), list) and 0 <= idx < len(episode_results[batch_id_]):
+                                episode_results[batch_id_][idx] = {'index': idx, 'filename': fname, 'success': False, 'error': str(e)}
+                            else:
+                                episode_results.setdefault(batch_id_, []).append({'index': idx, 'filename': fname, 'success': False, 'error': str(e)})
+            try:
+                st = episode_status.get(batch_id_, {})
+                if st:
+                    st['status'] = 'completed'
+            except Exception:
+                pass
+        threading.Thread(target=_episode_run_batch, args=(batch_id, saved, user_prompt, model), daemon=True).start()
+        return jsonify({'success': True, 'batch_id': batch_id, 'total_count': len(saved)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/episode/narration/batch/result/<batch_id>', methods=['GET'])
+def episode_narration_batch_result(batch_id):
+    try:
+        res = episode_results.get(batch_id)
+        if res is None:
+            return jsonify({'success': False, 'error': '结果未找到'})
+        return jsonify({'success': True, 'batch_id': batch_id, 'results': res, 'total_count': len(res)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/episode/narration/batch/status/<batch_id>', methods=['GET'])
+def episode_narration_batch_status(batch_id):
+    try:
+        status = episode_status.get(batch_id)
+        if status is None:
+            return jsonify({'success': False, 'error': '状态未找到'})
+        return jsonify({'success': True, 'batch_id': batch_id, 'status': status})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/episode/narration/retry_one', methods=['POST'])
+def episode_narration_retry_one():
+    try:
+        data = request.get_json(silent=True) or {}
+        batch_id = str(data.get('batch_id') or '').strip()
+        index = data.get('index')
+        override_model = (data.get('model') or '').strip()
+        override_prompt = (data.get('user_prompt') or '').strip()
+        st = episode_status.get(batch_id)
+        if not st:
+            return jsonify({'success': False, 'error': '批次不存在'})
+        items = st.get('items') or []
+        if not isinstance(index, int) or index < 0 or index >= len(items):
+            return jsonify({'success': False, 'error': '索引无效'})
+        fname = items[index].get('filename')
+        out_dir = st.get('out_dir')
+        if not fname or not out_dir:
+            return jsonify({'success': False, 'error': '文件信息缺失'})
+        save_path = os.path.join(out_dir, fname)
+        prompt = override_prompt or st.get('prompt') or ''
+        model = override_model or st.get('model') or ''
+        items[index]['status'] = 'processing'
+        t0 = time.time()
+        analyzer = VideoAnalyzer()
+        try:
+            result_text = analyzer.analyze_video_local(save_path, prompt, model=model, max_tokens=None, stream=False)
+            t1 = time.time()
+            duration_ms = int((t1 - t0) * 1000)
+            res = {'index': index, 'filename': fname, 'success': True, 'result': result_text, 'model': model, 'duration_ms': duration_ms}
+            if isinstance(episode_results.get(batch_id), list) and 0 <= index < len(episode_results[batch_id]):
+                episode_results[batch_id][index] = res
+            else:
+                episode_results.setdefault(batch_id, []).append(res)
+            items[index]['status'] = 'done'
+            items[index]['duration_ms'] = duration_ms
+            items[index]['model'] = model
+            return jsonify({'success': True, 'result': res})
+        except Exception as e:
+            items[index]['status'] = 'failed'
+            err = {'index': index, 'filename': fname, 'success': False, 'error': str(e)}
+            if isinstance(episode_results.get(batch_id), list) and 0 <= index < len(episode_results[batch_id]):
+                episode_results[batch_id][index] = err
+            else:
+                episode_results.setdefault(batch_id, []).append(err)
+            return jsonify({'success': False, 'error': str(e)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
     # 创建templates目录
