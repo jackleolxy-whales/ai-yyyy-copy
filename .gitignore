@@ -227,3 +227,12 @@ secrets.json
 *.bak
 *.backup
 *.old
+
+static/voiceover/voiceover_*/
+static/voiceover/voiceover_combined_*/
+static/voiceover/voiceover_edited_*/
+static/voiceover/step6_combined_*/
+static/voiceover/step6_edited_*/
+static/voiceover/test_batch/
+static/voiceover/json_merge_single_script_*/
+narration-episode.txt
