@@ -1858,7 +1858,7 @@ def voiceover_generate():
                     f.write(chunk)
 
         rel_url = f"/static/voiceover/{batch_id}/seg_{index:03d}.mp3"
-        return jsonify({"success": True, "url": rel_url, "file_path": out_path})
+        return jsonify({"success": True, "url": rel_url, "file_path": out_path, "voice_id": voice_id, "model_id": model_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

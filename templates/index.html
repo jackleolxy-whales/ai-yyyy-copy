@@ -7792,7 +7792,13 @@ Now, I give you the JSONs:
                 const groupBatchId = batchId + (typeof gi === 'number' ? (`_script_${gi}`) : '');
                 let voiceId = '';
                 const sel = document.getElementById('voiceToolVoiceSelect');
-                if (sel && sel.value) voiceId = sel.value;
+                if (sel) {
+                    voiceId = sel.value || '';
+                    if (!voiceId && sel.options && sel.options.length > 0) {
+                        voiceId = sel.options[0].value || '';
+                        sel.value = voiceId;
+                    }
+                }
                 const modelSel = document.getElementById('voiceToolModelSelect');
                 let modelId = '';
                 if (modelSel && modelSel.value) modelId = modelSel.value;
@@ -7827,7 +7833,13 @@ Now, I give you the JSONs:
                 const batchId = jsonMergeBatchId || ('voiceover_combined_' + Date.now());
                 let voiceId = '';
                 const voiceSel = document.getElementById('voiceToolVoiceSelect');
-                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+                if (voiceSel) {
+                    voiceId = voiceSel.value || '';
+                    if (!voiceId && voiceSel.options && voiceSel.options.length > 0) {
+                        voiceId = voiceSel.options[0].value || '';
+                        voiceSel.value = voiceId;
+                    }
+                }
                 let modelId = '';
                 const modelSel = document.getElementById('voiceToolModelSelect');
                 if (modelSel && modelSel.value) modelId = modelSel.value;
@@ -7899,7 +7911,13 @@ Now, I give you the JSONs:
                 // 获取当前选择的voice和model
                 let voiceId = '';
                 const voiceSel = document.getElementById('voiceToolVoiceSelect');
-                if (voiceSel && voiceSel.value) voiceId = voiceSel.value;
+                if (voiceSel) {
+                    voiceId = voiceSel.value || '';
+                    if (!voiceId && voiceSel.options && voiceSel.options.length > 0) {
+                        voiceId = voiceSel.options[0].value || '';
+                        voiceSel.value = voiceId;
+                    }
+                }
 
                 let modelId = '';
                 const modelSel = document.getElementById('voiceToolModelSelect');

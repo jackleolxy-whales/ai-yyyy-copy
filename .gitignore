@@ -198,6 +198,8 @@ temp/
 *.mp4
 *.avi
 *.mov
+static/voiceover/
+app.log
 *.wmv
 *.flv
 *.webm

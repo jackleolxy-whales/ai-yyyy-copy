@@ -30,6 +30,8 @@
       --bs-table-hover-color: #ffffff;
     }
     .result-card .table th, .result-card .table td { color: #ffffff; }
+    .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, 0.2); border-top-color: #ff006e; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 6px; vertical-align: -2px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -466,6 +468,10 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
               genBtn.type = 'button';
               genBtn.className = 'btn btn-sm btn-outline-light me-2';
               genBtn.textContent = '生成配音';
+              const simplifyBtn = document.createElement('button');
+              simplifyBtn.type = 'button';
+              simplifyBtn.className = 'btn btn-sm btn-outline-primary me-2';
+              simplifyBtn.textContent = '简化文案';
               const audioEl = document.createElement('audio');
               audioEl.controls = true;
               audioEl.style.display = 'none';
@@ -473,6 +479,38 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
               dl.className = 'btn btn-sm btn-outline-success ms-2';
               dl.textContent = '下载';
               dl.style.display = 'none';
+              simplifyBtn.onclick = async () => {
+                const text = (narrationCell.textContent || '').trim();
+                if (!text) return;
+                simplifyBtn.disabled = true;
+                const old = simplifyBtn.textContent;
+                simplifyBtn.innerHTML = '<span class="loading-spinner"></span>简化中...';
+                try {
+                  const prompt = '你是专业的口播文案编辑。目标：在不改变语义与语气的前提下，将输入句子压缩约15%-25%，去除赘述与填充词，保持口语化与节奏，输出且只输出一条简化后的中文文案，不要任何说明、标注或引号。输入：';
+                  const resp = await fetch('/deepseek/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_result: text, user_prompt: prompt })
+                  });
+                  const data = await resp.json();
+                  if (data && data.success) {
+                    const simplified = String(data.result || '').trim();
+                    if (simplified) {
+                      narrationCell.textContent = simplified;
+                    } else {
+                      alert('简化后的文案为空');
+                    }
+                  } else {
+                    const err = (data && data.error) || '简化失败';
+                    alert(err);
+                  }
+                } catch (e) {
+                  alert('简化错误：' + e.message);
+                } finally {
+                  simplifyBtn.disabled = false;
+                  simplifyBtn.textContent = old;
+                }
+              };
               genBtn.onclick = async () => {
                 const text = (narrationCell.textContent || '').trim();
                 if (!text) return;
@@ -512,6 +550,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
                 }
               };
               ttsCell.appendChild(genBtn);
+              ttsCell.appendChild(simplifyBtn);
               ttsCell.appendChild(audioEl);
               ttsCell.appendChild(dl);
               tr.appendChild(ttsCell);
@@ -638,6 +677,40 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
         if (ref.retryBtn) ref.retryBtn.disabled = false;
       }
     }
+
+    function injectSimplifyControls(root) {
+      try {
+        const tables = root.querySelectorAll('table');
+        tables.forEach((table) => {
+          table.setAttribute('data-simplify-injected', '1');
+        });
+      } catch (e) {}
+    }
+
+    (function observeNarrationTables(){
+      try {
+        const root = document.getElementById('results');
+        if (!root) return;
+        const obs = new MutationObserver((mutations) => {
+          mutations.forEach((m) => {
+            m.addedNodes.forEach((node) => {
+              try {
+                if (!(node instanceof Element)) return;
+                if (node.tagName === 'TABLE') {
+                  injectSimplifyControls(node.parentElement || node);
+                  return;
+                }
+                if (node.querySelector) {
+                  const hasTable = node.querySelector('table');
+                  if (hasTable) injectSimplifyControls(node);
+                }
+              } catch (_) {}
+            });
+          });
+        });
+        obs.observe(root, { childList: true, subtree: true });
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>
