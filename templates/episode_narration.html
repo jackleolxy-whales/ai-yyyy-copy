@@ -486,7 +486,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
                 const old = simplifyBtn.textContent;
                 simplifyBtn.innerHTML = '<span class="loading-spinner"></span>简化中...';
                 try {
-                  const prompt = '你是专业的口播文案编辑。目标：在不改变语义与语气的前提下，将输入句子压缩约15%-25%，去除赘述与填充词，保持口语化与节奏，输出且只输出一条简化后的中文文案，不要任何说明、标注或引号。输入：';
+                  const prompt = 'You are a professional script editor for spoken word broadcasts. Objective: Without altering the meaning and tone, compress the input sentence by approximately 10%-15%, removing redundancy and filler words, maintaining a conversational style and rhythm, and outputting only one simplified English script, without any explanations, annotations, or quotation marks. Input:';
                   const resp = await fetch('/deepseek/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -516,7 +516,6 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
                 if (!text) return;
                 epLog('tts:click', { batchId, fileIndex, row: i, text_len: text.length });
                 genBtn.disabled = true;
-                const old = genBtn.textContent;
                 genBtn.textContent = '生成中...';
               try {
                 const cfg = getTtsConfig();
@@ -536,6 +535,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
                     dl.style.display = '';
                     try { audioEl.play(); } catch (_) {}
                     epLog('tts:success', { url });
+                    genBtn.textContent = '重新生成配音';
                   } else {
                     const err = data && data.error ? data.error : '生成失败';
                     epLog('tts:fail', { error: err });
@@ -546,7 +546,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
                   alert('生成出错：' + e.message);
                 } finally {
                   genBtn.disabled = false;
-                  genBtn.textContent = old;
+                  genBtn.textContent = audioEl && audioEl.src ? '重新生成配音' : '生成配音';
                 }
               };
               ttsCell.appendChild(genBtn);

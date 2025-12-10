@@ -7666,8 +7666,6 @@ Now, I give you the JSONs:
             if (!md) { showError('请粘贴第5步的表格Markdown'); return; }
             const segments = extractNarrationSegmentsFromMarkdown(md);
             if (!segments.length) { showError('未解析到任何台词行'); return; }
-            try { await loadElevenVoices(); } catch (e) {}
-            try { await loadElevenModels(); } catch (e) {}
             const resultContainer = document.getElementById('voiceToolResultContainer');
             const resultText = document.getElementById('voiceToolResultText');
             if (resultContainer && resultText) {
@@ -7692,44 +7690,32 @@ Now, I give you the JSONs:
             try {
                 const sel = document.getElementById('voiceToolVoiceSelect');
                 if (!sel) return;
+                const prev = sel.value || '';
                 sel.innerHTML = '<option value="">加载中...</option>';
-                console.log('[VoiceTool] loadElevenVoices start');
                 const resp = await fetch('/elevenlabs/voices?page_size=100');
-                console.log('[VoiceTool] /elevenlabs/voices resp ok=', resp.ok, ' status=', resp.status);
                 let data = null;
-                try {
-                    data = await resp.json();
-                } catch (e) {
-                    console.error('[VoiceTool] parse json error', e);
-                    sel.innerHTML = '<option value="">加载失败</option>';
-                    return;
-                }
-                console.log('[VoiceTool] voices response payload=', data);
-                if (!data.success) {
-                    console.error('[VoiceTool] voices error=', data.error);
-                    sel.innerHTML = '<option value="">加载失败</option>';
-                    return;
-                }
+                try { data = await resp.json(); } catch (e) { sel.innerHTML = '<option value="">加载失败</option>'; return; }
+                if (!data.success) { sel.innerHTML = '<option value="">加载失败</option>'; return; }
                 const voices = data.voices || [];
-                if (!voices.length) {
-                    console.warn('[VoiceTool] voices empty');
-                    sel.innerHTML = '<option value="">无可用语音</option>';
-                    return;
-                }
+                if (!voices.length) { sel.innerHTML = '<option value="">无可用语音</option>'; return; }
                 const priorityName = '许你真心岁岁欢';
-                const top = [];
-                const rest = [];
-                for (const v of voices) {
-                    if (v.name === priorityName) top.push(v); else rest.push(v);
-                }
+                const top = [], rest = [];
+                for (const v of voices) { if (v.name === priorityName) top.push(v); else rest.push(v); }
                 const ordered = top.concat(rest);
                 sel.innerHTML = ordered.map(v => `<option value="${v.id}">${escapeHtml(v.name)}</option>`).join('');
-                if (top.length) sel.value = top[0].id;
-                console.log('[VoiceTool] voices loaded count=', voices.length);
+                let target = '';
+                try {
+                    const saved = localStorage.getItem('voice_tool_voice_id') || '';
+                    if (saved && ordered.find(v => v.id === saved)) target = saved;
+                } catch (_) {}
+                if (!target && prev && ordered.find(v => v.id === prev)) target = prev;
+                if (!target && top.length) target = top[0].id;
+                if (!target && ordered.length) target = ordered[0].id;
+                if (target) sel.value = target;
+                try { sel.addEventListener('change', () => { try { localStorage.setItem('voice_tool_voice_id', sel.value || ''); } catch(_){} }); } catch(_){}
             } catch (_) {
                 const sel = document.getElementById('voiceToolVoiceSelect');
                 if (sel) sel.innerHTML = '<option value="">加载失败</option>';
-                try { console.error('[VoiceTool] loadElevenVoices error', _); } catch(e){}
             }
         }
 
@@ -7737,6 +7723,7 @@ Now, I give you the JSONs:
             try {
                 const sel = document.getElementById('voiceToolModelSelect');
                 if (!sel) return;
+                const prev = sel.value || '';
                 sel.innerHTML = '<option value="">加载中...</option>';
                 const resp = await fetch('/elevenlabs/models');
                 let data = null;
@@ -7746,12 +7733,19 @@ Now, I give you the JSONs:
                 if (!models.length) { sel.innerHTML = '<option value="">无可用模型</option>'; return; }
                 const priorityName = 'Eleven v3 (alpha)';
                 const top = [], rest = [];
-                for (const m of models) {
-                    if ((m.name || m.id) === priorityName) top.push(m); else rest.push(m);
-                }
+                for (const m of models) { if ((m.name || m.id) === priorityName) top.push(m); else rest.push(m); }
                 const ordered = top.concat(rest);
                 sel.innerHTML = ordered.map(m => `<option value="${m.id}">${escapeHtml(m.name || m.id)}</option>`).join('');
-                if (top.length) sel.value = top[0].id;
+                let target = '';
+                try {
+                    const saved = localStorage.getItem('voice_tool_model_id') || '';
+                    if (saved && ordered.find(m => m.id === saved)) target = saved;
+                } catch (_) {}
+                if (!target && prev && ordered.find(m => m.id === prev)) target = prev;
+                if (!target && top.length) target = top[0].id;
+                if (!target && ordered.length) target = ordered[0].id;
+                if (target) sel.value = target;
+                try { sel.addEventListener('change', () => { try { localStorage.setItem('voice_tool_model_id', sel.value || ''); } catch(_){} }); } catch(_){}
             } catch (_) {
                 const sel = document.getElementById('voiceToolModelSelect');
                 if (sel) sel.innerHTML = '<option value="">加载失败</option>';
