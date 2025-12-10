@@ -47,14 +47,15 @@ app = Flask(__name__)
 
 # 配置日志
 log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-logging.basicConfig(
-    level=logging.INFO,
-    format=log_format,
-    handlers=[
-        logging.FileHandler('app.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
-)
+_handlers = []
+try:
+    _log_dir = os.getenv('LOG_DIR', '/tmp')
+    os.makedirs(_log_dir, exist_ok=True)
+    _handlers.append(logging.FileHandler(os.path.join(_log_dir, 'app.log'), encoding='utf-8'))
+except Exception:
+    pass
+_handlers.append(logging.StreamHandler())
+logging.basicConfig(level=logging.INFO, format=log_format, handlers=_handlers)
 
 # 创建专用日志器
 logger = logging.getLogger(__name__)
@@ -63,11 +64,20 @@ episode_logger = logging.getLogger('episode_narration')
 
 # 配置文件上传
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024
-app.config['UPLOAD_FOLDER'] = 'uploads'
+
+def ensure_writable_dir(path):
+    try:
+        os.makedirs(path, exist_ok=True)
+        return path
+    except Exception:
+        fallback = os.path.join('/tmp', path.replace('\\', '/').strip('/'))
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+app.config['UPLOAD_FOLDER'] = ensure_writable_dir(os.getenv('UPLOAD_FOLDER', 'uploads'))
 
 # 确保上传目录存在
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
+ensure_writable_dir(app.config['UPLOAD_FOLDER'])
 
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {
@@ -138,9 +148,24 @@ def add_cors_headers(resp):
     origin = request.headers.get('Origin') or '*'
     resp.headers['Access-Control-Allow-Origin'] = origin
     resp.headers['Access-Control-Allow-Credentials'] = 'true'
-    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
-    resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    req_headers = request.headers.get('Access-Control-Request-Headers')
+    if req_headers:
+        resp.headers['Access-Control-Allow-Headers'] = req_headers
+    else:
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, apikey'
+    resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, DELETE'
+    resp.headers['Access-Control-Max-Age'] = '86400'
+    resp.headers['Vary'] = 'Origin, Access-Control-Request-Headers, Access-Control-Request-Method'
     return resp
+
+@app.route('/api/files/<path:subpath>')
+def serve_stored_file(subpath):
+    base = app.config.get('UPLOAD_FOLDER') or 'uploads'
+    p = os.path.abspath(os.path.join(base, subpath))
+    base_abs = os.path.abspath(base)
+    if not p.startswith(base_abs) or not os.path.exists(p):
+        return jsonify({'success': False, 'error': 'File not found'}), 404
+    return send_file(p)
 
 class VideoAnalyzerWeb:
     def __init__(self):
@@ -258,8 +283,14 @@ deepseek_processor = DeepSeekProcessor()
 def index():
     return render_template('index.html')
 
-@app.route('/analyze', methods=['POST'])
+@app.route('/favicon.ico')
+def favicon():
+    return Response(status=204)
+
+@app.route('/analyze', methods=['POST', 'OPTIONS'])
 def analyze():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     data = request.json
     video_url = data.get('video_url', '').strip()
     text_prompt = data.get('text_prompt', '').strip()
@@ -285,9 +316,11 @@ def analyze():
 
     return jsonify({"success": True, "task_id": task_id})
 
-@app.route('/analyze/batch', methods=['POST'])
+@app.route('/analyze/batch', methods=['POST', 'OPTIONS'])
 def analyze_batch():
     """批量人物分析接口，用于第三步"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     data = request.json
     text_prompt = data.get('text_prompt', '').strip()
     batch_id = data.get('batch_id', '').strip()
@@ -327,15 +360,19 @@ def analyze_batch():
             "error": str(e)
         })
 
-@app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_video():
     """处理单个视频文件上传（保持兼容性）"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     return upload_videos_single()
 
-@app.route('/upload/batch', methods=['POST'])
+@app.route('/upload/batch', methods=['POST', 'OPTIONS'])
 def upload_videos():
     """处理批量视频文件上传"""
     try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
         # 检查是否有文件被上传
         if 'video_files' not in request.files:
             return jsonify({"success": False, "error": "没有选择文件"})
@@ -440,6 +477,35 @@ def upload_videos():
 
     except Exception as e:
         return jsonify({"success": False, "error": f"批量上传失败: {str(e)}"})
+
+@app.route('/upload/url', methods=['POST', 'OPTIONS'])
+def upload_videos_by_url():
+    try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
+        data = request.get_json(silent=True) or {}
+        urls = data.get('video_urls') or []
+        text_prompt = (data.get('text_prompt') or '').strip()
+        model = (data.get('model') or '').strip()
+        if model not in {"gemini-2.5-flash", "gemini-2.5-pro"}:
+            model = "gemini-2.5-flash"
+        if not isinstance(urls, list) or not urls:
+            return jsonify({"success": False, "error": "video_urls 不能为空"}), 400
+        if not text_prompt:
+            text_prompt = "请详细描述这个视频的内容"
+        batch_id = str(int(time.time() * 1000))
+        tasks = []
+        for i, video_url in enumerate(urls):
+            task_id = f"{batch_id}_{i}"
+            thread = threading.Thread(
+                target=web_analyzer.analyze_video_async,
+                args=(task_id, video_url, text_prompt, model)
+            )
+            thread.start()
+            tasks.append({"task_id": task_id, "video_url": video_url})
+        return jsonify({"success": True, "batch_id": batch_id, "tasks": tasks, "total_files": len(tasks)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 def upload_videos_single():
     """处理单个视频文件上传"""
@@ -586,9 +652,11 @@ def get_result(task_id):
         return jsonify({"success": False, "error": "结果未找到"})
 
 # DeepSeek处理端点
-@app.route('/deepseek/process', methods=['POST'])
+@app.route('/deepseek/process', methods=['POST', 'OPTIONS'])
 def deepseek_process():
     """单个视频分析结果的DeepSeek处理"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json
         video_result = data.get('video_result', '').strip()
@@ -642,9 +710,11 @@ def deepseek_process():
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
 
-@app.route('/deepseek/process/batch', methods=['POST'])
+@app.route('/deepseek/process/batch', methods=['POST', 'OPTIONS'])
 def deepseek_process_batch():
     """批量视频分析结果的DeepSeek处理"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json
         video_results = data.get('video_results', [])
@@ -758,9 +828,11 @@ def get_deepseek_batch_result(batch_id):
     except Exception as e:
         return jsonify({"success": False, "error": f"获取批量DeepSeek结果失败: {str(e)}"})
 
-@app.route('/json-merge/process', methods=['POST'])
+@app.route('/json-merge/process', methods=['POST', 'OPTIONS'])
 def json_merge_process():
     """第四步JSON拼接处理接口"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json
         text_prompt = data.get('text_prompt', '').strip()
@@ -814,8 +886,10 @@ def json_merge_process():
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
 
-@app.route('/script/generate', methods=['POST'])
+@app.route('/script/generate', methods=['POST', 'OPTIONS'])
 def script_generate():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json
         script_prompt = data.get('script_prompt', '').strip()
@@ -1026,8 +1100,10 @@ def script_generate():
     except Exception as e:
         return jsonify({"success": False, "error": f"请求处理失败: {str(e)}"})
 
-@app.route('/script/generate_direct', methods=['POST'])
+@app.route('/script/generate_direct', methods=['POST', 'OPTIONS'])
 def script_generate_direct():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json or {}
         script_prompt = (data.get('script_prompt') or '').strip()
@@ -1261,11 +1337,7 @@ def episode_narration_tts():
             return jsonify({'success': False, 'error': '缺少ELEVENLABS_API_KEY'})
         if not text:
             return jsonify({'success': False, 'error': '文本为空'})
-        out_dir = os.path.join('static', 'voiceover', f'episode_tts_{batch_id}_{index}')
-        try:
-            os.makedirs(out_dir, exist_ok=True)
-        except Exception:
-            pass
+        out_dir = ensure_writable_dir(os.path.join(app.config['UPLOAD_FOLDER'], 'voiceover', f'episode_tts_{batch_id}_{index}'))
         out_path = os.path.join(out_dir, f'line_{row:03d}.mp3')
         url = f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream'
         payload = {
@@ -1294,7 +1366,9 @@ def episode_narration_tts():
         except Exception as e:
             return jsonify({'success': False, 'error': f'保存失败: {str(e)}'})
         rel = out_path.replace('\\', '/')
-        return jsonify({'success': True, 'file': rel, 'url': '/' + rel})
+        base = app.config.get('UPLOAD_FOLDER') or 'uploads'
+        rel_subpath = os.path.relpath(rel, base).replace('\\', '/')
+        return jsonify({'success': True, 'file': rel, 'url': f"/api/files/{rel_subpath}"})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
@@ -1511,9 +1585,8 @@ def edit_video_task(task_id, clips, fps, mode, allowed=None, original_volume=100
         edl_tasks[task_id] = {'progress': 0, 'status': '错误', 'error': '缺少ffmpeg，请安装后重试', 'done': True, 'logs': edl_tasks[task_id]['logs']}
         edl_tasks[task_id]['logs'].append("ffmpeg not found")
         return
-    seg_dir = os.path.join('temp', 'segments', task_id)
-    ensure_dir(seg_dir)
-    ensure_dir(os.path.join('outputs', 'edits'))
+    seg_dir = ensure_writable_dir(os.path.join('temp', 'segments', task_id))
+    out_base = ensure_writable_dir(os.path.join('outputs', 'edits'))
     total = len(clips)
     for i, clip in enumerate(clips, start=1):
         edl_tasks[task_id]['status'] = f"处理片段 {i}/{total}"
@@ -1628,7 +1701,7 @@ def edit_video_task(task_id, clips, fps, mode, allowed=None, original_volume=100
     print(f"[DEBUG CONCAT]: Created list file {list_path}")
     edl_tasks[task_id]['logs'].append(f"concat list {list_path}")
 
-    out_path = os.path.join('outputs', 'edits', f"{task_id}.mp4")
+    out_path = os.path.join(out_base, f"{task_id}.mp4")
     print(f"[DEBUG CONCAT]: Starting concatenation to {out_path}")
 
     ok, log = run_ffmpeg_concat(list_path, out_path, original_volume)
@@ -1755,9 +1828,21 @@ def list_uploads():
 def health():
     return jsonify({"status": "healthy", "service": "Video Analyzer API"})
 
+@app.route('/auth/status', methods=['GET', 'OPTIONS'])
+def auth_status():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
+    a = getattr(g, '__auth__', {}) or {}
+    return jsonify({
+        'authenticated': bool(a.get('valid')),
+        'user': a.get('user')
+    })
+
 # 新增：下载txt文件
-@app.route('/download/txt', methods=['POST'])
+@app.route('/download/txt', methods=['POST', 'OPTIONS'])
 def download_txt():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json or {}
         filename = (data.get('filename') or '').strip()
@@ -1778,8 +1863,10 @@ def download_txt():
         return jsonify({"success": False, "error": f"下载失败: {str(e)}"}), 500
 
 # 新增：打包批量结果为zip
-@app.route('/download/zip', methods=['POST'])
+@app.route('/download/zip', methods=['POST', 'OPTIONS'])
 def download_zip():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.json or {}
         files = data.get('files') or []
@@ -1808,8 +1895,10 @@ def download_zip():
     except Exception as e:
         return jsonify({"success": False, "error": f"压缩失败: {str(e)}"}), 500
 
-@app.route('/voiceover/generate', methods=['POST'])
+@app.route('/voiceover/generate', methods=['POST', 'OPTIONS'])
 def voiceover_generate():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.get_json(silent=True) or {}
         text = (data.get('text') or '').strip()
@@ -1840,8 +1929,7 @@ def voiceover_generate():
             'model_id': model_id
         }
 
-        out_dir = os.path.join('static', 'voiceover', batch_id)
-        ensure_dir(out_dir)
+        out_dir = ensure_writable_dir(os.path.join(app.config['UPLOAD_FOLDER'], 'voiceover', batch_id))
         out_path = os.path.join(out_dir, f"seg_{index:03d}.mp3")
 
         r = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
@@ -1857,7 +1945,9 @@ def voiceover_generate():
                 if chunk:
                     f.write(chunk)
 
-        rel_url = f"/static/voiceover/{batch_id}/seg_{index:03d}.mp3"
+        base = app.config.get('UPLOAD_FOLDER') or 'uploads'
+        rel_subpath = os.path.relpath(out_path, base).replace('\\', '/')
+        rel_url = f"/api/files/{rel_subpath}"
         return jsonify({"success": True, "url": rel_url, "file_path": out_path, "voice_id": voice_id, "model_id": model_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -2256,8 +2346,7 @@ class VideoPackager:
             packaging_status[task_id] = {"status": "processing", "progress": 10}
 
             # 创建输出目录
-            output_dir = f"outputs/packaging/{task_id}"
-            os.makedirs(output_dir, exist_ok=True)
+            output_dir = ensure_writable_dir(os.path.join('outputs', 'packaging', task_id))
             print(f"[Packaging] Created output directory: {output_dir}")
 
             output_path = os.path.join(output_dir, "output.mp4")
@@ -2329,9 +2418,11 @@ class VideoPackager:
 # 全局视频包装器实例
 video_packager = VideoPackager()
 
-@app.route('/api/video/packaging/upload', methods=['POST'])
+@app.route('/api/video/packaging/upload', methods=['POST', 'OPTIONS'])
 def upload_packaging_file():
     """上传视频包装素材文件"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     start_time = time.time()
     client_ip = request.remote_addr
 
@@ -2392,9 +2483,11 @@ def upload_packaging_file():
         logger.error(f"[PACKAGING-UPLOAD] 上传异常 - 错误: {str(e)}, 耗时: {error_time:.2f}秒, IP: {client_ip}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/video/packaging/process', methods=['POST'])
+@app.route('/api/video/packaging/process', methods=['POST', 'OPTIONS'])
 def process_video_packaging():
     """处理视频包装"""
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     start_time = time.time()
     client_ip = request.remote_addr
 
@@ -2485,7 +2578,10 @@ def download_packaging_result(task_id):
         output_path = f"outputs/packaging/{task_id}/output.mp4"
 
         if not os.path.exists(output_path):
-            return jsonify({"success": False, "error": "Output file not found"}), 404
+            alt = os.path.join('/tmp', 'outputs', 'packaging', task_id, 'output.mp4')
+            if not os.path.exists(alt):
+                return jsonify({"success": False, "error": "Output file not found"}), 404
+            output_path = alt
 
         def generate():
             with open(output_path, 'rb') as f:
@@ -2516,7 +2612,10 @@ def download_packaging_config(task_id):
         config_path = f"outputs/packaging/{task_id}/config.json"
 
         if not os.path.exists(config_path):
-            return jsonify({"success": False, "error": "Config file not found"}), 404
+            alt = os.path.join('/tmp', 'outputs', 'packaging', task_id, 'config.json')
+            if not os.path.exists(alt):
+                return jsonify({"success": False, "error": "Config file not found"}), 404
+            config_path = alt
 
         return send_file(
             config_path,
@@ -2558,8 +2657,7 @@ def episode_narration_upload_batch():
         user_prompt = (request.form.get('user_prompt') or (request.json or {}).get('user_prompt') or '').strip()
         model = (request.form.get('model') or (request.json or {}).get('model') or '').strip() or 'gemini-2.5-pro'
         batch_id = str(int(time.time() * 1000))
-        out_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'episode_narration', batch_id)
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir = ensure_writable_dir(os.path.join(app.config['UPLOAD_FOLDER'], 'episode_narration', batch_id))
         results = []
         saved = []
         for i, f in enumerate(files):
@@ -2629,8 +2727,10 @@ def episode_narration_batch_status(batch_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/episode/narration/retry_one', methods=['POST'])
+@app.route('/episode/narration/retry_one', methods=['POST', 'OPTIONS'])
 def episode_narration_retry_one():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
     try:
         data = request.get_json(silent=True) or {}
         batch_id = str(data.get('batch_id') or '').strip()
@@ -2695,3 +2795,39 @@ if __name__ == '__main__':
     print("⚠️  确保你的API密钥已正确配置")
 
     app.run(host='0.0.0.0', port=5001, debug=True)
+SUPABASE_URL = (os.getenv('SUPABASE_URL') or '').strip()
+SUPABASE_ANON_KEY = (os.getenv('SUPABASE_ANON_KEY') or '').strip()
+
+def _validate_supabase_token(token):
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY or not token:
+        return None
+    try:
+        url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/user"
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'apikey': SUPABASE_ANON_KEY
+        }
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+@app.before_request
+def _auth_before_request():
+    try:
+        auth = {'token': None, 'user': None, 'valid': False}
+        h = (request.headers.get('Authorization') or '').strip()
+        token = ''
+        if h.lower().startswith('bearer '):
+            token = h[7:].strip()
+        auth['token'] = token
+        if token:
+            user = _validate_supabase_token(token)
+            if user:
+                auth['user'] = user
+                auth['valid'] = True
+        g.__auth__ = auth
+    except Exception:
+        pass

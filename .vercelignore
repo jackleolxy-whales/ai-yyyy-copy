@@ -1,0 +1,11 @@
+uploads/
+outputs/
+temp/
+static/voiceover/
+*.mp4
+*.zip
+*.log
+.DS_Store
+.claude/
+__pycache__/
+*.pyc
