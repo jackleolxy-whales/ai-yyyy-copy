@@ -2220,7 +2220,7 @@ Your one and only output must be:
 Now, I give you the user's JSON data: </textarea>
                                         </div>
                                         <div class="text-center">
-                                            <button type="button" class="btn btn-info btn-lg" id="deepSeekBtn">
+                                            <button type="button" class="btn btn-info btn-lg" id="deepSeekBtn" onclick="startDeepSeekProcessing()">
                                                 <i class="fas fa-brain"></i> 开始DeepSeek处理
                                             </button>
                                         </div>
@@ -3485,6 +3485,7 @@ Now, I give you the JSONs:
 
         // 步骤控制相关变量
         let currentStep = 1;
+        let currentWorkflow = 'local';
         let videoAnalysisResults = []; // 存储视频分析结果
         let deepSeekTaskIds = []; // 存储DeepSeek处理任务ID
         let uploadedFilenames = []; // 存储原始文件名列表
@@ -3600,6 +3601,7 @@ Now, I give you the JSONs:
 
         function moveToNextStep() {
             if (currentStep < 6) {
+                console.log('[moveToNextStep] before advance, currentStep=', currentStep);
                 // 完成当前步骤
                 setStepStatus(currentStep, 'completed', '已完成');
                 updateStepProgress(currentStep, 100);
@@ -3607,6 +3609,7 @@ Now, I give you the JSONs:
                 // 激活下一步
                 currentStep++;
                 setStepStatus(currentStep, 'active', '进行中');
+                console.log('[moveToNextStep] advanced to step', currentStep);
 
                 // 重置进度条为下一步准备（但第三步和第四步不重置，因为有自己的进度管理）
                 if (currentStep < 3) {
@@ -3615,21 +3618,86 @@ Now, I give you the JSONs:
 
                 // 如果移动到第二步，显示DeepSeek处理区域
                 if (currentStep === 2) {
+                    console.log('[moveToNextStep] showing DeepSeek sections');
                     showDeepSeekSections();
                     // 自动填充视频分析结果
                     fillVideoAnalysisResults();
+                } else if (currentStep === 3) {
+                    console.log('[moveToNextStep] showing personAnalysisSection');
+                    showPersonAnalysisSection();
+                    const el = document.getElementById('personAnalysisSection');
+                    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else if (currentStep === 4) {
+                    if (typeof showJsonMergeSection === 'function') {
+                        console.log('[moveToNextStep] showing jsonMergeSection');
+                        showJsonMergeSection();
+                        const el = document.getElementById('jsonMergeSection');
+                        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                } else if (currentStep === 5) {
+                    const section = document.getElementById('scriptSection');
+                    if (section) {
+                        console.log('[moveToNextStep] showing scriptSection');
+                        section.style.display = 'block';
+                        if (currentWorkflow === 'url') {
+                            const hintId = 'scriptUrlHint';
+                            if (!document.getElementById(hintId)) {
+                                const hint = document.createElement('div');
+                                hint.className = 'alert alert-info mt-2';
+                                hint.id = hintId;
+                                hint.innerHTML = '<i class="fas fa-link"></i> 当前为 <strong>URL 模式</strong>：脚本生成将基于第4步的合并 JSON/文本结果。';
+                                section.querySelector('.card .card-body')?.insertBefore(hint, section.querySelector('.card .card-body').firstChild);
+                            }
+                        }
+                        if (section.scrollIntoView) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                } else if (currentStep === 6) {
+                    const section = document.getElementById('scriptExtractSection');
+                    if (section) {
+                        console.log('[moveToNextStep] showing scriptExtractSection');
+                        section.style.display = 'block';
+                        if (typeof initStep6VoiceConfig === 'function') initStep6VoiceConfig();
+                        const vbtn = document.getElementById('videoEditNextStepButtonContainer');
+                        if (vbtn) { vbtn.style.display = 'block'; }
+                        if (currentWorkflow === 'url') {
+                            const hintId = 'scriptExtractUrlHint';
+                            if (!document.getElementById(hintId)) {
+                                const hint = document.createElement('div');
+                                hint.className = 'alert alert-info mt-2';
+                                hint.id = hintId;
+                                hint.innerHTML = '<i class="fas fa-link"></i> 当前为 <strong>URL 模式</strong>：台词配音将基于第5步脚本文本内容生成。';
+                                section.querySelector('.card .card-body')?.insertBefore(hint, section.querySelector('.card .card-body').firstChild);
+                            }
+                        }
+                        if (section.scrollIntoView) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                } else if (currentStep === 7) {
+                    const section = document.getElementById('videoEditSection');
+                    if (section) {
+                        console.log('[moveToNextStep] showing videoEditSection');
+                        section.style.display = 'block';
+                        if (currentWorkflow === 'url') {
+                            const hintId = 'videoEditUrlHint';
+                            if (!document.getElementById(hintId)) {
+                                const hint = document.createElement('div');
+                                hint.className = 'alert alert-info mt-2';
+                                hint.id = hintId;
+                                hint.innerHTML = '<i class="fas fa-link"></i> 当前为 <strong>URL 模式</strong>：自动拼接视频需要可访问的视频源或外部工具支持。';
+                                section.querySelector('.card .card-body')?.insertBefore(hint, section.querySelector('.card .card-body').firstChild);
+                            }
+                        }
+                        if (section.scrollIntoView) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
             }
         }
 
         function showDeepSeekSections() {
-            // 显示单个结果的DeepSeek处理区域
-            const singleDeepSeekSection = document.getElementById('singleDeepSeekSection');
-            if (singleDeepSeekSection) {
-                singleDeepSeekSection.style.display = 'block';
+            const deepSeekSection = document.getElementById('deepSeekSection');
+            if (deepSeekSection) {
+                deepSeekSection.style.display = 'block';
             }
 
-            // 显示批量结果的DeepSeek处理区域
             const batchDeepSeekSection = document.getElementById('batchDeepSeekSection');
             if (batchDeepSeekSection) {
                 batchDeepSeekSection.style.display = 'block';
@@ -3637,9 +3705,9 @@ Now, I give you the JSONs:
         }
 
         function hideDeepSeekSections() {
-            const singleDeepSeekSection = document.getElementById('singleDeepSeekSection');
-            if (singleDeepSeekSection) {
-                singleDeepSeekSection.style.display = 'none';
+            const deepSeekSection = document.getElementById('deepSeekSection');
+            if (deepSeekSection) {
+                deepSeekSection.style.display = 'none';
             }
 
             const batchDeepSeekSection = document.getElementById('batchDeepSeekSection');
@@ -3798,8 +3866,8 @@ Now, I give you the JSONs:
         function startDeepSeekProcessing() {
             console.log('startDeepSeekProcessing function called'); // 调试信息
 
-            const userPrompt = document.getElementById('userPrompt').value.trim();
-            const videoResult = document.getElementById('videoResultInput').value.trim();
+            const userPrompt = document.getElementById('deepSeekPrompt').value.trim();
+            const videoResult = (Array.isArray(videoAnalysisResults) && videoAnalysisResults.length > 0) ? (videoAnalysisResults[0] || '').trim() : '';
 
             console.log('userPrompt length:', userPrompt.length); // 调试信息
             console.log('videoResult length:', videoResult.length); // 调试信息
@@ -3814,14 +3882,14 @@ Now, I give you the JSONs:
             updateStepProgress(2, 30);
 
             // 禁用DeepSeek处理按钮
-            const deepSeekBtn = document.getElementById('deepSeekProcessBtn');
+            const deepSeekBtn = document.getElementById('deepSeekBtn');
             console.log('deepSeekBtn:', deepSeekBtn); // 调试信息
 
             if (deepSeekBtn) {
                 deepSeekBtn.disabled = true;
                 deepSeekBtn.innerHTML = '<span class="loading-spinner"></span>DeepSeek处理中...';
             } else {
-                console.error('deepSeekProcessBtn not found!'); // 调试信息
+                console.error('deepSeekBtn not found!');
             }
 
             updateStepProgress(2, 50);
@@ -5152,7 +5220,7 @@ Now, I give you the JSONs:
         }
 
         function resetDeepSeekInterface() {
-            const deepSeekBtn = document.getElementById('deepSeekProcessBtn');
+            const deepSeekBtn = document.getElementById('deepSeekBtn');
             if (deepSeekBtn) {
                 deepSeekBtn.disabled = false;
                 deepSeekBtn.innerHTML = '<i class="fas fa-brain"></i> 开始DeepSeek处理';
@@ -5334,7 +5402,31 @@ Now, I give you the JSONs:
             }
         }
 
+        function relaxAfterStep1() {
+            console.log('[relaxAfterStep1] start');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const batchBtn = document.getElementById('batchBtn');
+
+            if (analyzeBtn) { analyzeBtn.disabled = false; analyzeBtn.innerHTML = '<i class="fas fa-play"></i> 开始分析'; }
+            if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.innerHTML = '<i class="fas fa-upload"></i> 上传并分析'; }
+            if (batchBtn) { batchBtn.disabled = false; batchBtn.innerHTML = '<i class="fas fa-layer-group"></i> 批量上传并分析'; }
+
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+
+            currentTaskId = null;
+            currentBatchId = null;
+            currentTaskIds = [];
+
+            hideProgress();
+            console.log('[relaxAfterStep1] done');
+        }
+
         function startUrlAnalysis() {
+            currentWorkflow = 'url';
             // 重置步骤但不重置状态，避免状态冲突
             currentStep = 1;
             videoAnalysisResults = [];
@@ -5522,17 +5614,20 @@ Now, I give you the JSONs:
         }
 
         function getResult() {
+            console.log('[getResult] fetching result for taskId=', currentTaskId);
             fetch(`/result/${currentTaskId}`)
             .then(response => response.json())
             .then(data => {
+                console.log('[getResult] response success=', data && data.success);
                 if (data.success) {
                     showResult(data.result, data.video_url || '未知文件');
                 } else {
                     showError(data.error || '获取结果失败');
                 }
-                resetInterface();
+                relaxAfterStep1();
             })
             .catch(error => {
+                console.log('[getResult] error', error);
                 showError('获取结果时发生错误：' + error.message);
                 resetInterface();
             });
@@ -5976,6 +6071,9 @@ Now, I give you the JSONs:
         // 进入第三步
         function proceedToStep3() {
             console.log('进入第三步：分时间戳人物分析');
+            try {
+                console.log('[proceedToStep3] begin, currentStep=', currentStep);
+            } catch (_) {}
 
             // 隐藏第三步入口按钮
             const entranceContainer = document.getElementById('thirdStepEntranceContainer');
@@ -5989,24 +6087,94 @@ Now, I give you the JSONs:
             }
 
             // 移动到第三步
-            moveToNextStep();
+            try {
+                moveToNextStep();
+                console.log('[proceedToStep3] after moveToNextStep, currentStep=', currentStep);
+            } catch (e) {
+                console.log('[proceedToStep3] moveToNextStep error', e);
+            }
 
             // 显示第三步分析界面
-            showPersonAnalysisSection();
+            try {
+                showPersonAnalysisSection();
+                console.log('[proceedToStep3] showPersonAnalysisSection called');
+            } catch (e) {
+                console.log('[proceedToStep3] showPersonAnalysisSection error', e);
+            }
 
             // 填充DeepSeek结果到提示词中
-            fillDeepSeekResultsToPrompt();
+            try {
+                fillDeepSeekResultsToPrompt();
+                console.log('[proceedToStep3] fillDeepSeekResultsToPrompt called');
+            } catch (e) {
+                console.log('[proceedToStep3] fillDeepSeekResultsToPrompt error', e);
+            }
         }
 
         // 显示第三步分析界面
         function showPersonAnalysisSection() {
+            console.log('[showPersonAnalysisSection] toggling display');
             const personAnalysisSection = document.getElementById('personAnalysisSection');
             if (personAnalysisSection) {
+                if (currentWorkflow === 'url') {
+                    const deepSeekSection = document.getElementById('deepSeekSection');
+                    if (deepSeekSection && personAnalysisSection.parentElement !== deepSeekSection) {
+                        try {
+                            deepSeekSection.appendChild(personAnalysisSection);
+                            console.log('[showPersonAnalysisSection] moved section under deepSeekSection for URL mode');
+                        } catch (e) {
+                            console.log('[showPersonAnalysisSection] move failed', e);
+                        }
+                    }
+                }
                 personAnalysisSection.style.display = 'block';
+                console.log('[showPersonAnalysisSection] personAnalysisSection found, display=', personAnalysisSection.style.display);
+                if (currentWorkflow === 'url') {
+                    const hintId = 'personAnalysisUrlHint';
+                    if (!document.getElementById(hintId)) {
+                        const hint = document.createElement('div');
+                        hint.className = 'alert alert-info mt-2';
+                        hint.id = hintId;
+                        hint.innerHTML = '<i class="fas fa-link"></i> 当前为 <strong>URL 模式</strong>：基于第二步的 DeepSeek 文本结果进行人物分析，无需上传本地视频文件。';
+                        personAnalysisSection.querySelector('.card .card-body')?.insertBefore(hint, personAnalysisSection.querySelector('.card .card-body').firstChild);
+                    }
+                    const highlightId = 'personAnalysisUrlHighlight';
+                    if (!document.getElementById(highlightId)) {
+                        const hl = document.createElement('div');
+                        hl.id = highlightId;
+                        hl.className = 'mt-2';
+                        hl.style.border = '2px dashed #17a2b8';
+                        hl.style.borderRadius = '8px';
+                        hl.style.padding = '6px';
+                        hl.innerHTML = '<span class="badge bg-info"><i class="fas fa-link"></i> URL 模式</span>';
+                        personAnalysisSection.insertBefore(hl, personAnalysisSection.firstChild);
+                    }
+                }
+
+                // 显示进度区域，提升存在感
+                const progressContainer = document.getElementById('analysisProgressContainer');
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
+
+                // 强制滚动到可视区域，避免用户误以为没显示
+                try {
+                    const top = personAnalysisSection.getBoundingClientRect().top + window.pageYOffset - 80;
+                    window.scrollTo({ top, behavior: 'smooth' });
+                } catch (_) {
+                    if (personAnalysisSection.scrollIntoView) personAnalysisSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            } else {
+                console.log('[showPersonAnalysisSection] personAnalysisSection NOT FOUND');
             }
 
             // 显示待分析视频列表
-            showVideoList();
+            try {
+                showVideoList();
+                console.log('[showPersonAnalysisSection] showVideoList called');
+            } catch (e) {
+                console.log('[showPersonAnalysisSection] showVideoList error', e);
+            }
         }
 
         // 显示待分析视频列表
@@ -6016,6 +6184,7 @@ Now, I give you the JSONs:
             const videoCount = document.getElementById('videoCount');
 
             if (!videoListContainer || !videoList || !videoCount) {
+                console.log('[showVideoList] container elements missing', { hasContainer: !!videoListContainer, hasList: !!videoList, hasCount: !!videoCount });
                 return;
             }
 
@@ -6023,7 +6192,25 @@ Now, I give you the JSONs:
             const videoFileNames = getOriginalVideoFileNames();
 
             if (videoFileNames.length === 0) {
-                videoListContainer.style.display = 'none';
+                console.log('[showVideoList] no original filenames, show placeholder for URL 模式');
+                videoListContainer.style.display = 'block';
+                videoList.innerHTML = `
+                    <div class="d-flex align-items-center mb-2 p-2 border rounded bg-white">
+                        <div class="me-3">
+                            <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center"
+                                 style="width: 40px; height: 40px; font-weight: bold;">—</div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">URL 模式</div>
+                            <div class="text-muted small">未检测到本地视频文件，仍可进行人物分析</div>
+                        </div>
+                        <div class="me-2">
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-link"></i> 使用视频URL
+                            </span>
+                        </div>
+                    </div>
+                `;
                 return;
             }
 
@@ -6056,6 +6243,7 @@ Now, I give you the JSONs:
 
             videoList.innerHTML = videoListHTML;
             videoListContainer.style.display = 'block';
+            console.log('[showVideoList] list rendered, count=', videoFileNames.length);
         }
 
         // 获取原始视频文件名
@@ -6111,6 +6299,9 @@ Now, I give you the JSONs:
 
         // 开始人物分析
         function startPersonAnalysis() {
+            if (currentWorkflow === 'url') {
+                return startPersonAnalysisUrl();
+            }
             console.log('startPersonAnalysis function called');
 
             const analysisPrompt = document.getElementById('personAnalysisPrompt').value.trim();
@@ -6157,6 +6348,65 @@ Now, I give you the JSONs:
 
             // 分别处理每个DeepSeek结果
             processPersonAnalysisBatch(analysisPrompt, originalVideoUrl);
+        }
+
+        function startPersonAnalysisUrl() {
+            const analysisPrompt = document.getElementById('personAnalysisPrompt').value.trim();
+            const modelPerson = document.getElementById('modelSelectPerson') ? document.getElementById('modelSelectPerson').value : 'gemini-2.5-pro';
+            if (!analysisPrompt) {
+                showError('请输入分析要求');
+                return;
+            }
+            if (!deepSeekResults || !Array.isArray(deepSeekResults) || deepSeekResults.length === 0) {
+                showError('未找到DeepSeek处理结果，请先完成第二步');
+                return;
+            }
+
+            const startBtn = document.getElementById('startPersonAnalysisBtn');
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="loading-spinner"></span> 人物分析中...';
+            }
+            setStepStatus(3, 'processing', '人物分析中');
+            updateStepProgress(3, 10);
+            showPersonAnalysisProgress('正在根据DeepSeek结果进行文本分析...', 0, deepSeekResults.length);
+
+            fetch('/person/analyze_direct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_prompt: analysisPrompt,
+                    deepseek_results: deepSeekResults,
+                    model: modelPerson
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.success && Array.isArray(data.results)) {
+                    const results = data.results.map((res, index) => ({
+                        index,
+                        success: !!res.success,
+                        result: res.result || '',
+                        error: res.error || '',
+                        deepSeekInput: deepSeekResults[index] || ''
+                    }));
+                    updateStepProgress(3, 100);
+                    finishPersonAnalysisBatch(results);
+                } else {
+                    setStepStatus(3, 'error', '分析失败');
+                    showError((data && data.error) ? data.error : '人物分析失败');
+                }
+            })
+            .catch(err => {
+                setStepStatus(3, 'error', '分析失败');
+                showError('人物分析错误：' + err.message);
+            })
+            .finally(() => {
+                if (startBtn) {
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-users"></i> 开始人物分析';
+                }
+            });
         }
 
         // 处理人物分析（改为单个视频模式）
@@ -6535,14 +6785,25 @@ Now, I give you the JSONs:
             entranceContainer.className = 'text-center mt-4 fade-in';
             entranceContainer.id = 'fourthStepEntranceContainer';
 
-            entranceContainer.innerHTML = `
-                <button type="button" class="btn btn-warning btn-lg" id="fourthStepEntranceBtn" onclick="proceedToStep4()">
-                    <i class="fas fa-code-merge"></i> 下一步：JSON拼接
-                </button>
-                <div class="mt-2 text-muted">
-                    <small>将第一步的视频分析结果和第三步的人物分析结果按时间戳进行拼接，生成完整的JSON数据</small>
-                </div>
-            `;
+            if (currentWorkflow === 'url') {
+                entranceContainer.innerHTML = `
+                    <button type="button" class="btn btn-warning btn-lg" id="fourthStepEntranceBtn" onclick="proceedToStep4()">
+                        <i class="fas fa-code-merge"></i> 下一步：JSON拼接（URL 模式）
+                    </button>
+                    <div class="mt-2 text-muted">
+                        <small>将第1步（URL 分析）与第3步（文本人物分析）结果按时间戳进行拼接</small>
+                    </div>
+                `;
+            } else {
+                entranceContainer.innerHTML = `
+                    <button type="button" class="btn btn-warning btn-lg" id="fourthStepEntranceBtn" onclick="proceedToStep4()">
+                        <i class="fas fa-code-merge"></i> 下一步：JSON拼接
+                    </button>
+                    <div class="mt-2 text-muted">
+                        <small>将第一步的视频分析结果和第三步的人物分析结果按时间戳进行拼接，生成完整的JSON数据</small>
+                    </div>
+                `;
+            }
 
             // 将按钮添加到人物分析结果容器后面
             const personAnalysisContainer = document.getElementById('personAnalysisResultContainer');
@@ -6573,6 +6834,16 @@ Now, I give you the JSONs:
             const jsonMergeSection = document.getElementById('jsonMergeSection');
             if (jsonMergeSection) {
                 jsonMergeSection.style.display = 'block';
+                if (currentWorkflow === 'url') {
+                    const hintId = 'jsonMergeUrlHint';
+                    if (!document.getElementById(hintId)) {
+                        const hint = document.createElement('div');
+                        hint.className = 'alert alert-info mt-2';
+                        hint.id = hintId;
+                        hint.innerHTML = '<i class="fas fa-link"></i> 当前为 <strong>URL 模式</strong>：将第1步（URL 分析结果）与第3步（文本人物分析结果）按时间戳进行拼接。';
+                        jsonMergeSection.querySelector('.card .card-body')?.insertBefore(hint, jsonMergeSection.querySelector('.card .card-body').firstChild);
+                    }
+                }
             }
         }
 

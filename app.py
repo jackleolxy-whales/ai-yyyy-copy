@@ -803,6 +803,36 @@ def get_deepseek_result(task_id):
     else:
         return jsonify({"success": False, "error": "DeepSeek结果未找到"})
 
+@app.route('/person/analyze_direct', methods=['POST', 'OPTIONS'])
+def person_analyze_direct():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
+    try:
+        data = request.json or {}
+        user_prompt = (data.get('user_prompt') or '').strip()
+        model = (data.get('model') or 'gemini-2.5-pro').strip()
+        deepseek_results_input = data.get('deepseek_results')
+        if not isinstance(deepseek_results_input, list):
+            if deepseek_results_input:
+                deepseek_results_input = [deepseek_results_input]
+            else:
+                deepseek_results_input = []
+        if not user_prompt:
+            return jsonify({"success": False, "error": "分析要求不能为空"})
+        if not deepseek_results_input:
+            return jsonify({"success": False, "error": "缺少DeepSeek处理结果"})
+        batch_results = []
+        for ds_text in deepseek_results_input:
+            try:
+                full_input = f"{user_prompt}\n\n{ds_text}"
+                result = web_analyzer.analyze_direct(full_input, model=model, max_tokens=None, stream=False)
+                batch_results.append({"success": True, "result": result})
+            except Exception as e:
+                batch_results.append({"success": False, "error": str(e)})
+        return jsonify({"success": True, "results": batch_results})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/deepseek/batch/result/<batch_id>')
 def get_deepseek_batch_result(batch_id):
     """获取批量DeepSeek处理结果"""
