@@ -2737,6 +2737,84 @@ def episode_narration_upload_batch():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/episode/narration/url_batch', methods=['POST', 'OPTIONS'])
+def episode_narration_url_batch():
+    try:
+        if request.method == 'OPTIONS':
+            return Response(status=200)
+        data = request.get_json(silent=True) or {}
+        urls = data.get('urls') or []
+        user_prompt = (data.get('user_prompt') or '').strip()
+        model = (data.get('model') or '').strip() or 'gemini-2.5-pro'
+        if not isinstance(urls, list) or not urls:
+            return jsonify({'success': False, 'error': '未提供URL列表'})
+        batch_id = str(int(time.time() * 1000))
+        episode_status[batch_id] = {
+            'status': 'processing',
+            'count': 0,
+            'total': len(urls),
+            'items': [{'index': i, 'filename': urls[i], 'status': 'queued'} for i in range(len(urls))],
+            'prompt': user_prompt,
+            'model': model,
+            'out_dir': None
+        }
+        episode_results[batch_id] = [None] * len(urls)
+        def _episode_run_url_batch(batch_id_, urls_, prompt_, model_):
+            max_workers = max(1, min(len(urls_), (os.cpu_count() or 4)))
+            if urls_:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(_episode_analyze_url_one, batch_id_, idx, url, prompt_, model_): (idx, url) for (idx, url) in enumerate(urls_)}
+                    for fut in concurrent.futures.as_completed(futures):
+                        try:
+                            _ = fut.result()
+                        except Exception as e:
+                            idx, url = futures[fut]
+                            if isinstance(episode_results.get(batch_id_), list) and 0 <= idx < len(episode_results[batch_id_]):
+                                episode_results[batch_id_][idx] = {'index': idx, 'filename': url, 'success': False, 'error': str(e)}
+                            else:
+                                episode_results.setdefault(batch_id_, []).append({'index': idx, 'filename': url, 'success': False, 'error': str(e)})
+            try:
+                st = episode_status.get(batch_id_, {})
+                if st:
+                    st['status'] = 'completed'
+            except Exception:
+                pass
+        threading.Thread(target=_episode_run_url_batch, args=(batch_id, urls, user_prompt, model), daemon=True).start()
+        return jsonify({'success': True, 'batch_id': batch_id, 'total_count': len(urls)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+def _episode_analyze_url_one(batch_id, index, url, prompt, model):
+    try:
+        st = episode_status.get(batch_id)
+        if st and isinstance(st.get('items'), list) and 0 <= index < len(st['items']):
+            st['items'][index]['status'] = 'processing'
+        t0 = time.time()
+        analyzer = VideoAnalyzer()
+        result_text = analyzer.analyze_video_from_url(url, prompt, model=model, max_tokens=None, stream=False)
+        t1 = time.time()
+        duration_ms = int((t1 - t0) * 1000)
+        res = {'index': index, 'filename': url, 'success': True, 'result': result_text, 'model': model, 'duration_ms': duration_ms}
+        if isinstance(episode_results.get(batch_id), list) and 0 <= index < len(episode_results[batch_id]):
+            episode_results[batch_id][index] = res
+        else:
+            episode_results.setdefault(batch_id, []).append(res)
+        if st and isinstance(st.get('items'), list) and 0 <= index < len(st['items']):
+            st['items'][index]['status'] = 'done'
+            st['items'][index]['duration_ms'] = duration_ms
+            st['items'][index]['model'] = model
+        return res
+    except Exception as e:
+        st = episode_status.get(batch_id)
+        if st and isinstance(st.get('items'), list) and 0 <= index < len(st['items']):
+            st['items'][index]['status'] = 'failed'
+        err = {'index': index, 'filename': url, 'success': False, 'error': str(e)}
+        if isinstance(episode_results.get(batch_id), list) and 0 <= index < len(episode_results[batch_id]):
+            episode_results[batch_id][index] = err
+        else:
+            episode_results.setdefault(batch_id, []).append(err)
+        return err
+
 @app.route('/episode/narration/batch/result/<batch_id>', methods=['GET'])
 def episode_narration_batch_result(batch_id):
     try:

@@ -38,7 +38,7 @@
   <div class="container py-4">
     <div class="mb-4">
       <h2 class="fw-bold" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">剧集解说（批量）</h2>
-      <p class="text-muted">批量上传本地视频，每个视频分别调用 LaoZhang 模型进行解说生成</p>
+      <p class="text-muted">支持批量本地上传与批量URL模式，每个视频分别调用模型进行解说生成</p>
       <a href="/" class="btn btn-sm btn-outline-light"><i class="fa fa-home me-1"></i>返回首页</a>
     </div>
 
@@ -46,9 +46,27 @@
       <div class="card-body">
         <form id="episodeForm">
           <div class="mb-3">
+            <label class="form-label fw-bold"><i class="fa fa-exchange-alt"></i> 输入方式</label>
+            <div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="episodeInputMode" id="episodeModeUpload" value="upload" checked>
+                <label class="form-check-label" for="episodeModeUpload">本地上传</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="episodeInputMode" id="episodeModeUrl" value="url">
+                <label class="form-check-label" for="episodeModeUrl">URL 批量</label>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3" id="episodeUploadBlock">
             <label class="form-label">选择视频（可多选）</label>
             <input class="form-control" type="file" id="episodeFiles" name="episode_files" multiple accept="video/*">
             <div class="form-text">支持 mp4/avi/mov/wmv/flv/webm/mkv 等格式</div>
+          </div>
+          <div class="mb-3 d-none" id="episodeUrlBlock">
+            <label class="form-label">输入视频URL（每行一个）</label>
+            <textarea class="form-control" id="episodeUrls" rows="6" placeholder="https://example.com/a.mp4\nhttps://example.com/b.mp4"></textarea>
+            <div class="form-text">支持可直接访问的视频链接，格式同上；建议 1-20 条。</div>
           </div>
           <div class="mb-3">
             <label class="form-label">生成要求（提示词）</label>
@@ -123,7 +141,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
               </div>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary" id="submitBtn"><i class="fa fa-upload me-1"></i>开始上传并分析</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn"><i class="fa fa-upload me-1"></i>开始批量分析</button>
         </form>
       </div>
     </div>
@@ -136,6 +154,11 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
   <script>
     const formEl = document.getElementById('episodeForm');
     const filesEl = document.getElementById('episodeFiles');
+    const urlsEl = document.getElementById('episodeUrls');
+    const uploadBlockEl = document.getElementById('episodeUploadBlock');
+    const urlBlockEl = document.getElementById('episodeUrlBlock');
+    const modeUploadEl = document.getElementById('episodeModeUpload');
+    const modeUrlEl = document.getElementById('episodeModeUrl');
     const promptEl = document.getElementById('userPrompt');
     const modelEl = document.getElementById('modelSelect');
     const statusEl = document.getElementById('statusBox');
@@ -143,28 +166,54 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
     let elevenVoices = [];
     const btnEl = document.getElementById('submitBtn');
 
+    // 模式切换
+    [modeUploadEl, modeUrlEl].forEach(r => {
+      r.addEventListener('change', () => {
+        const mode = modeUrlEl.checked ? 'url' : 'upload';
+        if (mode === 'upload') {
+          uploadBlockEl.classList.remove('d-none');
+          urlBlockEl.classList.add('d-none');
+        } else {
+          uploadBlockEl.classList.add('d-none');
+          urlBlockEl.classList.remove('d-none');
+        }
+      });
+    });
+
     formEl.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const mode = modeUrlEl.checked ? 'url' : 'upload';
       const files = filesEl.files;
       const prompt = (promptEl.value || '').trim();
       const model = (modelEl.value || '').trim();
-      if (!files || files.length === 0) {
-        alert('请至少选择一个视频文件');
-        return;
-      }
       btnEl.disabled = true;
       statusEl.classList.remove('d-none');
-      statusEl.textContent = '正在上传并分析...';
+      statusEl.textContent = mode === 'upload' ? '正在上传并分析...' : '正在提交URL并分析...';
       try {
-        const fd = new FormData();
-        for (let i = 0; i < files.length; i++) fd.append('episode_files', files[i]);
-        fd.append('user_prompt', prompt);
-        if (model) fd.append('model', model);
-        const resp = await fetch('/episode/narration/upload_batch', { method: 'POST', body: fd });
-        const data = await resp.json();
-        if (!data.success) throw new Error(data.error || '上传分析失败');
-        statusEl.textContent = `已开始处理，批次ID：${data.batch_id}，共 ${data.total_count} 个文件`;
-        initProgressCards(files);
+        let data;
+        if (mode === 'upload') {
+          if (!files || files.length === 0) { alert('请至少选择一个视频文件'); return; }
+          const fd = new FormData();
+          for (let i = 0; i < files.length; i++) fd.append('episode_files', files[i]);
+          fd.append('user_prompt', prompt);
+          if (model) fd.append('model', model);
+          const resp = await fetch('/episode/narration/upload_batch', { method: 'POST', body: fd });
+          data = await resp.json();
+          if (!data.success) throw new Error(data.error || '上传分析失败');
+          statusEl.textContent = `已开始处理，批次ID：${data.batch_id}，共 ${data.total_count} 个文件`;
+          initProgressCards(Array.from(files).map(f => f.name));
+        } else {
+          const urls = (urlsEl.value || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+          if (!urls.length) { alert('请至少填写一个视频URL'); return; }
+          const resp = await fetch('/episode/narration/url_batch', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls, user_prompt: prompt, model })
+          });
+          data = await resp.json();
+          if (!data.success) throw new Error(data.error || 'URL批量分析失败');
+          statusEl.textContent = `已开始处理，批次ID：${data.batch_id}，共 ${data.total_count} 个URL`;
+          initProgressCards(urls);
+        }
         window.currentBatchId = data.batch_id;
         startPolling(data.batch_id);
       } catch (err) {
@@ -226,11 +275,11 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
     }
 
     const cards = new Map();
-    function initProgressCards(files) {
+    function initProgressCards(items) {
       resultsEl.innerHTML = '';
       cards.clear();
-      for (let i = 0; i < files.length; i++) {
-        const fname = files[i].name;
+      for (let i = 0; i < items.length; i++) {
+        const fname = typeof items[i] === 'string' ? items[i] : (items[i] && items[i].name) || `视频 ${i+1}`;
         const card = document.createElement('div');
         card.className = 'card result-card mb-3';
         const body = document.createElement('div');
