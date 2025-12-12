@@ -19,6 +19,7 @@ import logging
 from datetime import datetime
 import json
 import concurrent.futures
+import base64 as _b64
 
 def _load_env_files():
     paths = [".env.local", ".env"]
@@ -113,7 +114,10 @@ def _episode_analyze_one(batch_id, index, filename, save_path, user_prompt, mode
             pass
         t0 = time.time()
         analyzer = VideoAnalyzer()
-        result_text = analyzer.analyze_video_local(save_path, user_prompt, model=model, max_tokens=None, stream=False)
+        if (model or '').strip() == 'YunWu-gemini-2.5-pro':
+            result_text = yunwu_generate_content_for_video(save_path, user_prompt)
+        else:
+            result_text = analyzer.analyze_video_local(save_path, user_prompt, model=model, max_tokens=None, stream=False)
         t1 = time.time()
         duration_ms = int((t1 - t0) * 1000)
         res = {'index': index, 'filename': filename, 'success': True, 'result': result_text, 'model': model, 'duration_ms': duration_ms}
@@ -166,6 +170,116 @@ def serve_stored_file(subpath):
     if not p.startswith(base_abs) or not os.path.exists(p):
         return jsonify({'success': False, 'error': 'File not found'}), 404
     return send_file(p)
+
+def yunwu_generate_content_for_video(video_path, text_prompt):
+    api_key = (os.getenv('YUNWU_API_KEY') or '').strip()
+    if not api_key:
+        raise Exception('缺少YunWu API密钥')
+    url = f'https://yunwu.ai/v1beta/models/gemini-2.5-pro:generateContent?key={api_key}'
+    try:
+        with open(video_path, 'rb') as f:
+            data_b64 = _b64.b64encode(f.read()).decode('ascii')
+    except Exception as e:
+        raise Exception(f'读取视频失败: {str(e)}')
+    payload = {
+        'contents': [
+            {
+                'role': 'user',
+                'parts': [
+                    {
+                        'inline_data': {
+                            'mime_type': 'video/mp4',
+                            'data': data_b64
+                        }
+                    },
+                    {
+                        'text': text_prompt or ''
+                    }
+                ]
+            }
+        ]
+    }
+    headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept-Charset': 'utf-8'
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=120)
+    if resp.status_code != 200:
+        body_preview = ''
+        try:
+            body_preview = resp.text[:500]
+        except Exception:
+            pass
+        raise Exception(f'YunWu调用失败: HTTP {resp.status_code} body={body_preview}')
+    try:
+        data = resp.json()
+    except Exception as e:
+        raise Exception(f'解析YunWu响应失败: {str(e)}')
+    try:
+        cands = data.get('candidates') or []
+        if cands:
+            parts = (cands[0].get('content') or {}).get('parts') or []
+            texts = []
+            for p in parts:
+                t = p.get('text')
+                if isinstance(t, str) and t:
+                    texts.append(t)
+            if texts:
+                return '\n'.join(texts)
+    except Exception:
+        pass
+    return str(data)
+
+def yunwu_generate_text(full_input, system_instruction=None, generation_config=None, thinking_config=None):
+    api_key = (os.getenv('YUNWU_API_KEY') or '').strip()
+    if not api_key:
+        raise Exception('缺少YunWu API密钥')
+    url = f'https://yunwu.ai/v1beta/models/gemini-3-pro-preview:generateContent?key={api_key}'
+    payload = {}
+    if system_instruction:
+        payload['systemInstruction'] = {
+            'parts': [ {'text': system_instruction} ]
+        }
+    payload['contents'] = [
+        {
+            'role': 'user',
+            'parts': [ {'text': full_input or ''} ]
+        }
+    ]
+    if isinstance(generation_config, dict):
+        payload['generationConfig'] = generation_config
+    if isinstance(thinking_config, dict):
+        payload['thinkingConfig'] = thinking_config
+    headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept-Charset': 'utf-8'
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=120)
+    if resp.status_code != 200:
+        body_preview = ''
+        try:
+            body_preview = resp.text[:500]
+        except Exception:
+            pass
+        raise Exception(f'YunWu文本生成失败: HTTP {resp.status_code} body={body_preview}')
+    try:
+        data = resp.json()
+    except Exception as e:
+        raise Exception(f'解析YunWu响应失败: {str(e)}')
+    try:
+        cands = data.get('candidates') or []
+        if cands:
+            parts = (cands[0].get('content') or {}).get('parts') or []
+            texts = []
+            for p in parts:
+                t = p.get('text')
+                if isinstance(t, str) and t:
+                    texts.append(t)
+            if texts:
+                return '\n'.join(texts)
+    except Exception:
+        pass
+    return str(data)
 
 class VideoAnalyzerWeb:
     def __init__(self):
@@ -228,14 +342,17 @@ class VideoAnalyzerWeb:
             analysis_status[task_id] = {"status": "encoding", "progress": 50}
             analysis_status[task_id] = {"status": "analyzing", "progress": 70}
 
-            # 使用本地视频分析方法
-            result = self.analyzer.analyze_video_local(
-                video_path=video_path,
-                text_prompt=text_prompt,
-                model=model,
-                max_tokens=None,  # 不限制token数量
-                stream=False  # Web应用暂时使用非流式以便获取完整结果
-            )
+            # 使用本地视频分析方法（YunWu 或 LaoZhang）
+            if (model or '').strip() == 'YunWu-gemini-2.5-pro':
+                result = yunwu_generate_content_for_video(video_path, text_prompt)
+            else:
+                result = self.analyzer.analyze_video_local(
+                    video_path=video_path,
+                    text_prompt=text_prompt,
+                    model=model,
+                    max_tokens=None,  # 不限制token数量
+                    stream=False  # Web应用暂时使用非流式以便获取完整结果
+                )
 
             analysis_status[task_id] = {"status": "completed", "progress": 100}
             analysis_results[task_id] = {
@@ -380,7 +497,7 @@ def upload_videos():
         files = request.files.getlist('video_files')
         text_prompt = request.form.get('text_prompt', '').strip()
         model = (request.form.get('model') or '').strip()
-        if model not in {"gemini-2.5-flash", "gemini-2.5-pro"}:
+        if model not in {"gemini-2.5-flash", "gemini-2.5-pro", "YunWu-gemini-2.5-pro"}:
             model = "gemini-2.5-flash"
 
         if not files or files[0].filename == '':
@@ -517,7 +634,7 @@ def upload_videos_single():
         file = request.files['video_file']
         text_prompt = request.form.get('text_prompt', '').strip()
         model = (request.form.get('model') or '').strip()
-        if model not in {"gemini-2.5-flash", "gemini-2.5-pro"}:
+        if model not in {"gemini-2.5-flash", "gemini-2.5-pro", "YunWu-gemini-2.5-pro"}:
             model = "gemini-2.5-flash"
 
         # 检查文件名是否为空
@@ -1010,7 +1127,10 @@ def script_generate():
         deepseek_status[task_id] = {"status": "processing", "progress": 50}
 
         try:
-            if model_provider == 'glm-4-long':
+            if model_provider == 'YunWu-gemini-3-pro-preview':
+                full_input = f"{script_prompt}\n\n{combined_input}"
+                result = yunwu_generate_text(full_input)
+            elif model_provider == 'glm-4-long':
                 print(f"[script_generate] task_id={task_id} call glm-4-long")
                 api_key = os.environ.get('BIGMODEL_API_KEY', '').strip()
                 if not api_key:
@@ -1157,7 +1277,10 @@ def script_generate_direct():
         task_id = str(int(time.time() * 1000))
         deepseek_status[task_id] = {"status": "processing", "progress": 50}
         try:
-            if model_provider == 'glm-4-long':
+            if model_provider == 'YunWu-gemini-3-pro-preview':
+                full_input = f"{script_prompt}\n\n{combined_input}"
+                result = yunwu_generate_text(full_input)
+            elif model_provider == 'glm-4-long':
                 api_key = os.environ.get('BIGMODEL_API_KEY', '').strip()
                 if not api_key:
                     raise Exception('缺少GLM-4-Long API密钥')
@@ -2862,7 +2985,10 @@ def episode_narration_retry_one():
         t0 = time.time()
         analyzer = VideoAnalyzer()
         try:
-            result_text = analyzer.analyze_video_local(save_path, prompt, model=model, max_tokens=None, stream=False)
+            if (model or '').strip() == 'YunWu-gemini-2.5-pro':
+                result_text = yunwu_generate_content_for_video(save_path, prompt)
+            else:
+                result_text = analyzer.analyze_video_local(save_path, prompt, model=model, max_tokens=None, stream=False)
             t1 = time.time()
             duration_ms = int((t1 - t0) * 1000)
             res = {'index': index, 'filename': fname, 'success': True, 'result': result_text, 'model': model, 'duration_ms': duration_ms}

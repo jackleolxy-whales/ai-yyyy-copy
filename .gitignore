@@ -213,6 +213,7 @@ logs/
 
 # Local configuration
 config.local
+.env.local
 secrets.json
 *.key
 *.pem

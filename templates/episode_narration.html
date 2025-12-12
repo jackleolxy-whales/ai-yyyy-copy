@@ -120,6 +120,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
               <option value="">默认（gemini-2.5-pro）</option>
               <option value="gemini-2.5-pro" selected>gemini-2.5-pro</option>
               <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+              <option value="YunWu-gemini-2.5-pro">YunWu-gemini-2.5-pro</option>
             </select>
           </div>
           <div class="mb-3">
@@ -177,6 +178,15 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
           uploadBlockEl.classList.add('d-none');
           urlBlockEl.classList.remove('d-none');
         }
+        const yunwuOpt = modelEl.querySelector('option[value="YunWu-gemini-2.5-pro"]');
+        if (yunwuOpt) {
+          if (mode === 'url') {
+            yunwuOpt.disabled = true;
+            if (modelEl.value === 'YunWu-gemini-2.5-pro') modelEl.value = 'gemini-2.5-pro';
+          } else {
+            yunwuOpt.disabled = false;
+          }
+        }
       });
     });
 
@@ -186,6 +196,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
       const files = filesEl.files;
       const prompt = (promptEl.value || '').trim();
       const model = (modelEl.value || '').trim();
+      const effectiveModel = (mode === 'url' && model === 'YunWu-gemini-2.5-pro') ? 'gemini-2.5-pro' : model;
       btnEl.disabled = true;
       statusEl.classList.remove('d-none');
       statusEl.textContent = mode === 'upload' ? '正在上传并分析...' : '正在提交URL并分析...';
@@ -196,7 +207,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
           const fd = new FormData();
           for (let i = 0; i < files.length; i++) fd.append('episode_files', files[i]);
           fd.append('user_prompt', prompt);
-          if (model) fd.append('model', model);
+          if (effectiveModel) fd.append('model', effectiveModel);
           const resp = await fetch('/episode/narration/upload_batch', { method: 'POST', body: fd });
           data = await resp.json();
           if (!data.success) throw new Error(data.error || '上传分析失败');
@@ -207,7 +218,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
           if (!urls.length) { alert('请至少填写一个视频URL'); return; }
           const resp = await fetch('/episode/narration/url_batch', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urls, user_prompt: prompt, model })
+            body: JSON.stringify({ urls, user_prompt: prompt, model: effectiveModel })
           });
           data = await resp.json();
           if (!data.success) throw new Error(data.error || 'URL批量分析失败');
