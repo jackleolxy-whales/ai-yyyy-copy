@@ -281,6 +281,47 @@ def yunwu_generate_text(full_input, system_instruction=None, generation_config=N
         pass
     return str(data)
 
+@app.route('/vercel/blob/upload_url', methods=['POST', 'OPTIONS'])
+def vercel_blob_upload_url():
+    if request.method == 'OPTIONS':
+        return Response(status=200)
+    try:
+        token = (os.getenv('VERCEL_BLOB_RW_TOKEN') or os.getenv('VERCEL_BLOB_TOKEN') or os.getenv('BLOB_READ_WRITE_TOKEN') or '').strip()
+        if not token:
+            return jsonify({'success': False, 'error': '缺少VERCEL_BLOB_RW_TOKEN'}), 400
+        data = request.get_json(silent=True) or {}
+        content_type = (data.get('content_type') or 'application/octet-stream').strip()
+        name = (data.get('filename') or f"upload_{int(time.time()*1000)}").strip()
+        url = 'https://api.vercel.com/v2/blobs/upload-url'
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept-Charset': 'utf-8'
+        }
+        payload = {
+            'contentType': content_type,
+            'token': True,
+            'cacheControlMaxAge': 31536000,
+            'addRandomSuffix': True,
+            'mimeType': content_type,
+            'pathname': name
+        }
+        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        if resp.status_code != 200:
+            body_preview = resp.text[:500]
+            return jsonify({'success': False, 'error': f'Vercel生成上传URL失败: HTTP {resp.status_code} {body_preview}'}), 500
+        j = {}
+        try:
+            j = resp.json()
+        except Exception:
+            pass
+        upload_url = j.get('url') or j.get('uploadURL') or ''
+        if not upload_url:
+            return jsonify({'success': False, 'error': '响应缺少上传URL'}), 500
+        return jsonify({'success': True, 'upload_url': upload_url})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 class VideoAnalyzerWeb:
     def __init__(self):
         self.analyzer = VideoAnalyzer()
@@ -2914,7 +2955,19 @@ def _episode_analyze_url_one(batch_id, index, url, prompt, model):
             st['items'][index]['status'] = 'processing'
         t0 = time.time()
         analyzer = VideoAnalyzer()
-        result_text = analyzer.analyze_video_from_url(url, prompt, model=model, max_tokens=None, stream=False)
+        if (model or '').strip() == 'YunWu-gemini-2.5-pro':
+            tmp_path = None
+            try:
+                tmp_path = _download_to_temp(url)
+                result_text = yunwu_generate_content_for_video(tmp_path, prompt)
+            finally:
+                try:
+                    if tmp_path and os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception:
+                    pass
+        else:
+            result_text = analyzer.analyze_video_from_url(url, prompt, model=model, max_tokens=None, stream=False)
         t1 = time.time()
         duration_ms = int((t1 - t0) * 1000)
         res = {'index': index, 'filename': url, 'success': True, 'result': result_text, 'model': model, 'duration_ms': duration_ms}
@@ -3065,3 +3118,14 @@ def _auth_before_request():
         g.__auth__ = auth
     except Exception:
         pass
+def _download_to_temp(url):
+    tmp_dir = ensure_writable_dir(os.path.join(app.config.get('UPLOAD_FOLDER', 'uploads'), 'tmp'))
+    fname = f"dl_{int(time.time()*1000)}_{abs(hash(url))}.mp4"
+    dst = os.path.join(tmp_dir, fname)
+    r = requests.get(url, stream=True, timeout=60)
+    r.raise_for_status()
+    with open(dst, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                f.write(chunk)
+    return dst

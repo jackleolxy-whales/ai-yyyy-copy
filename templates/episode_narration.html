@@ -60,9 +60,12 @@
           </div>
           <div class="mb-3" id="episodeUploadBlock">
             <label class="form-label">选择视频（可多选）</label>
-            <input class="form-control" type="file" id="episodeFiles" name="episode_files" multiple accept="video/*">
-            <div class="form-text">支持 mp4/avi/mov/wmv/flv/webm/mkv 等格式</div>
+          <input class="form-control" type="file" id="episodeFiles" name="episode_files" multiple accept="video/*">
+          <div class="form-text">支持 mp4/avi/mov/wmv/flv/webm/mkv 等格式</div>
+          <div class="mt-2">
+            <button type="button" class="btn btn-outline-light" id="uploadToBlobBtn">上传到云存储（Vercel Blob）并转为URL</button>
           </div>
+        </div>
           <div class="mb-3 d-none" id="episodeUrlBlock">
             <label class="form-label">输入视频URL（每行一个）</label>
             <textarea class="form-control" id="episodeUrls" rows="6" placeholder="https://example.com/a.mp4\nhttps://example.com/b.mp4"></textarea>
@@ -166,6 +169,7 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
     const resultsEl = document.getElementById('results');
     let elevenVoices = [];
     const btnEl = document.getElementById('submitBtn');
+    const uploadToBlobBtn = document.getElementById('uploadToBlobBtn');
 
     // 模式切换
     [modeUploadEl, modeUrlEl].forEach(r => {
@@ -181,13 +185,88 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
         const yunwuOpt = modelEl.querySelector('option[value="YunWu-gemini-2.5-pro"]');
         if (yunwuOpt) {
           if (mode === 'url') {
-            yunwuOpt.disabled = true;
-            if (modelEl.value === 'YunWu-gemini-2.5-pro') modelEl.value = 'gemini-2.5-pro';
+            const enable = shouldEnableYunWuForUrlMode();
+            yunwuOpt.disabled = !enable;
+            if (!enable && modelEl.value === 'YunWu-gemini-2.5-pro') modelEl.value = 'gemini-2.5-pro';
           } else {
             yunwuOpt.disabled = false;
           }
         }
       });
+    });
+
+    urlsEl.addEventListener('input', () => {
+      if (!modeUrlEl.checked) return;
+      const yunwuOpt = modelEl.querySelector('option[value="YunWu-gemini-2.5-pro"]');
+      if (!yunwuOpt) return;
+      const enable = shouldEnableYunWuForUrlMode();
+      yunwuOpt.disabled = !enable;
+      if (!enable && modelEl.value === 'YunWu-gemini-2.5-pro') modelEl.value = 'gemini-2.5-pro';
+    });
+
+    function isTrustedBlobUrl(u) {
+      return /^https?:\/\/blob\.vercel-storage\.com\//.test(u || '');
+    }
+    function shouldEnableYunWuForUrlMode() {
+      const urls = (urlsEl.value || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (!urls.length) return false;
+      return urls.every(isTrustedBlobUrl);
+    }
+
+    async function getVercelUploadUrl(filename, contentType) {
+      const resp = await fetch('/vercel/blob/upload_url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, content_type: contentType })
+      });
+      const data = await resp.json().catch(async () => ({ success: false, error: await resp.text() }));
+      if (!resp.ok || !data.success) throw new Error(data.error || `HTTP ${resp.status}`);
+      return data.upload_url;
+    }
+    async function uploadFileToBlob(file) {
+      const url = await getVercelUploadUrl(file.name, file.type || 'application/octet-stream');
+      const r = await fetch(url, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+      if (!r.ok) {
+        const txt = await r.text();
+        throw new Error(txt || `上传失败 HTTP ${r.status}`);
+      }
+      const loc = r.headers.get('Location');
+      if (loc) return loc;
+      let j = {};
+      try { j = await r.json(); } catch (e) {}
+      if (j.url) return j.url;
+      throw new Error('上传成功但未返回URL');
+    }
+    uploadToBlobBtn.addEventListener('click', async () => {
+      const files = filesEl.files;
+      if (!files || !files.length) { alert('请先选择本地视频'); return; }
+      uploadToBlobBtn.disabled = true;
+      statusEl.classList.remove('d-none');
+      statusEl.textContent = '正在上传到云存储...';
+      try {
+        const urls = [];
+        for (let i = 0; i < files.length; i++) {
+          const u = await uploadFileToBlob(files[i]);
+          urls.push(u);
+        }
+        const current = (urlsEl.value || '').trim();
+        urlsEl.value = (current ? current + '\n' : '') + urls.join('\n');
+        modeUrlEl.checked = true;
+        modeUploadEl.checked = false;
+        uploadBlockEl.classList.add('d-none');
+        urlBlockEl.classList.remove('d-none');
+        const yunwuOpt = modelEl.querySelector('option[value="YunWu-gemini-2.5-pro"]');
+        if (yunwuOpt) {
+          const enable = shouldEnableYunWuForUrlMode();
+          yunwuOpt.disabled = !enable;
+          if (!enable && modelEl.value === 'YunWu-gemini-2.5-pro') modelEl.value = 'gemini-2.5-pro';
+        }
+        statusEl.textContent = '已转换为URL，可开始分析';
+      } catch (e) {
+        statusEl.classList.add('alert-danger');
+        statusEl.textContent = `上传失败：${e.message}`;
+      } finally {
+        uploadToBlobBtn.disabled = false;
+      }
     });
 
     formEl.addEventListener('submit', async (e) => {
@@ -204,23 +283,54 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
         let data;
         if (mode === 'upload') {
           if (!files || files.length === 0) { alert('请至少选择一个视频文件'); return; }
+          // 前置大小校验：单文件≤100MB，总≤500MB
+          const MB = 1024 * 1024;
+          let total = 0;
+          for (let i = 0; i < files.length; i++) {
+            const sz = files[i].size || 0;
+            total += sz;
+            if (sz > 100 * MB) { alert(`文件过大：${files[i].name} 超过 100MB`); return; }
+          }
+          if (total > 500 * MB) { alert('总大小超过 500MB，请分批上传'); return; }
           const fd = new FormData();
           for (let i = 0; i < files.length; i++) fd.append('episode_files', files[i]);
           fd.append('user_prompt', prompt);
           if (effectiveModel) fd.append('model', effectiveModel);
           const resp = await fetch('/episode/narration/upload_batch', { method: 'POST', body: fd });
-          data = await resp.json();
+          if (!resp.ok) {
+            const txt = await resp.text();
+            if (resp.status === 413) throw new Error('上传内容过大（413）。请减小单文件或总大小。');
+            throw new Error(txt || `HTTP ${resp.status}`);
+          }
+          let parsed;
+          try { parsed = await resp.json(); }
+          catch (e) {
+            const txt = await resp.text();
+            throw new Error(txt || '响应不是有效JSON');
+          }
+          data = parsed;
           if (!data.success) throw new Error(data.error || '上传分析失败');
           statusEl.textContent = `已开始处理，批次ID：${data.batch_id}，共 ${data.total_count} 个文件`;
           initProgressCards(Array.from(files).map(f => f.name));
         } else {
-          const urls = (urlsEl.value || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
-          if (!urls.length) { alert('请至少填写一个视频URL'); return; }
-          const resp = await fetch('/episode/narration/url_batch', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urls, user_prompt: prompt, model: effectiveModel })
-          });
-          data = await resp.json();
+      const urls = (urlsEl.value || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (!urls.length) { alert('请至少填写一个视频URL'); return; }
+      const yunwuAllowed = shouldEnableYunWuForUrlMode();
+      const resp = await fetch('/episode/narration/url_batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls, user_prompt: prompt, model: (yunwuAllowed ? effectiveModel : (effectiveModel === 'YunWu-gemini-2.5-pro' ? 'gemini-2.5-pro' : effectiveModel)) })
+      });
+          if (!resp.ok) {
+            const txt = await resp.text();
+            throw new Error(txt || `HTTP ${resp.status}`);
+          }
+          let parsed;
+          try { parsed = await resp.json(); }
+          catch (e) {
+            const txt = await resp.text();
+            throw new Error(txt || '响应不是有效JSON');
+          }
+          data = parsed;
           if (!data.success) throw new Error(data.error || 'URL批量分析失败');
           statusEl.textContent = `已开始处理，批次ID：${data.batch_id}，共 ${data.total_count} 个URL`;
           initProgressCards(urls);
@@ -774,3 +884,11 @@ Objective: Turn the plot into a juicy, engaging story that fits perfectly within
   </script>
 </body>
 </html>
+    function isTrustedBlobUrl(u) {
+      return /^https?:\/\/blob\.vercel-storage\.com\//.test(u || '');
+    }
+    function shouldEnableYunWuForUrlMode() {
+      const urls = (urlsEl.value || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+      if (!urls.length) return false;
+      return urls.every(isTrustedBlobUrl);
+    }
