@@ -63,6 +63,44 @@ logger = logging.getLogger(__name__)
 packaging_logger = logging.getLogger('video_packaging')
 episode_logger = logging.getLogger('episode_narration')
 
+# Supabase auth integration (loaded early so before_request works in all runtimes)
+SUPABASE_URL = (os.getenv('SUPABASE_URL') or '').strip()
+SUPABASE_ANON_KEY = (os.getenv('SUPABASE_ANON_KEY') or '').strip()
+
+def _validate_supabase_token(token):
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY or not token:
+        return None
+    try:
+        url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/user"
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'apikey': SUPABASE_ANON_KEY
+        }
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+@app.before_request
+def _auth_before_request():
+    try:
+        auth = {'token': None, 'user': None, 'valid': False}
+        h = (request.headers.get('Authorization') or '').strip()
+        token = ''
+        if h.lower().startswith('bearer '):
+            token = h[7:].strip()
+        auth['token'] = token
+        if token:
+            user = _validate_supabase_token(token)
+            if user:
+                auth['user'] = user
+                auth['valid'] = True
+        g.__auth__ = auth
+    except Exception:
+        pass
+
 # 配置文件上传
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024
 
@@ -3099,42 +3137,6 @@ if __name__ == '__main__':
     print("⚠️  确保你的API密钥已正确配置")
 
     app.run(host='0.0.0.0', port=5001, debug=True)
-SUPABASE_URL = (os.getenv('SUPABASE_URL') or '').strip()
-SUPABASE_ANON_KEY = (os.getenv('SUPABASE_ANON_KEY') or '').strip()
-
-def _validate_supabase_token(token):
-    if not SUPABASE_URL or not SUPABASE_ANON_KEY or not token:
-        return None
-    try:
-        url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/user"
-        headers = {
-            'Authorization': f'Bearer {token}',
-            'apikey': SUPABASE_ANON_KEY
-        }
-        r = requests.get(url, headers=headers, timeout=10)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
-    return None
-
-@app.before_request
-def _auth_before_request():
-    try:
-        auth = {'token': None, 'user': None, 'valid': False}
-        h = (request.headers.get('Authorization') or '').strip()
-        token = ''
-        if h.lower().startswith('bearer '):
-            token = h[7:].strip()
-        auth['token'] = token
-        if token:
-            user = _validate_supabase_token(token)
-            if user:
-                auth['user'] = user
-                auth['valid'] = True
-        g.__auth__ = auth
-    except Exception:
-        pass
 def _download_to_temp(url):
     tmp_dir = ensure_writable_dir(os.path.join(app.config.get('UPLOAD_FOLDER', 'uploads'), 'tmp'))
     fname = f"dl_{int(time.time()*1000)}_{abs(hash(url))}.mp4"

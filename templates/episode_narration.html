@@ -659,6 +659,10 @@ You must output **ONLY** a table with three columns.
               expandBtn.type = 'button';
               expandBtn.className = 'btn btn-sm btn-outline-info me-2';
               expandBtn.textContent = '加长文案';
+              const emotionBtn = document.createElement('button');
+              emotionBtn.type = 'button';
+              emotionBtn.className = 'btn btn-sm btn-outline-warning me-2';
+              emotionBtn.textContent = '文案增加情绪';
               const undoBtn = document.createElement('button');
               undoBtn.type = 'button';
               undoBtn.className = 'btn btn-sm btn-outline-secondary me-2';
@@ -746,6 +750,40 @@ You must output **ONLY** a table with three columns.
                 narrationCell.textContent = prev;
                 if (!history.length) undoBtn.disabled = true;
               };
+              emotionBtn.onclick = async () => {
+                const text = (narrationCell.textContent || '').trim();
+                if (!text) return;
+                emotionBtn.disabled = true;
+                const old = emotionBtn.textContent;
+                emotionBtn.innerHTML = '<span class="loading-spinner"></span>增加情绪中...';
+                try {
+                  const prompt = '# Role\n You are an expert Voice Over Director and Sentiment Analyst for short dramas. \n \n # Task \n Your goal is to optimize the provided script lines by adding tone, emotion, or delivery style tags. \n \n 1. Analyze the context and emotional flow of the input text. \n 2. Insert tags in the format [tag] immediately before the relevant sentence or phrase. \n 3. The tags must be English words describing the specific tone (e.g., excited, angry, sarcastic) or delivery style (e.g., whisper, rapid, pause). \n \n # Constraints \n - Output ONLY the processed text with tags. \n - Do NOT output any explanations, introductions, or conversational filler. \n - Do NOT alter the original text content; only add tags. \n \n # Examples \n \n Input: \n Which brings us back to now! Oh my god. He is looking at me. \n \n Output: \n [excited] Which brings us back to now! [surprised] Oh my god. [whisper] He is looking at me. \n \n Input: \n I can\'t believe he actually did that. It\'s over. \n \n Output: \n [angry] I can\'t believe he actually did that. [sad] It\'s over. \n \n # Current Input';
+                  const resp = await fetch('/deepseek/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_result: text, user_prompt: prompt })
+                  });
+                  const data = await resp.json();
+                  if (data && data.success) {
+                    const out = String(data.result || '').trim();
+                    if (out) {
+                      history.push((narrationCell.textContent || '').trim());
+                      undoBtn.disabled = false;
+                      narrationCell.textContent = out;
+                    } else {
+                      alert('增加情绪后的文案为空');
+                    }
+                  } else {
+                    const err = (data && data.error) || '增加情绪失败';
+                    alert(err);
+                  }
+                } catch (e) {
+                  alert('增加情绪错误：' + e.message);
+                } finally {
+                  emotionBtn.disabled = false;
+                  emotionBtn.textContent = old;
+                }
+              };
               genBtn.onclick = async () => {
                 const text = (narrationCell.textContent || '').trim();
                 if (!text) return;
@@ -787,6 +825,7 @@ You must output **ONLY** a table with three columns.
               ttsCell.appendChild(genBtn);
               ttsCell.appendChild(simplifyBtn);
               ttsCell.appendChild(expandBtn);
+              ttsCell.appendChild(emotionBtn);
               ttsCell.appendChild(undoBtn);
               ttsCell.appendChild(audioEl);
               ttsCell.appendChild(dl);
