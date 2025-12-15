@@ -628,6 +628,14 @@ You must output **ONLY** a table with three columns.
         const tables = root.querySelectorAll('table');
         tables.forEach((table) => {
           const rows = table.querySelectorAll('tr');
+          let narrationIdx = 2;
+          try {
+            const headerCells = table.querySelectorAll('tr:first-child th, tr:first-child td');
+            headerCells.forEach((hc, idx) => {
+              const txt = (hc.textContent || '').toLowerCase().trim();
+              if (txt.includes('narration')) narrationIdx = idx;
+            });
+          } catch (_) {}
           rows.forEach((tr, i) => {
             const cells = tr.querySelectorAll('th, td');
             if (!cells || cells.length < 2) return;
@@ -636,8 +644,9 @@ You must output **ONLY** a table with three columns.
               th.textContent = 'TTS';
               tr.appendChild(th);
             } else {
-              const narrationCell = cells[1];
+              const narrationCell = cells[narrationIdx] || cells[cells.length - 1];
               const ttsCell = document.createElement('td');
+              const history = [];
               const genBtn = document.createElement('button');
               genBtn.type = 'button';
               genBtn.className = 'btn btn-sm btn-outline-light me-2';
@@ -646,6 +655,15 @@ You must output **ONLY** a table with three columns.
               simplifyBtn.type = 'button';
               simplifyBtn.className = 'btn btn-sm btn-outline-primary me-2';
               simplifyBtn.textContent = '简化文案';
+              const expandBtn = document.createElement('button');
+              expandBtn.type = 'button';
+              expandBtn.className = 'btn btn-sm btn-outline-info me-2';
+              expandBtn.textContent = '加长文案';
+              const undoBtn = document.createElement('button');
+              undoBtn.type = 'button';
+              undoBtn.className = 'btn btn-sm btn-outline-secondary me-2';
+              undoBtn.textContent = '撤销';
+              undoBtn.disabled = true;
               const audioEl = document.createElement('audio');
               audioEl.controls = true;
               audioEl.style.display = 'none';
@@ -670,6 +688,8 @@ You must output **ONLY** a table with three columns.
                   if (data && data.success) {
                     const simplified = String(data.result || '').trim();
                     if (simplified) {
+                      history.push((narrationCell.textContent || '').trim());
+                      undoBtn.disabled = false;
                       narrationCell.textContent = simplified;
                     } else {
                       alert('简化后的文案为空');
@@ -684,6 +704,47 @@ You must output **ONLY** a table with three columns.
                   simplifyBtn.disabled = false;
                   simplifyBtn.textContent = old;
                 }
+              };
+
+              expandBtn.onclick = async () => {
+                const text = (narrationCell.textContent || '').trim();
+                if (!text) return;
+                expandBtn.disabled = true;
+                const old = expandBtn.textContent;
+                expandBtn.innerHTML = '<span class="loading-spinner"></span>加长中...';
+                try {
+                  const prompt = 'You are a professional script editor for spoken word broadcasts. Objective: Without altering the meaning and tone, expand the input sentence by approximately 10%-15%, adding natural conversational detail while keeping rhythm and style consistent. Output only one expanded English script, without any explanations, annotations, or quotation marks. Input:';
+                  const resp = await fetch('/deepseek/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ video_result: text, user_prompt: prompt })
+                  });
+                  const data = await resp.json();
+                  if (data && data.success) {
+                    const expanded = String(data.result || '').trim();
+                    if (expanded) {
+                      history.push((narrationCell.textContent || '').trim());
+                      undoBtn.disabled = false;
+                      narrationCell.textContent = expanded;
+                    } else {
+                      alert('加长后的文案为空');
+                    }
+                  } else {
+                    const err = (data && data.error) || '加长失败';
+                    alert(err);
+                  }
+                } catch (e) {
+                  alert('加长错误：' + e.message);
+                } finally {
+                  expandBtn.disabled = false;
+                  expandBtn.textContent = old;
+                }
+              };
+              undoBtn.onclick = () => {
+                if (!history.length) return;
+                const prev = history.pop();
+                narrationCell.textContent = prev;
+                if (!history.length) undoBtn.disabled = true;
               };
               genBtn.onclick = async () => {
                 const text = (narrationCell.textContent || '').trim();
@@ -725,6 +786,8 @@ You must output **ONLY** a table with three columns.
               };
               ttsCell.appendChild(genBtn);
               ttsCell.appendChild(simplifyBtn);
+              ttsCell.appendChild(expandBtn);
+              ttsCell.appendChild(undoBtn);
               ttsCell.appendChild(audioEl);
               ttsCell.appendChild(dl);
               tr.appendChild(ttsCell);

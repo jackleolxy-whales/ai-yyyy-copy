@@ -115,7 +115,11 @@ def _episode_analyze_one(batch_id, index, filename, save_path, user_prompt, mode
         t0 = time.time()
         analyzer = VideoAnalyzer()
         if (model or '').strip() == 'YunWu-gemini-2.5-pro':
-            result_text = yunwu_generate_content_for_video(save_path, user_prompt)
+            try:
+                result_text = yunwu_generate_content_for_video(save_path, user_prompt)
+            except Exception:
+                result_text = analyzer.analyze_video_local(save_path, user_prompt, model='gemini-2.5-pro', max_tokens=None, stream=False)
+                model = 'gemini-2.5-pro'
         else:
             result_text = analyzer.analyze_video_local(save_path, user_prompt, model=model, max_tokens=None, stream=False)
         t1 = time.time()
@@ -2155,8 +2159,8 @@ def elevenlabs_voices():
         if explicit:
             api_key = explicit
         if not api_key:
-            print("[elevenlabs_voices] missing api key")
-            return jsonify({"success": False, "error": "缺少ElevenLabs API密钥"}), 400
+            print("[elevenlabs_voices] missing api key; return empty voices for dev")
+            return jsonify({"success": True, "voices": []})
         base_url = 'https://api.elevenlabs.io'
         url = f"{base_url}/v2/voices"
         base_params = {}
@@ -2199,7 +2203,15 @@ def elevenlabs_voices():
                 except Exception:
                     pass
                 print(f"[elevenlabs_voices] error_body={body_preview}")
-                break
+                # graceful fallback: return cache or empty list
+                try:
+                    cached = _voices_cache.get(cache_key)
+                    if cached:
+                        print(f"[elevenlabs_voices] cache_fallback key={cache_key}")
+                        return jsonify({"success": True, "voices": cached['data']})
+                except Exception:
+                    pass
+                return jsonify({"success": True, "voices": []})
             data = resp.json()
             items = data.get('voices') or data.get('items') or []
             for v in items:
@@ -2239,7 +2251,7 @@ def elevenlabs_voices():
             print(f"[elevenlabs_voices] exception={str(e)}")
         except Exception:
             pass
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": True, "voices": []})
 
 @app.route('/elevenlabs/models', methods=['GET'])
 def elevenlabs_models():
@@ -2250,7 +2262,8 @@ def elevenlabs_models():
         if explicit:
             api_key = explicit
         if not api_key:
-            return jsonify({"success": False, "error": "缺少ElevenLabs API密钥"}), 400
+            # provide minimal defaults for dev
+            return jsonify({"success": True, "models": [{"id": "eleven_multilingual_v2", "name": "eleven_multilingual_v2"}]})
         base_url = 'https://api.elevenlabs.io'
         url = f"{base_url}/v1/models"
         cache_key = f"k={bool(api_key)}"
@@ -2277,7 +2290,7 @@ def elevenlabs_models():
                     return jsonify({"success": True, "models": cached['data']})
             except Exception:
                 pass
-            return jsonify({"success": False, "error": f"HTTP {resp.status_code}", "body": body_preview}), 500
+            return jsonify({"success": True, "models": [{"id": "eleven_multilingual_v2", "name": "eleven_multilingual_v2"}]})
         data = resp.json()
         items = []
         try:
@@ -2300,7 +2313,7 @@ def elevenlabs_models():
             pass
         return jsonify({"success": True, "models": models})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": True, "models": [{"id": "eleven_multilingual_v2", "name": "eleven_multilingual_v2"}]})
 
 # 视频包装任务存储
 packaging_tasks = {}
@@ -2959,7 +2972,11 @@ def _episode_analyze_url_one(batch_id, index, url, prompt, model):
             tmp_path = None
             try:
                 tmp_path = _download_to_temp(url)
-                result_text = yunwu_generate_content_for_video(tmp_path, prompt)
+                try:
+                    result_text = yunwu_generate_content_for_video(tmp_path, prompt)
+                except Exception:
+                    result_text = analyzer.analyze_video_from_url(url, prompt, model='gemini-2.5-pro', max_tokens=None, stream=False)
+                    model = 'gemini-2.5-pro'
             finally:
                 try:
                     if tmp_path and os.path.exists(tmp_path):
